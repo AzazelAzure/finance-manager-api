@@ -1,13 +1,25 @@
 # TODO: Add Docstrings
 # TODO: Import and add logging
 
-from finance.models import CurrentAsset, Transaction, UpcomingExpense, Currency, Tag, PaymentSource, Category, AppProfile
+from finance.models import (
+    CurrentAsset,
+    Transaction,
+    UpcomingExpense,
+    Currency,
+    Tag,
+    PaymentSource,
+    Category,
+    AppProfile,
+    FinancialSnapshot,
+)
+
 
 # Set Assets
 def add_asset(**kwargs):
     data = kwargs
     CurrentAsset.objects.create(**data)
     return
+
 
 def update_asset(uid, source, **kwargs):
     asset_instance = CurrentAsset.objects.get(uid=uid, source=source)
@@ -16,10 +28,12 @@ def update_asset(uid, source, **kwargs):
     asset_instance.save()
     return
 
+
 def delete_asset(uid, source):
     asset_instance = CurrentAsset.objects.get(uid=uid, source=source)
     asset_instance.delete()
     return
+
 
 # Set Transactions
 def add_transaction(**kwargs):
@@ -27,17 +41,20 @@ def add_transaction(**kwargs):
     Transaction.objects.create(**data)
     return
 
+
 def update_transaction(uid, tx_id, **kwargs):
-    tx_instance = Transaction.objects.get(uid=uid, tx_id = tx_id)
+    tx_instance = Transaction.objects.get(uid=uid, tx_id=tx_id)
     for key, value in kwargs.items():
         setattr(tx_instance, key, value)
     tx_instance.save()
     return
 
+
 def delete_transaction(uid, tx_id):
     tx_instance = Transaction.objects.get(uid=uid, tx_id=tx_id)
     tx_instance.delete()
     return
+
 
 # Set Expenses
 def add_expense(**kwargs):
@@ -45,12 +62,14 @@ def add_expense(**kwargs):
     UpcomingExpense.objects.create(**data)
     return
 
+
 def update_expense(uid, name, **kwargs):
     exp_instance = UpcomingExpense.objects.get(uid=uid, name=name)
     for key, value in kwargs.items():
         setattr(exp_instance, key, value)
     exp_instance.save()
     return
+
 
 def delete_expense(uid, name):
     exp_instance = UpcomingExpense.objects.get(uid=uid, name=name)
@@ -63,21 +82,25 @@ def add_tag(uid, name):
     Tag.objects.create(uid=uid, name=name)
     return
 
-def update_tag(uid, name,new_name):
+
+def update_tag(uid, name, new_name):
     tag_instance = Tag.objects.get(uid=uid, name=name)
     setattr(tag_instance, name, new_name)
     return
+
 
 def delete_tag(uid, name):
     tag_instance = Tag.objects.get(uid=uid, name=name)
     tag_instance.delete()
     return
 
+
 # Set Currencies
 def add_currency(**kwargs):
     data = kwargs
     Currency.objects.create(**data)
     return
+
 
 def update_currency(uid, code, **kwargs):
     cur_instance = Currency.objects.get(uid=uid, code=code)
@@ -86,16 +109,19 @@ def update_currency(uid, code, **kwargs):
     cur_instance.save()
     return
 
+
 def delete_currency(uid, code):
     cur_instance = Currency.objects.get(uid=uid, code=code)
     cur_instance.delete()
     return
+
 
 # Set Payment Sources
 def add_payment_source(**kwargs):
     data = kwargs
     PaymentSource.objects.create(**data)
     return
+
 
 def update_source(uid, src, **kwargs):
     src_instance = PaymentSource.objects.get(uid=uid, source=src)
@@ -104,16 +130,19 @@ def update_source(uid, src, **kwargs):
     src_instance.save()
     return
 
+
 def delete_source(uid, src):
     src_instance = PaymentSource.objects.get(uid=uid, source=src)
     src_instance.delete()
     return
-    
+
+
 # Set Categories
 def add_category(**kwargs):
     data = kwargs
     Category.objects.create(**data)
     return
+
 
 def update_category(uid, name, **kwargs):
     cat_instance = Category.objects.get(uid=uid, name=name)
@@ -122,28 +151,102 @@ def update_category(uid, name, **kwargs):
     cat_instance.save()
     return
 
+
 def delete_category(uid, name):
     cat_instance = Category.objects.get(uid=uid, name=name)
     cat_instance.delete()
     return
+
 
 # Add User
 def add_user(username):
     AppProfile.objects.create(username=username)
     return
 
+
 def set_user_currency(uid, currency):
     usr_instance = AppProfile.objects.get(uid=uid)
     setattr(usr_instance, usr_instance.base_currency, currency)
     return
 
+
 def delete_user(uid):
-    usr_instance=AppProfile.objects.get(uid=uid)
+    usr_instance = AppProfile.objects.get(uid=uid)
     usr_instance.delete()
     return
+
 
 def user_login(uid, date):
     usr_instance = AppProfile.objects.get(uid=uid)
     setattr(usr_instance, usr_instance.last_login, date)
     return
-    
+
+
+def set_spend_accounts(uid, *args):
+    usr_instance = AppProfile.objects.get(uid=uid)
+    setattr(usr_instance, usr_instance.spend_accounts, args)
+    return
+
+
+# Add Finical Snapshot
+def set_total_assets(uid, total_assets):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_assets, total_assets)
+    finsnap.save()
+    return
+
+
+def set_safe_to_spend(uid, safe_to_spend):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.safe_to_spend, safe_to_spend)
+    finsnap.save()
+    return
+
+
+def set_total_savings(uid, total_savings):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_savings, total_savings)
+    fisnap.save()
+    return
+
+
+def set_total_checking(uid, total_checking):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_checking, total_checking)
+    finsnap.save()
+    return
+
+
+def set_total_investment(uid, total_investment):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_investment, total_investment)
+    finsnap.save()
+    return
+
+
+def set_total_cash(uid, total_cash):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_cash, total_cash)
+    finsnap.save()
+    return
+
+
+def set_total_ewallet(uid, total_ewallet):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_ewallet, total_ewallet)
+    finsnap.save()
+    return
+
+
+def set_total_monthly_spending(uid, total_monthly_spending):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_monthly_spending, total_monthly_spending)
+    finsnap.save()
+    return
+
+
+def set_total_remaining_expenses(uid, total_remaining_expenses):
+    finsnap = FinancialSnapshot.objects.get(uid=uid)
+    setattr(finsnap, finsnap.total_remaining_expenses, total_remaining_expenses)
+    finsnap.save()
+    return
