@@ -37,8 +37,14 @@ def delete_asset(uid, source):
 
 # Set Transactions
 def add_transaction(**kwargs):
+    tags = kwargs.pop("tags")
+    kwargs.pop("is_income")
     data = kwargs
-    Transaction.objects.create(**data)
+    tx = Transaction.objects.create(**data)
+    if tags:
+        tags = [tags.strip() for tags in tags.split(",")]
+        tag_obj = Tag.objects.filter(name__in=tags)
+        tx.tags.set(tag_obj)
     return
 
 
@@ -191,6 +197,5 @@ def set_spend_accounts(uid, *args):
 # Add Finical Snapshot
 def set_total(uid, acc_type, total):
     data = {acc_type: total}
-    FinancialSnapshot.obects.filter(uid=uid).update(**data)
-
+    FinancialSnapshot.objects.filter(uid=uid).update(**data)
     return

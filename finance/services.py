@@ -1,35 +1,25 @@
-import logic.implementors as implement
-import logic.validators as validator
-import logic.updaters as update
+import finance.logic.implementors as implement
+import finance.logic.validators as validator
+import finance.logic.updaters as update
 from django.db import transaction
+from loguru import logger
+from finance.logging_config import logging_config
+logging_config()
 
 
 @transaction.atomic
 @validator.TransactionValidator
-def user_add_transaction(data: dict):
-    implement.add_transaction(**data)
-    update.new_transaction(uid=data["uid"], is_income=data["is_income"])
-    return
-
+def user_add_transaction(uid,data:dict):
+    return _user_add_transaction(uid, data)
 
 @transaction.atomic
-@validator.TransferValidator
-def user_add_transfer(data: list):
-    xfer_out = data[0]
-    xfer_in = data[1]
-    implement.add_transaction(**xfer_out)
-    update.new_transaction(uid=xfer_out["uid"], is_income=False)
-    implement.add_transaction(**xfer_in)
-    update.new_transaction(uid=xfer_in["uid"], is_income=True)
-    return
-
-
-@transaction.atomic
-@validator.TransactionValidator
-def user_add_bulk_transactions(data: list):
+@validator.BulkTransactionValidator
+def user_add_bulk_transactions(uid, data: list):
+    logger.debug(f"Adding bulk transactions: {data}")
     for item in data:
-        user_add_transaction(item)
-    return
+        logger.debug(f"Adding transaction: {item}")
+        _user_add_transaction(uid, item)
+    return {'message':'Bulk transactions added successfully'}
 
 
 @transaction.atomic
@@ -42,3 +32,9 @@ def user_add_asset(data: dict):
 @transaction.atomic
 def user_change_asset(data):
     return
+
+def _user_add_transaction(uid, data):
+    logger.debug(f"Adding transaction: {data} for {uid}")
+    implement.add_transaction(**data)
+    update.new_transaction(uid=uid, is_income=data["is_income"])
+    return {'message': "Transaction added successfully"}

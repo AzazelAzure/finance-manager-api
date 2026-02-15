@@ -1,43 +1,62 @@
 from functools import wraps
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from models import (
-        AppProfile, 
-        Category, 
-        Currency, 
-        Tag, 
-        PaymentSource, 
-        UpcomingExpense, 
-        Transaction, 
-        CurrentAsset, 
-        FinancialSnapshot,
-)
+from finance.models import *
+from loguru import logger
+import finance.logic.grabbers as select
 
+# TODO: Add Docstrings
+# TODO: Add tag validation
+# TODO: Fix _fix_data to pull from models directly
 
 
 def TransactionValidator(func):
     @wraps(func)
     def _wrapped(uid, data:dict):
+        logger.debug(f"Validating transaction: {data} with uid: {uid}")
         _validate_transaction(uid, data)
+        _fix_data(uid, data)
         return func(uid, data)
     return _wrapped
 
-def TransferValidator(func):
+def BulkTransactionValidator(func):
     @wraps(func)
     def _wrapped(uid, data:list):
+        logger.debug(f"Validating bulk transaction: {data} with uid: {uid}")
         for item in data:
+            logger.debug(f"Validating transaction: {item}")
             _validate_transaction(uid, item)
+            _fix_data(uid, item)
         return func(uid, data)
     return _wrapped
 
-
 def _validate_transaction(uid, data:dict):
-    if not Tranasction.objects.filter(uid=uid, data['category']).exists():
+    logger.debug(f"Validating transaction: {data} with uid: {uid}")
+    if not Category.objects.filter(name=data['category'], uid=uid).exists():
+        logger.debug(f"Category does not exist: {data['category']}")
         raise ValidationError("Category does not exist")
-    if not Tranasction.objects.filter(uid=uid, data['source']).exists():
+    if not PaymentSource.objects.filter(source=data['source'],uid=uid).exists():
+        logger.debug(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
-    if not Tranasction.objects.filter(uid=uid, data['currency']).exists():
+    if not Currency.objects.filter(code=data['currency'],uid=uid).exists():
+        logger.debug(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
-    if not Tranasction.objects.filter(uid=uid, data['date']).exists():
+    if not Tag.objects.filter(name=data['tags'], uid=uid).exists():
+        logger.debug(f"Tag does not exist: {data['tags']}.  Creating...")
+        uid_instance = AppProfile.objects.get(user_id=uid)
+        Tag.objects.create(name=data['tags'], uid=uid_instance)
+    if not data.get('date'):
         data['date'] = timezone.now().date()
     return
+
+def _fix_data(uid, data:dict):
+    logger.debug(f"Fixing data for {uid}")
+    categories = select.get_categories(uid=uid)
+    sources = select.get_payment_sources(uid=uid)
+    currencies = select.get_currencies(uid=uid)
+    user = select.get_user(uid=uid)
+    data['category'] = categories.get(name=data['category'])
+    data['source'] = sources.get(source=data['source'])
+    data['currency'] = currencies.get(code=data['currency'])
+    data['uid'] = user.get(user_id=uid)
+    return data

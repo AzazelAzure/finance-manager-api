@@ -11,7 +11,7 @@ from finance.models import (
     PaymentSource,
     FinancialSnapshot,
 )
-from django_utils import timezone
+from django.utils import timezone
 
 
 # Get Assets
@@ -101,6 +101,9 @@ def get_currency_names(uid):
 
 
 # Get Payment Sources
+def get_payment_sources(uid):
+    return PaymentSource.objects.filter(uid=uid)
+
 def get_sources(uid):
     return PaymentSource.objects.filter(uid=uid).values("source")
 
@@ -114,13 +117,14 @@ def get_uid(username):
     profile = AppProfile.objects.filter(user__username=username)
     return profile.user_id
 
+def get_user(uid):
+    return AppProfile.objects.filter(user_id=uid)
 
 def get_base_currency(uid):
-    return AppProfile.objects.get(uid=uid).get_base_currency
-
+    return AppProfile.objects.get(user_id=uid).base_currency
 
 def get_spend_accounts(uid):
-    return AppProfile.objects.filter(uid=uid).values_list("spend_accounts", flat=True)
+    return AppProfile.objects.filter(user_id=uid).values_list("spend_accounts__acc_type", flat=True)
 
 
 # Get Snapshot Info

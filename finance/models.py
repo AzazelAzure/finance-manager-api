@@ -11,13 +11,12 @@ class AppProfile(models.Model):
     username = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     last_login = models.DateField(null=True, blank=True)
-    spend_accounts = models.ManyToManyField("finance.source.PaymentSource", blank=True)
+    spend_accounts = models.ManyToManyField("PaymentSource", blank=True)
     base_currency = models.ForeignKey(
         "finance.Currency",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        default="USD",
     )
 
     def __str__(self):
@@ -41,7 +40,7 @@ class Category(models.Model):
     cat_type = models.CharField(max_length=10, choices=CatType.choices)
 
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.name} ({self.get_cat_type_display()})"
@@ -52,12 +51,12 @@ class Currency(models.Model):
         verbose_name_plural = "Currencies"
         ordering = ["code"]
 
-    code = models.CharField(max_length=3, unique=True, editable=False)
-    name = models.CharField(max_length=50)
-    symbol = models.CharField(max_length=5, default="₱")
+    code = models.CharField(max_length=3, unique=True, default="USD")
+    name = models.CharField(max_length=50, default="USD")
+    symbol = models.CharField(max_length=5, default="$")
 
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.code} ({self.symbol})"
@@ -65,6 +64,7 @@ class Currency(models.Model):
 
 class Tag(models.Model):
     name = models.CharField(max_length=200, unique=True)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
@@ -85,7 +85,7 @@ class PaymentSource(models.Model):
     acc_type = models.CharField(max_length=10, choices=AccType.choices)
 
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.source} ({self.AccType})"
@@ -109,9 +109,9 @@ class UpcomingExpense(models.Model):
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     paid_flag = models.BooleanField(default=False)
-    expense_id = models.AutoField(primary_key=False)
+    expense_id = models.AutoField(primary_key=True)
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     # This is the "State Machine" field
     status = models.CharField(
@@ -151,11 +151,11 @@ class Transaction(models.Model):
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
-    entry_id = models.AutoField(primary_key=False, db_index=True)
+    entry_id = models.AutoField(primary_key=True, db_index=True)
     tx_id = models.CharField(max_length=20, unique=True, editable=False)
 
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     class TxType(models.TextChoices):
         EXPENSE = (
@@ -195,10 +195,10 @@ class CurrentAsset(models.Model):
 
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
-    currency = models.ForeignKey("code.Currency", on_delete=models.PROTECT)
+    currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
 
     # User dependancy
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.source.source} ({self.amount})"
@@ -218,7 +218,7 @@ class FinancialSnapshot(models.Model):
     total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2)
     total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2)
     total_leaks = models.DecimalField(max_digits=15, decimal_places=2)
-    uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
+    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"
