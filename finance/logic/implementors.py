@@ -192,4 +192,5 @@ def set_spend_accounts(uid, *args):
 def set_total(uid, acc_type, total):
     data = {acc_type: total}
     FinancialSnapshot.obects.filter(uid=uid).update(**data)
+
     return

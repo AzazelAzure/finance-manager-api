@@ -146,6 +146,7 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     # Link to relationship models
+
     category = models.ForeignKey("Category", on_delete=models.PROTECT)
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
@@ -178,6 +179,9 @@ class Transaction(models.Model):
             day_suffix = timezone.now().year
             unique_id = str(uuid.uuid4())[:8].upper()
             self.tx_id = f"{day_suffix}-{unique_id}"
+
+        if not self.date:
+            self.date = timezone.now().date()
 
         super().save(*args, **kwargs)
 
