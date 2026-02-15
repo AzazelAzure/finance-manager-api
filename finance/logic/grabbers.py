@@ -1,5 +1,4 @@
 # TODO: Add Docstrings
-# TODO: Rename file
 
 from finance.models import (
     CurrentAsset,
@@ -70,6 +69,10 @@ def get_expense(uid, name):
     return UpcomingExpense.objects.filter(uid=uid, name=name)
 
 
+def get_expense_by_id(uid, expense_id):
+    return UpcomingExpense.objects.filter(uid=uid, expense_id=expense_id)
+
+
 # Get Tags
 def get_tags(uid):
     return Tag.objects.filter(uid=uid)
@@ -121,40 +124,13 @@ def get_spend_accounts(uid):
 
 
 # Get Snapshot Info
-def get_total_assets(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_assets
-
-
-def get_safe_to_spend(uid):
-    return FinancialSnapshot.objects.get(uid=uid).safe_to_spend
-
-
-def get_total_savings(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_savings
-
-
-def get_total_checking(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_checking
-
-
-def get_total_investment(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_investment
-
-
-def get_total_cash(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_cash
-
-
-def get_total_ewallet(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_ewallet
-
-
-def get_total_monthly_spending(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_monthly_spending
-
-
-def get_total_remaining_expenses(uid):
-    return FinancialSnapshot.objects.get(uid=uid).total_remaining_expenses
+def get_total_acc(uid, acc_type):
+    field_name = f"total_{acc_type}"
+    return (
+        FinancialSnapshot.objects.filter(uid=uid)
+        .values_list(field_name, flat=True)
+        .first()
+    )
 
 
 def get_full_snapshot(uid):

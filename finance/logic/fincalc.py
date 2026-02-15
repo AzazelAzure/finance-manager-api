@@ -81,6 +81,40 @@ def calc_spending_total(transactions_queryset, base_currency):
     return total.quantize(Decimal("0.01"))
 
 
+def calc_new_balance(uid, source, amount):
+    old_balance = select.get_asset(uid, source).values_list("amount", flat=True).first()
+    new_balance = old_balance - amount
+    return new_balance
+
+
+def calc_total_assets(uid, base_currency):
+    assets = select.get_all_assets(uid)
+    asset_by_currency = assets.values("currency").annotate(total=Sum("amount"))
+    asset_total = 0
+    for item in asset_by_currency:
+        if item["currency"] != base_currency:
+            asset_total += _convert_currency(
+                item["currency"], base_currency, item["total"]
+            )
+        else:
+            asset_total += item["total"] or Decimal("0")
+    return asset_total.quantize(Decimal("0.01"))
+
+
+def calc_asset_type(uid, base_currency, acc_type):
+    asset = select.get_type(uid, acc_type)
+    asset_by_currency = asset.values("currency").annotate(total=Sum("amount"))
+    asset_total = 0
+    for item in asset_by_currency:
+        if item["currency"] != base_currency:
+            asset_total += _convert_currency(
+                item["currency"], base_currency, item["total"]
+            )
+        else:
+            asset_total += item["total"] or Decimal("0")
+    return asset_total.quantize(Decimal("0.01"))
+
+
 def _convert_currency(from_code, to_code, amount):
     if amount is None:
         return 0

@@ -13,7 +13,11 @@ class AppProfile(models.Model):
     last_login = models.DateField(null=True, blank=True)
     spend_accounts = models.ManyToManyField("finance.source.PaymentSource", blank=True)
     base_currency = models.ForeignKey(
-        "finance.Currency", on_delete=models.SET_NULL, null=True, blank=True
+        "finance.Currency",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default="USD",
     )
 
     def __str__(self):
@@ -105,7 +109,7 @@ class UpcomingExpense(models.Model):
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     paid_flag = models.BooleanField(default=False)
-
+    expense_id = models.AutoField(primary_key=False)
     # User dependancy
     uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
 
@@ -146,7 +150,7 @@ class Transaction(models.Model):
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
-    entry_id = models.AutoField(primary_key=False)
+    entry_id = models.AutoField(primary_key=False, db_index=True)
     tx_id = models.CharField(max_length=20, unique=True, editable=False)
 
     # User dependancy
@@ -209,7 +213,8 @@ class FinancialSnapshot(models.Model):
     total_ewallet = models.DecimalField(max_digits=15, decimal_places=2)
     total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2)
     total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2)
+    total_leaks = models.DecimalField(max_digits=15, decimal_places=2)
     uid = models.ForeignKey("user_id.AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}"
+        return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"

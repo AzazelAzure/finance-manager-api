@@ -189,64 +189,7 @@ def set_spend_accounts(uid, *args):
 
 
 # Add Finical Snapshot
-def set_total_assets(uid, total_assets):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_assets, total_assets)
-    finsnap.save()
-    return
-
-
-def set_safe_to_spend(uid, safe_to_spend):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.safe_to_spend, safe_to_spend)
-    finsnap.save()
-    return
-
-
-def set_total_savings(uid, total_savings):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_savings, total_savings)
-    fisnap.save()
-    return
-
-
-def set_total_checking(uid, total_checking):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_checking, total_checking)
-    finsnap.save()
-    return
-
-
-def set_total_investment(uid, total_investment):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_investment, total_investment)
-    finsnap.save()
-    return
-
-
-def set_total_cash(uid, total_cash):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_cash, total_cash)
-    finsnap.save()
-    return
-
-
-def set_total_ewallet(uid, total_ewallet):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_ewallet, total_ewallet)
-    finsnap.save()
-    return
-
-
-def set_total_monthly_spending(uid, total_monthly_spending):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_monthly_spending, total_monthly_spending)
-    finsnap.save()
-    return
-
-
-def set_total_remaining_expenses(uid, total_remaining_expenses):
-    finsnap = FinancialSnapshot.objects.get(uid=uid)
-    setattr(finsnap, finsnap.total_remaining_expenses, total_remaining_expenses)
-    finsnap.save()
+def set_total(uid, acc_type, total):
+    data = {acc_type: total}
+    FinancialSnapshot.obects.filter(uid=uid).update(**data)
     return
