@@ -11,6 +11,6 @@ class TransactionSerializer(serializers.Serializer):
     category = serializers.CharField()
     source = serializers.CharField()
     currency = serializers.CharField(max_length=3)
-    tags = serializers.CharField(required=False)
+    tags = serializers.ListField(required=False)
     tx_type = serializers.CharField(max_length=10)
     is_income = serializers.BooleanField(required=False)

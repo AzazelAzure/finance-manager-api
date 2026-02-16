@@ -4,10 +4,12 @@
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
+from finance.managers import *
 import uuid
 
 
 class AppProfile(models.Model):
+    objects = AppProfileManager.as_manager()
     username = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     last_login = models.DateField(null=True, blank=True)
@@ -27,7 +29,7 @@ class Category(models.Model):
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ["name"]
-
+    objects = CategoryManager.as_manager()
     # Sets the overarching category types
     class CatType(models.TextChoices):
         BILL = "BILL", "Recurring Bill"
@@ -50,7 +52,7 @@ class Currency(models.Model):
     class Meta:
         verbose_name_plural = "Currencies"
         ordering = ["code"]
-
+    objects = CurrencyManager.as_manager()
     code = models.CharField(max_length=3, unique=True, default="USD")
     name = models.CharField(max_length=50, default="USD")
     symbol = models.CharField(max_length=5, default="$")
@@ -65,12 +67,13 @@ class Currency(models.Model):
 class Tag(models.Model):
     name = models.CharField(max_length=200, unique=True)
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
-
+    objects = TagManager()
     def __str__(self):
         return self.name
 
 
 class PaymentSource(models.Model):
+    objects = PaymentSourceManager.as_manager()
     class Meta:
         verbose_name_plural = "Payment Sources"
 
@@ -93,6 +96,7 @@ class PaymentSource(models.Model):
 
 class UpcomingExpense(models.Model):
     # The 'choices' class acts as our internal logic guard
+    objects = UpcomingExpenseManager.as_manager()
 
     class Meta:
         ordering = ["due_date"]
@@ -137,13 +141,15 @@ class UpcomingExpense(models.Model):
 
 
 class Transaction(models.Model):
+    objects = TransactionManager.as_manager()
+
     class Meta:
         ordering = ["date"]
 
     # Hard Coded Requirements
     date = models.DateField()
     description = models.CharField(max_length=200, null=True, blank=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     # Link to relationship models
 
@@ -166,9 +172,13 @@ class Transaction(models.Model):
             "INCOME",
             "Income",
         )
-        TRANSFER = (
-            "XFER",
-            "Transfer",
+        TRANSFER_IN = (
+            "XFER_IN",
+            "Transfer In",
+        )
+        TRANSFER_OUT = (
+            "XFER_OUT",
+            "Transfer Out",
         )
 
     tx_type = models.CharField(max_length=10, choices=TxType.choices)
@@ -190,11 +200,13 @@ class Transaction(models.Model):
 
 
 class CurrentAsset(models.Model):
+    objects = CurrentAssetManager.as_manager()
+
     class Meta:
         verbose_name_plural = "Current Assets"
 
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
-    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
 
     # User dependancy
@@ -205,20 +217,22 @@ class CurrentAsset(models.Model):
 
 
 class FinancialSnapshot(models.Model):
+    objects = FinancialSnapshotManager.as_manager()
     class Meta:
         verbose_name_plural = "Financial Snapshot"
 
-    total_assets = models.DecimalField(max_digits=15, decimal_places=2)
-    safe_to_spend = models.DecimalField(max_digits=15, decimal_places=2)
-    total_savings = models.DecimalField(max_digits=15, decimal_places=2)
-    total_checking = models.DecimalField(max_digits=15, decimal_places=2)
-    total_investment = models.DecimalField(max_digits=15, decimal_places=2)
-    total_cash = models.DecimalField(max_digits=15, decimal_places=2)
-    total_ewallet = models.DecimalField(max_digits=15, decimal_places=2)
-    total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2)
-    total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2)
-    total_leaks = models.DecimalField(max_digits=15, decimal_places=2)
+    total_assets = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    safe_to_spend = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_savings = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_checking = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_investment = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_cash = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_ewallet = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_leaks = models.DecimalField(max_digits=15, decimal_places=2, default=0)  
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"
+
