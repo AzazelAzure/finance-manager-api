@@ -32,11 +32,9 @@ def BulkTransactionValidator(func):
 def UserValidator(func):
     @wraps(func)
     def _wrapped(uid, data:dict):
-        logger.debug(f"Validating user: {data} with uid: {uid}")
-        uid_user = AppProfile.objects.filter(user_id=uid).values_list("username", flat=True).first()
-        valid = AppProfile.objects.filter(username= uid_user, user_id=uid).exists()
-        if not valid:
-            raise ValidationError("Incorreect User")
+        logger.debug(f"Validating user with uid: {uid}")
+        if not AppProfile.objects.filter(user_id=uid).exists():
+            raise ValidationError("User does not exist")
         return func(uid, data)
     return _wrapped
 
