@@ -90,6 +90,33 @@ class PaymentSource(models.Model):
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
+    def save(self, *args, **kwargs):
+        """
+        Automatically create a CurrentAsset when a PaymentSource is created.
+        This ensures every PaymentSource has a corresponding asset tracking its balance.
+        """
+        created = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if created:
+            # Get the user's base currency (should always exist)
+            base_currency = self.uid.base_currency
+            if not base_currency:
+                # Fallback: get first currency for user if base_currency not set
+                base_currency = Currency.objects.filter(uid=self.uid).first()
+            
+            if base_currency:
+                # Create CurrentAsset with initial amount of 0
+                # User can update the amount later via user_add_asset or transactions
+                CurrentAsset.objects.get_or_create(
+                    source=self,
+                    defaults={
+                        'amount': 0,
+                        'currency': base_currency,
+                        'uid': self.uid
+                    }
+                )
+
     def __str__(self):
         return f"{self.source} ({self.AccType})"
 

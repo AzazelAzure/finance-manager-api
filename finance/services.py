@@ -29,8 +29,43 @@ def user_add_bulk_transactions(uid, data: list):
 
 
 @transaction.atomic
-def user_add_asset(data: dict):
-    update.rebalance(uid=data["uid"], acc_type=data["source"])
+@validator.UserValidator
+def user_add_bulk_assets(uid, data: list):
+    logger.debug(f"Adding bulk assets: {data}")
+    for item in data:
+        logger.debug(f"Adding asset: {item}")
+        user_add_asset(uid, item)
+    return
+
+
+@transaction.atomic
+@validator.AssetValidator
+@validator.UserValidator
+def user_add_asset(uid, data: dict):
+    """
+    Update the amount for an existing CurrentAsset.
+    Since CurrentAsset is automatically created when PaymentSource is created,
+    this function updates the existing asset rather than creating a new one.
+    """
+    logger.debug(f"Updating asset: {data}")
+    # Convert string references to objects (similar to _fix_data for transactions)
+    source_obj = PaymentSource.objects.for_user(uid).get_by_source(source=data['source']).get()
+    currency_obj = Currency.objects.filter(code=data['currency'], uid=uid).get()
+    
+    # Update or create the asset (should already exist due to automatic creation)
+    asset, created = CurrentAsset.objects.update_or_create(
+        source=source_obj,
+        uid=AppProfile.objects.for_user(uid).get(),
+        defaults={
+            'amount': data['amount'],
+            'currency': currency_obj
+        }
+    )
+    
+    if created:
+        logger.info(f"Created missing CurrentAsset for source {source_obj.source}")
+    
+    update.rebalance(uid=uid, acc_type=asset.source.acc_type)
     return
 
 
