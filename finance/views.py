@@ -17,3 +17,36 @@ class TransactionView(APIView):
                 data=serializer.data,
                 uid=request.user.appprofile.user_id)
         return Response(result, status=200)
+
+    def get_transactions(self, request):
+        result = svc.user_get_transactions(
+            uid=request.user.appprofile.user_id)
+        return Response(result, status=200)
+
+    def get_transaction(self, request, tx_id: str):
+        result = svc.user_get_transaction(
+            uid=request.user.appprofile.user_id,
+            tx_id=tx_id)
+        return Response(result, status=200)
+
+    def put(self, request, tx_id: str):
+        result = svc.user_update_transaction(
+            uid=request.user.appprofile.user_id,
+            tx_id=tx_id,
+            data=request.data)
+        return Response(result, status=200)
+
+    def delete(self, request, tx_id: str):
+        result = svc.user_delete_transaction(
+            uid=request.user.appprofile.user_id,
+            tx_id=tx_id)
+        return Response(result, status=200)
+
+class AssetView(APIView):
+    def post(self, request):
+        serializer = AssetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = svc.user_add_asset(
+            data=serializer.data,
+            uid=request.user.appprofile.user_id)
+        return Response(result, status=200)

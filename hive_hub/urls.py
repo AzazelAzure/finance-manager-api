@@ -21,5 +21,9 @@ from finance.views import TransactionView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("test/", TransactionView.as_view(), name="transaction")
+    path("finance/transaction/new_transaction/", TransactionView.as_view(), name="transaction")
+    path("finance/transaction/get_transactions/", TransactionView.as_view(), name="transaction")
+    path("finance/transaction/get_transaction/<str:tx_id>/", TransactionView.as_view(), name="transaction")
+    path("finance/transaction/update_transaction/<str:tx_id>/", TransactionView.as_view(), name="transaction")
+    path("finance/transaction/delete_transaction/<str:tx_id>/", TransactionView.as_view(), name="transaction")
 ]

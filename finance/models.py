@@ -29,6 +29,9 @@ class Category(models.Model):
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'uid'], name='unique_category_per_user')
+        ]
     objects = CategoryManager.as_manager()
     # Sets the overarching category types
     class CatType(models.TextChoices):
@@ -38,8 +41,10 @@ class Category(models.Model):
         XFER = "XFER", "Transfer"
 
     # Ensure the category doesn't already exists.
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     cat_type = models.CharField(max_length=10, choices=CatType.choices)
+
+
 
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
@@ -52,8 +57,11 @@ class Currency(models.Model):
     class Meta:
         verbose_name_plural = "Currencies"
         ordering = ["code"]
+        constraints = [
+            models.UniqueConstraint(fields=['code', 'uid', 'name', 'symbol'], name='unique_currency_per_user')
+        ]
     objects = CurrencyManager.as_manager()
-    code = models.CharField(max_length=3, unique=True, default="USD")
+    code = models.CharField(max_length=3, default="USD")
     name = models.CharField(max_length=50, default="USD")
     symbol = models.CharField(max_length=5, default="$")
 
@@ -65,7 +73,11 @@ class Currency(models.Model):
 
 
 class Tag(models.Model):
-    name = models.CharField(max_length=200, unique=True)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'uid'], name='unique_tag_per_user')
+        ]
+    name = models.CharField(max_length=200, )
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
     objects = TagManager()
     def __str__(self):
@@ -76,6 +88,9 @@ class PaymentSource(models.Model):
     objects = PaymentSourceManager.as_manager()
     class Meta:
         verbose_name_plural = "Payment Sources"
+        constraints = [
+            models.UniqueConstraint(fields=['source', 'uid'], name='unique_source_per_user')
+        ]
 
     class AccType(models.TextChoices):
         SAVINGS = "SAVINGS", "Savings"
@@ -84,7 +99,7 @@ class PaymentSource(models.Model):
         INVESTMENT = "INVESTMENT", "Investment"
         EWALLET = "EWALLET", "Mobile Wallet"
 
-    source = models.CharField(max_length=50, unique=True)
+    source = models.CharField(max_length=50)
     acc_type = models.CharField(max_length=10, choices=AccType.choices)
 
     # User dependancy
@@ -127,6 +142,9 @@ class UpcomingExpense(models.Model):
 
     class Meta:
         ordering = ["due_date"]
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'uid'], name='unique_upcoming_expense_per_user')
+        ]
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
@@ -134,7 +152,7 @@ class UpcomingExpense(models.Model):
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
 
-    name = models.CharField(max_length=200, unique=True)
+    name = models.CharField(max_length=200)
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2)
     due_date = models.DateField(null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -172,7 +190,9 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ["date"]
-
+        constraints = [
+            models.UniqueConstraint(fields=['tx_id', 'uid'], name='unique_transaction_per_user')
+        ]
     # Hard Coded Requirements
     date = models.DateField()
     description = models.CharField(max_length=200, null=True, blank=True)
@@ -185,7 +205,7 @@ class Transaction(models.Model):
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
     entry_id = models.AutoField(primary_key=True, db_index=True)
-    tx_id = models.CharField(max_length=20, unique=True, editable=False)
+    tx_id = models.CharField(max_length=20, editable=False)
 
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
@@ -232,7 +252,7 @@ class CurrentAsset(models.Model):
     class Meta:
         verbose_name_plural = "Current Assets"
 
-    source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
+    source = models.OneToOneField("PaymentSource", on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
 
@@ -258,7 +278,7 @@ class FinancialSnapshot(models.Model):
     total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_leaks = models.DecimalField(max_digits=15, decimal_places=2, default=0)  
-    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
+    uid = models.OneToOneField("AppProfile", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"

@@ -3,22 +3,14 @@ from finance.models import *
 from loguru import logger
 
 
-def new_transaction(uid):
-    tx = Transaction.objects.for_user(uid).get_latest(uid)
-    logger.debug(f"Transaction: {tx}")
+def transaction_updated(uid, tx_id: str):
+    tx = Transaction.objects.filter(uid=uid, tx_id=tx_id).get()
     tx_amount = tx.amount
     tx_source = tx.source.source
-    logger.debug(f'tx_source: {tx_source}.  tx_amount: {tx_amount}. tx currency: {tx.currency}')
     multiplier = -1 if tx.tx_type in ["INCOME", "XFER_IN"] else 1
-    adjusted_amount = tx_amount * multiplier
-    balance = fc.calc_new_balance(uid, tx_source, adjusted_amount)
-    logger.warning(f'Changed balance to: {balance} from: {CurrentAsset.objects.filter(uid=uid, source=tx.source).get().amount} for: {tx.source.source}')
-    CurrentAsset.objects.filter(uid=uid, source=tx.source).update(amount=balance)
-    logger.warning(f'Amount after balance change: {CurrentAsset.objects.filter(uid=uid, source=tx.source).get().amount}')
+    _recalc_asset_amount(uid, tx.source, tx_amount, multiplier)
     rebalance(uid, tx.source)
-    logger.warning(f'Rebalanced {tx.source.source}.  Total assets: {FinancialSnapshot.objects.for_user(uid).get_totals("ASSETS")}, total checking: {FinancialSnapshot.objects.for_user(uid).get_totals("CHECKING")}, total savings: {FinancialSnapshot.objects.for_user(uid).get_totals("SAVINGS")}')
     return
-
 
 def rebalance(uid, acc_type=None):
     logger.debug(f"Rebalancing {uid} with acc_type {acc_type}")
@@ -34,7 +26,7 @@ def rebalance(uid, acc_type=None):
 def _recalc_sts(uid, base_currency):
     logger.debug(f"Recalculating safe to spend for {uid}")
     spend_accounts = AppProfile.objects.for_user(uid).get_spend_accounts(uid)
-    logger.debug(f"Spend accounts: {spend_accounts} Base currency: {base_currency}")
+    logger.debug(f"Spend accounts: {spend_asset.uidaccounts} Base currency: {base_currency}")
     spend_accounts = tuple(spend_accounts)
     sts = fc.calc_sts(uid, base_currency, spend_accounts)
     logger.warning(f"Changed safe to spend to: {sts}")
@@ -63,3 +55,13 @@ def _recalc_leaks(uid, base_currency):
     leaks = fc.calc_leaks(uid, base_currency)
     FinancialSnapshot.objects.filter(uid=uid).update(total_leaks=leaks)
     return
+
+def _recalc_asset_amount(uid, source, amount, multiplier):
+    logger.debug(f"Recalculating asset amount for {uid} with source {source} and amount {amount}")
+    asset = CurrentAsset.objects.filter(uid=uid, source=source).get()
+    new_amount = amount * multiplier
+    new_balance = fc.calc_new_balance(uid, source, new_amount)
+    asset.amount = new_balance
+    asset.save()
+    return
+

@@ -14,3 +14,7 @@ class TransactionSerializer(serializers.Serializer):
     tags = serializers.ListField(required=False)
     tx_type = serializers.CharField(max_length=10)
     is_income = serializers.BooleanField(required=False)
+
+class AssetSerializer(serializers.Serializer):
+    source = serializers.CharField()
+    currency = serializers.CharField(max_length=3)
