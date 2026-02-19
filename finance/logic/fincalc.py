@@ -35,7 +35,7 @@ def calc_sts(uid, types_to_include: tuple = ('CASH,')):
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     logger.debug(f"Calculating sts for {uid} with base currency {base_currency} for types {types_to_include}")
     spendable = CurrentAsset.objects.for_user(uid).get_by_type(*types_to_include)
-    debts = UpcomingExpense.objects.for_user(uid).get_total_remaining()
+    debts = UpcomingExpense.objects.for_user(uid).get_by_remaining()
     spend_by_currency = spendable.values("currency__code").annotate(total=Sum("amount"))
     debt_by_currency = debts.values("currency__code").annotate(total=Sum("estimated_cost"))
     spend = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), spend_by_currency))
@@ -59,28 +59,11 @@ def calc_leaks(uid):
     xfer_total = xfer_in_total - xfer_out_total
     return Decimal(xfer_total).quantize(Decimal("0.01"))
 
-def calc_monthly_spending_total(uid):
+def calc_queryset(uid, queryset):
+    logger.debug(f"Calculating total for {queryset}")
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
-    tx = Transaction.objects.for_user(uid).get_current_month()
-    total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), tx))
-    return Decimal(total).quantize(Decimal("0.01"))
-
-def calc_all_spending_total(uid):
-    base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
-    tx = Transaction.objects.for_user(uid).all()
-    total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), tx))
-    return Decimal(total).quantize(Decimal("0.01"))
-
-def calc_total_by_type(uid, tx_type):
-    base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
-    tx = Transaction.objects.for_user(uid).get_by_tx_type(tx_type)
-    total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), tx))
-    return Decimal(total).quantize(Decimal("0.01"))
-
-def calc_total_by_period(uid, start_date, end_date):
-    base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
-    tx = Transaction.objects.for_user(uid).get_by_period(start_date, end_date)
-    total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), tx))
+    total_by_currency = queryset.values("currency__code").annotate(total=Sum("amount"))
+    total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), total_by_currency))
     return Decimal(total).quantize(Decimal("0.01"))
 
 def calc_new_balance(uid, source, amount):

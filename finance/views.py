@@ -18,15 +18,29 @@ class TransactionView(APIView):
                 uid=request.user.appprofile.user_id)
         return Response(result, status=200)
 
-    def get_all_transactions(self, request):
-        result = svc.user_get_transactions(
-            uid=request.user.appprofile.user_id)
-        return Response(result, status=200)
+    def get(self, request, tx_id: str = None):
+        uid = request.user.appprofile.user_id
+        
+        if tx_id: # If tx_id is provided in the URL path, get a single transaction
+            result = svc.user_get_transaction(uid=uid, tx_id=tx_id)
+            return Response(result, status=200)
+        
+        # Otherwise, handle dynamic filtering for a list of transactions
+        filter_params = {
+            'tx_type': request.query_params.get('tx_type'),
+            'tag_name': request.query_params.get('tag_name'),
+            'category': request.query_params.get('category'),
+            'source': request.query_params.get('source'),
+            'currency_code': request.query_params.get('currency_code'),
+            'start_date': request.query_params.get('start_date'),
+            'end_date': request.query_params.get('end_date'),
+            'current_month': request.query_params.get('current_month'), # Check for presence, e.g., ?current_month=true
+        }
+        
+        # Remove None values to avoid passing them to the service function if not provided
+        filter_params = {k: v for k, v in filter_params.items() if v is not None}
 
-    def get_transaction(self, request, tx_id: str):
-        result = svc.user_get_transaction(
-            uid=request.user.appprofile.user_id,
-            tx_id=tx_id)
+        result = svc.user_get_transactions(uid=uid, **filter_params)
         return Response(result, status=200)
 
     def put(self, request, tx_id: str):

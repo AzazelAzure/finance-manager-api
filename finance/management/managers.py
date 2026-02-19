@@ -18,6 +18,18 @@ class TransactionManager(models.QuerySet):
         return self.filter(tx_type=tx_type).all()
     def get_tx(self, tx_id):
         return self.get(tx_id=tx_id)
+    def get_by_tag_name(self, tag_name):
+        return self.filter(tags__name=tag_name)
+    def get_by_category(self, cat_name):
+        return self.filter(category__name=cat_name)
+    def get_by_source(self, source):
+        return self.filter(source__source=source)
+    def get_by_currency(self, code):
+        return self.filter(currency__code=code)
+    def get_by_month(self, month, year):
+        return self.filter(date__month=month, date__year=year)
+    def get_by_year(self, year):
+        return self.filter(date__year=year)
     
 class CurrentAssetManager(models.QuerySet):
     def for_user(self, uid):
@@ -34,7 +46,7 @@ class UpcomingExpenseManager(models.QuerySet):
         today = timezone.now().date()
         first_of_month = today.replace(day=1)
         return self.filter(due_date__range=[first_of_month, today])
-    def get_total_remaining(self):
+    def get_by_remaining(self):
         return self.filter(
             paid_flag=False, 
             status="ACTIVE",
@@ -50,6 +62,10 @@ class UpcomingExpenseManager(models.QuerySet):
         return self.filter(status=status)
     def get_expenseid(self, name):
         return self.get(name=name).expense_id
+    def get_by_paid_flag(self, paid_flag):
+        return self.filter(paid_flag=paid_flag)
+    def get_by_recurring(self, recurring):
+        return self.filter(is_recurring=recurring)
 
 class TagManager(models.QuerySet):
     def for_user(self, uid):
