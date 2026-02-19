@@ -2,7 +2,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import AppProfile, FinancialSnapshot, Currency, PaymentSource
+from finance.models import AppProfile, FinancialSnapshot, Currency, PaymentSource
 from loguru import logger
 
 @receiver(post_save, sender=User)

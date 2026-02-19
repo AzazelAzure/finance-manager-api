@@ -3,7 +3,7 @@ from rest_framework import status
 from django.urls import reverse
 from finance.models import *
 from django.contrib.auth.models import User
-from finance.factories import *
+from finance.tests.factories import *
 from loguru import logger
 
 class TransactionTestCase(APITestCase):

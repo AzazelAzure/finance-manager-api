@@ -1,8 +1,10 @@
 asgiref==3.11.0
-currency.converter==0.5.5
+Babel==2.14.0
+currencyconverter==0.18.14
 Django==6.0.1
 djangorestframework==3.16.1
 loguru==0.7.3
+pycountry==22.3.5
 setuptools==80.9.0
 sqlparse==0.5.5
 tzdata==2025.3

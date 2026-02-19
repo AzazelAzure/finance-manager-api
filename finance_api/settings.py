@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
-from finance.logging_config import logging_config
+from finance.management.logging_config import logging_config
 
 
 

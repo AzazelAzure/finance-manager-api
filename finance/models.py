@@ -3,7 +3,7 @@
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
-from finance.managers import *
+from finance.management.managers import *
 import uuid
 
 
