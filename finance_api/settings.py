@@ -59,7 +59,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "hive_hub.urls"
+ROOT_URLCONF = "finance_api.urls"
 
 TEMPLATES = [
     {
@@ -76,7 +76,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "hive_hub.wsgi.application"
+WSGI_APPLICATION = "finance_api.wsgi.application"
 
 
 # Database
