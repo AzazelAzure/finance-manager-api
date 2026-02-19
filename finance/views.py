@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import TransactionSerializer
+from .serializers import TransactionSerializer, SourceSerializer, AssetSerializer
 import finance.services as svc
 
 class TransactionView(APIView):
@@ -18,7 +18,7 @@ class TransactionView(APIView):
                 uid=request.user.appprofile.user_id)
         return Response(result, status=200)
 
-    def get_transactions(self, request):
+    def get_all_transactions(self, request):
         result = svc.user_get_transactions(
             uid=request.user.appprofile.user_id)
         return Response(result, status=200)

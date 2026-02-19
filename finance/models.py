@@ -1,4 +1,3 @@
-# TODO: Migrate new tables once user requirement is done.
 # TODO: Create Docstrings
 
 from django.db import models
@@ -58,15 +57,14 @@ class Currency(models.Model):
         verbose_name_plural = "Currencies"
         ordering = ["code"]
         constraints = [
-            models.UniqueConstraint(fields=['code', 'uid', 'name', 'symbol'], name='unique_currency_per_user')
+            models.UniqueConstraint(
+                fields=['code', 'name', 'symbol'],
+                name='unique_currency_per_code'
+            )
         ]
-    objects = CurrencyManager.as_manager()
     code = models.CharField(max_length=3, default="USD")
     name = models.CharField(max_length=50, default="USD")
-    symbol = models.CharField(max_length=5, default="$")
-
-    # User dependancy
-    uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
+    symbol = models.CharField(max_length=5, default="$", null=True, blank=True)
 
     def __str__(self):
         return f"{self.code} ({self.symbol})"
@@ -164,7 +162,7 @@ class UpcomingExpense(models.Model):
 
     # This is the "State Machine" field
     status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.PENDING
+        max_length=10, choices=Status.choices, default=Status.ACTIVE
     )
 
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
@@ -282,4 +280,3 @@ class FinancialSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"
-

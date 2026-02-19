@@ -15,7 +15,9 @@ class TransactionManager(models.QuerySet):
     def get_tx_id(self, entry_id):
         return self.get(entry_id=entry_id).tx_id
     def get_by_tx_type(self, tx_type):
-        return self.filter(tx_type=tx_type)
+        return self.filter(tx_type=tx_type).all()
+    def get_tx(self, tx_id):
+        return self.get(tx_id=tx_id)
     
 class CurrentAssetManager(models.QuerySet):
     def for_user(self, uid):
@@ -23,7 +25,7 @@ class CurrentAssetManager(models.QuerySet):
     def get_by_type(self, *args):
         return self.filter(source__acc_type__in=args)
     def get_asset(self, *args):
-        return self.filter(source__source__in=args)
+        return self.get(source__source__in=args)
 
 class UpcomingExpenseManager(models.QuerySet):
     def for_user(self, uid):
@@ -46,6 +48,8 @@ class UpcomingExpenseManager(models.QuerySet):
         return self.filter(expense_id=expense_id)
     def get_by_status(self, status):
         return self.filter(status=status)
+    def get_expenseid(self, name):
+        return self.get(name=name).expense_id
 
 class TagManager(models.QuerySet):
     def for_user(self, uid):
@@ -58,12 +62,6 @@ class CategoryManager(models.QuerySet):
         return self.filter(cat_type=cat_type)
     def get_by_name(self, name):
         return self.filter(name=name)
-
-class CurrencyManager(models.QuerySet):
-    def for_user(self, uid):
-        return self.filter(uid=uid)
-    def get_by_code(self, code):
-        return self.filter(code=code)
 
 class PaymentSourceManager(models.QuerySet):
     def for_user(self, uid):
