@@ -14,12 +14,13 @@ from finance.models import Transaction, Tag, UpcomingExpense
 def user_get_transactions(uid,**kwargs):
     """
     Retrieves a list of transactions for a user with dynamic filtering and ordering.
+    if no tx_type is set, will return sum for all tx_type.
 
     :param uid: The user id.
     :type uid: str
     :param kwargs: A dictionary of filters and ordering options.
     :type kwargs: dict
-    :returns: A dictionary with the transactions and the total amount. If no tx_type is set, will return sum for all tx_type.
+    :returns: {'transactions': queryset, 'amount': decimal amount}
     :rtype: dict
     """
     
@@ -64,7 +65,7 @@ def user_add_transaction(uid,data:dict):
     :type uid: str
     :param data: The data for the transaction.
     :type data: dict
-    :returns: A dictionary with a message indicating the transaction was added successfully.
+    :returns: {'message': "Transaction added successfully"}
     :rtype: dict
     """
     return _user_add_transaction(uid, data)
@@ -80,7 +81,7 @@ def user_add_bulk_transactions(uid, data: list):
     :type uid: str
     :param data: A list of dictionaries representing the transactions to add.
     :type data: list
-    :returns: A dictionary with a message indicating the transactions were added successfully.
+    :returns: {'message': "Bulk transactions added successfully"}
     :rtype: dict
     """
     logger.debug(f"Adding bulk transactions: {data}")
@@ -103,7 +104,7 @@ def user_update_transaction(uid, tx_id: str, data: dict):
     :type tx_id: str
     :param data: The data to update the transaction with.
     :type data: dict
-    :returns: A dictionary with a message indicating the transaction was updated successfully.
+    :returns: {'message': "{tx_id} updated successfully"}
     :rtype: dict
     """
     logger.debug(f"Updating transaction: {data}")
@@ -131,7 +132,7 @@ def user_delete_transaction(uid, tx_id: str):
     :type uid: str
     :param tx_id: The transaction id to delete.
     :type tx_id: str
-    :returns: A dictionary with a message indicating the transaction was deleted successfully.
+    :returns: {'message': "Deleted {tx_id} successfully"}
     :rtype: dict
     """
     logger.debug(f"Deleting transaction: {tx_id}")
@@ -155,7 +156,7 @@ def user_get_transaction(uid, tx_id: str):
     :type uid: str
     :param tx_id: The transaction id to retrieve.
     :type tx_id: str
-    :returns: A dictionary with the transaction data.
+    :returns: {'transaction': queryset}
     :rtype: dict
     """
     logger.debug(f"Getting transaction: {tx_id} for {uid}")
