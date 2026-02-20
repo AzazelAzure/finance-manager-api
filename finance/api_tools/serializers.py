@@ -13,6 +13,7 @@ class TransactionSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     tags = serializers.ListField(required=False)
     tx_type = serializers.CharField(max_length=10)
+    bill = serializers.CharField(max_length=200, required=False)
 
 class AssetSerializer(serializers.Serializer):
     source = serializers.CharField()

@@ -34,14 +34,6 @@ class PaymentSourceFactory(factory.django.DjangoModelFactory):
     source = factory.Faker("word")
     acc_type = factory.Faker("random_element", elements=("SAVINGS", "CHECKING", "CASH", "INVESTMENT", "EWALLET"))
 
-class CategoryFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = Category
-
-    uid = factory.SubFactory(AppProfileFactory)
-    name = factory.Faker("word")
-    cat_type = factory.Faker("random_element", elements=("BILL", "DAILY", "INCOME", "XFER"))
-
 class TagFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Tag
@@ -56,7 +48,6 @@ class TransactionFactory(factory.django.DjangoModelFactory):
     date = factory.Faker("date")
     description = factory.Faker("sentence")
     amount = factory.Faker("random_int", min=100, max=1000)
-    category = factory.SubFactory(CategoryFactory, uid=factory.SelfAttribute('..uid'))
     source = factory.SubFactory(PaymentSourceFactory, uid=factory.SelfAttribute('..uid'))
     currency = factory.SubFactory(CurrencyFactory, uid=factory.SelfAttribute('..uid'))
     tx_type = factory.Faker("random_element", elements=("EXPENSE", "INCOME"))

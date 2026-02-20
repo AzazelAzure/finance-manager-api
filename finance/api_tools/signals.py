@@ -1,12 +1,30 @@
-from django.db.models.signals import post_save
+"""
+This module handles all signal receivers for the finance manager application.
+"""
+
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.utils import timezone
-from finance.models import AppProfile, FinancialSnapshot, Currency, PaymentSource
+from dateutil.relativedelta import relativedelta
+from finance.models import (
+    Transaction, 
+    CurrentAsset, 
+    AppProfile, 
+    FinancialSnapshot, 
+    Currency, 
+    PaymentSource,
+    UpcomingExpense
+)
 from loguru import logger
 
 @receiver(post_save, sender=User)
 def create_user(sender, instance, created, **kwargs):
+    """
+    Signal receiver for user creation.
+    Creates a new AppProfile and FinancialSnapshot for the user.
+    Automatically creates a default currency and default payment source.
+    """
     if created:
         logger.debug(f"Creating user: {instance}")
         instance.appprofile = AppProfile.objects.create(username=instance)
@@ -20,8 +38,27 @@ def create_user(sender, instance, created, **kwargs):
         logger.debug(f"Created user: {instance}.  User: {instance.appprofile}.  Base currency: {default_currency}. Default source: {default_source}")
         return
     else:
+        # If not new creation, update the user's last login time
         instance.appprofile = AppProfile.objects.get(username=instance)
         instance.appprofile.last_login = timezone.now()
         instance.appprofile.save()
         logger.debug(f"Updating user: {instance}")
         return
+    
+@receiver(post_save, sender=UpcomingExpense)
+def update_monthly(sender, instance, **kwargs):
+    """
+    Signal receiver for UpcomingExpenses.
+    Updates the due date of recurring expenses and resets paid flag.
+    """
+    instance.appprofile = AppProfile.objects.get(username=instance)
+    uid = instance.appprofile.user_id
+    expenses = UpcomingExpense.objects.for_user(uid).get_by_paid_flag(True).get_by_recurring(True)
+    # Update expenses if they exist
+    if expenses:
+        for expense in expenses:
+            if  expense.due_date <= timezone.now().date():
+                expense.due_date = expense.due_date + relativedelta(months=1)
+                expense.paid_flag = False
+                expense.save()
+    return

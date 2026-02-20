@@ -21,8 +21,6 @@ from finance.views import TransactionView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # Consolidated endpoint for transactions
     path("finance/transactions/", TransactionView.as_view(), name="transactions_list_create"), # Handles GET (list with filters) and POST (new transaction)
     path("finance/transactions/<str:tx_id>/", TransactionView.as_view(), name="transaction_detail_update_delete"), # Handles GET (single), PUT, DELETE
-    # Removed redundant paths that are now covered by the consolidated endpoints
 ]

@@ -1,7 +1,6 @@
 from django.contrib import admin
-from .models import Category, Currency, Tag, UpcomingExpense, PaymentSource, Transaction, CurrentAsset, AppProfile
+from .models import Currency, Tag, UpcomingExpense, PaymentSource, Transaction, CurrentAsset, AppProfile
 # Register your models here.
-admin.site.register(Category)
 admin.site.register(Currency)
 admin.site.register(Tag)
 admin.site.register(UpcomingExpense)

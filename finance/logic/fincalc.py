@@ -12,7 +12,6 @@ from finance.models import (
     AppProfile
 )
 from django.db.models import Sum
-from django.utils import timezone
 from django.conf import settings
 from currency_converter import CurrencyConverter
 from decimal import Decimal
@@ -25,17 +24,17 @@ def calc_sts(uid, types_to_include: tuple = ('CASH,')):
     """
     Calculates 'safe to spend' totals by aggregating specific source types.
 
-    Args:
-        uid: Required to linking accounts to user profile.
-        base_currency: Base currency code to normalize totals to.
-        types_to_include (tuple): String identifiers for source types to include.
-    Returns:
-        Decimal difference between spendable total and debt total.
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :param types_to_include: String identifiers for source types to include.
+    :type types_to_include: tuple
+    :returns: Decimal difference between spendable total and debt total.
+    :rtype: Decimal
     """
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     logger.debug(f"Calculating sts for {uid} with base currency {base_currency} for types {types_to_include}")
     spendable = CurrentAsset.objects.for_user(uid).get_by_type(*types_to_include)
-    debts = UpcomingExpense.objects.for_user(uid).get_by_remaining()
+    debts = UpcomingExpense.objects.for_user(uid).get_current_month()
     spend_by_currency = spendable.values("currency__code").annotate(total=Sum("amount"))
     debt_by_currency = debts.values("currency__code").annotate(total=Sum("estimated_cost"))
     spend = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), spend_by_currency))
@@ -47,7 +46,11 @@ def calc_sts(uid, types_to_include: tuple = ('CASH,')):
 def calc_leaks(uid):
     """
     Calculates leaks for transfers to monitor fees.
-    Returns aggregate sum on xfers or 0
+    
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :returns: Aggregate sum on xfers or 0 if none.
+    :rtype: Decimal
     """
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     xfers_in = Transaction.objects.for_user(uid).get_by_tx_type("XFER_IN")
@@ -60,6 +63,16 @@ def calc_leaks(uid):
     return Decimal(xfer_total).quantize(Decimal("0.01"))
 
 def calc_queryset(uid, queryset):
+    """
+    Calculates the total amount for a queryset.
+
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :param queryset: The queryset to calculate the total for.
+    :type queryset: QuerySet
+    :returns: The total amount for the queryset.
+    :rtype: Decimal
+    """
     logger.debug(f"Calculating total for {queryset}")
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     total_by_currency = queryset.values("currency__code").annotate(total=Sum("amount"))
@@ -67,6 +80,18 @@ def calc_queryset(uid, queryset):
     return Decimal(total).quantize(Decimal("0.01"))
 
 def calc_new_balance(uid, source, amount):
+    """
+    Calculates the new balance for a source.
+
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :param source: The source to calculate the balance for.
+    :type source: str
+    :param amount: The amount to subtract from the balance.
+    :type amount: Decimal
+    :returns: The new balance for the source.
+    :rtype: Decimal
+    """
     logger.debug(f"Calculating new balance for {source} with amount {amount}")
     old_balance = CurrentAsset.objects.filter(uid=uid, source__source=source).values_list("amount", flat=True).first()
     logger.debug(f"Old balance: {old_balance}")
@@ -76,6 +101,14 @@ def calc_new_balance(uid, source, amount):
 
 
 def calc_total_assets(uid):
+    """
+    Calculates the total assets for a user.
+
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :returns: The total assets for the user.
+    :rtype: Decimal
+    """
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     logger.debug(f"Calculating total assets for {uid} with base currency {base_currency}")
     assets = CurrentAsset.objects.filter(uid=uid)
@@ -87,6 +120,16 @@ def calc_total_assets(uid):
 
 
 def calc_asset_type(uid, acc_type):
+    """
+    Calculates the total assets for a specific account type.
+
+    :param uid: Required to linking accounts to user profile.
+    :type uid: str
+    :param acc_type: The account type to calculate the total for.
+    :type acc_type: str
+    :returns: The total assets for the account type.
+    :rtype: Decimal
+    """
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     logger.debug(f"Calculating asset type {acc_type} for {uid} with base currency {base_currency}")
     asset = CurrentAsset.objects.filter(uid=uid, source__acc_type=acc_type)

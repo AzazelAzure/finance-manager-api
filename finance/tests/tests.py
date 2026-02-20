@@ -10,7 +10,6 @@ class TransactionTestCase(APITestCase):
     def setUp(self):
         self.user = UserFactory()
         self.profile = self.user.appprofile
-        self.category = CategoryFactory.create(uid=self.profile)
         self.source = PaymentSourceFactory.create(uid=self.profile)
         self.currency = self.profile.base_currency
         self.asset = CurrentAssetFactory.create(uid=self.profile, source=self.source, currency=self.currency)
@@ -27,7 +26,6 @@ class TransactionTestCase(APITestCase):
             uid=self.profile, 
             tx_type='EXPENSE',
             currency=self.currency,
-            category=self.category,
             source=self.source,
             )
         
@@ -36,7 +34,6 @@ class TransactionTestCase(APITestCase):
             "date": tx.date,
             "description": tx.description,
             "amount": tx.amount,
-            "category": tx.category.name, 
             "source": tx.source.source,     
             "currency": tx.currency.code,
             "tx_type": tx.tx_type,
@@ -53,7 +50,6 @@ class TransactionTestCase(APITestCase):
             uid=self.profile, 
             tx_type='INCOME',
             currency=self.currency,
-            category=self.category,
             source=self.source,
             )
         data = {
@@ -61,7 +57,6 @@ class TransactionTestCase(APITestCase):
             "date": tx.date,
             "description": tx.description,
             "amount": tx.amount,
-            "category": tx.category.name,
             "source": tx.source.source,
             "currency": tx.currency.code,
             "tx_type": tx.tx_type,
@@ -79,7 +74,6 @@ class TransactionTestCase(APITestCase):
             "date": "2023-01-01",
             "description": "Test Transaction",
             "amount": 'test', # Invalid type
-            "category": "Test Category",
             "source": "Invalid Source", 
             "currency": "USD",
             "tags": "Test Tag",
@@ -95,14 +89,12 @@ class TransactionTestCase(APITestCase):
             uid=self.profile, 
             tx_type='XFER_OUT',
             currency=self.currency,
-            category=self.category,
             source=self.source,
             )
         tx_in = TransactionFactory.build(
             uid=self.profile, 
             tx_type='XFER_IN',
             currency=self.currency,
-            category=self.category,
             source=self.source,
             )
         
@@ -112,7 +104,6 @@ class TransactionTestCase(APITestCase):
                 "date": tx_out.date,
                 "description": tx_out.description,
                 "amount": tx_out.amount,
-                "category": tx_out.category.name,
                 "source": tx_out.source.source,
                 "currency": tx_out.currency.code,
                 "tx_type": tx_out.tx_type,
@@ -123,7 +114,6 @@ class TransactionTestCase(APITestCase):
                 "date": tx_in.date,
                 "description": tx_in.description,
                 "amount": tx_in.amount,
-                "category": tx_in.category.name,
                 "source": tx_in.source.source,
                 "currency": tx_in.currency.code,
                 "tx_type": tx_in.tx_type,

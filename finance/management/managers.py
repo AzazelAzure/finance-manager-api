@@ -1,3 +1,6 @@
+"""
+This module defines all managers for the finance manager application.
+"""
 from django.db import models
 from django.utils import timezone
 
@@ -47,37 +50,25 @@ class UpcomingExpenseManager(models.QuerySet):
         first_of_month = today.replace(day=1)
         return self.filter(due_date__range=[first_of_month, today])
     def get_by_remaining(self):
-        return self.filter(
-            paid_flag=False, 
-            status="ACTIVE",
-            due_date__lte=timezone.now().date()
-        )
+        return self.filter(paid_flag=False)
     def get_expenses_by_period(self, start_date, end_date):
         return self.filter(date__range=[start_date, end_date])
     def get_expense(self, name):
         return self.filter(name=name)
     def get_expense_by_id(self, expense_id):
         return self.filter(expense_id=expense_id)
-    def get_by_status(self, status):
-        return self.filter(status=status)
     def get_expenseid(self, name):
         return self.get(name=name).expense_id
     def get_by_paid_flag(self, paid_flag):
         return self.filter(paid_flag=paid_flag)
     def get_by_recurring(self, recurring):
         return self.filter(is_recurring=recurring)
+    def get_all_upcoming(self):
+        return self.filter(due_date__lte=timezone.now().date())
 
 class TagManager(models.QuerySet):
     def for_user(self, uid):
         return self.filter(uid=uid)
-
-class CategoryManager(models.QuerySet):
-    def for_user(self, uid):
-        return self.filter(uid=uid)
-    def get_by_type(self, cat_type):
-        return self.filter(cat_type=cat_type)
-    def get_by_name(self, name):
-        return self.filter(name=name)
 
 class PaymentSourceManager(models.QuerySet):
     def for_user(self, uid):
