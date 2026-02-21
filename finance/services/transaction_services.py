@@ -132,7 +132,7 @@ def update_transaction(uid, tx_id: str, data: dict):
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
     tx.update(**data)
     if data.get('bill'):
-        expense = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill'])
+        expense = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill']).get()
         expense_month = expense.due_date
         expense_month.replace(day=1)
         if expense_month >= timezone.now().date():

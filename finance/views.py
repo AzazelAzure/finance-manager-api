@@ -58,13 +58,13 @@ from .api_tools.serializers import (
         summary="Update a transaction",
         description="Updates an existing transaction identified by its ID.",
         request=TransactionSerializer,
-        responses={status.HTTP_200_OK: TransactionSerializer},
+        responses={status.HTTP_200_OK: TransactionSerializer(many=True)},
         tags=["Transactions"]
     ),
     delete=extend_schema(
         summary="Delete a transaction",
         description="Deletes an existing transaction identified by its ID.",
-        responses={status.HTTP_200_OK: TransactionSerializer},
+        responses={status.HTTP_200_OK: TransactionSerializer(many=True)},
         tags=["Transactions"]
     )
 )
@@ -81,7 +81,8 @@ class TransactionView(APIView):
             result = tx_svc.add_transaction(
                 data=serializer.data,
                 uid=request.user.appprofile.user_id)
-        return Response(result, status=status.HTTP_201_CREATED)
+        serializer = TransactionSerializer(result['added'], many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def get(self, request, tx_id: str = None):
         uid = request.user.appprofile.user_id
@@ -117,14 +118,14 @@ class TransactionView(APIView):
             uid=request.user.appprofile.user_id,
             tx_id=tx_id,
             data=request.data)
-        serializer = TransactionSerializer(result['updated'])
+        serializer = TransactionSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, tx_id: str):
         result = tx_svc.user_delete_transaction(
             uid=request.user.appprofile.user_id,
             tx_id=tx_id)
-        serializer = TransactionSerializer(data=result['deleted'])
+        serializer = TransactionSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 # Asset View
@@ -145,7 +146,7 @@ class TransactionView(APIView):
         summary="Update an asset",
         description="Updates an existing asset identified by its source. Source passed in must exist in PaymentSources, or will raise Validation error.",
         request=AssetSerializer,
-        responses={status.HTTP_200_OK: AssetSerializer},
+        responses={status.HTTP_200_OK: AssetSerializer(many=True)},
         tags=["Assets"]
     ),
     delete=extend_schema(
@@ -165,7 +166,7 @@ class AssetView(APIView):
             serializer = AssetSerializer(result['asset'], many=True)
         else:
             result = asset_svc.get_asset(uid=request.user.appprofile.user_id, source=source)
-            serializer = AssetSerializer(result['assets'])
+            serializer = AssetSerializer(result['assets'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, source: str):
@@ -201,13 +202,13 @@ class AssetView(APIView):
         summary="Update a payment source",
         description="Updates an existing payment source identified by its source.",
         request=SourceSerializer,
-        responses={status.HTTP_200_OK: SourceSerializer},
+        responses={status.HTTP_200_OK: SourceSerializer(many=True)},
         tags=["Sources"]
     ),
     delete=extend_schema(
         summary="Delete a payment source",
         description="Deletes an existing payment source identified by its source.",
-        responses={status.HTTP_200_OK: SourceSerializer},
+        responses={status.HTTP_200_OK: SourceSerializer(many=True)},
         tags=["Sources"]
     )
 )
@@ -221,13 +222,12 @@ class SourceView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-            serializer = SourceSerializer(result['added'], many=True)
         else:
             result = src_svc.add_source(
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-            serializer = SourceSerializer(result['added'])
+        serializer = SourceSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request):
@@ -240,7 +240,7 @@ class SourceView(APIView):
             uid=request.user.appprofile.user,
             data=request.data
         )
-        serializer = SourceSerializer(result['updated'])
+        serializer = SourceSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def delete(self, request):
@@ -248,7 +248,7 @@ class SourceView(APIView):
             uid=request.user.appprofile.user,
             source=request.data['source']
         )
-        serializer = SourceSerializer(result['deleted'])
+        serializer = SourceSerializer(result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 # Upcoming Expense View
@@ -279,20 +279,20 @@ class SourceView(APIView):
             OpenApiParameter(name='remaining', type=OpenApiTypes.BOOL, description='Filter by remaining'),
             OpenApiParameter(name='upcoming', type=OpenApiTypes.BOOL, description='Filter by upcoming'),
         ],
-        responses={status.HTTP_200_OK: SpectacularExpenseSerializer},
+        responses={status.HTTP_200_OK: SpectacularExpenseSerializer(many=True)},
         tags=["Upcoming Expenses"]
     ),
     put=extend_schema(
         summary="Update an expense",
         description="Updates an existing expense identified by its name.",
         request=ExpenseSerializer,
-        responses={status.HTTP_200_OK: ExpenseSerializer},
+        responses={status.HTTP_200_OK: ExpenseSerializer(many=True)},
         tags=["Upcoming Expenses"]
     ),
     delete=extend_schema(
         summary="Delete an expense",
         description="Deletes an existing expense identified by its name.",
-        responses={status.HTTP_200_OK: ExpenseSerializer},
+        responses={status.HTTP_200_OK: ExpenseSerializer(many=True)},
         tags=["Upcoming Expenses"]
     )
 )
@@ -306,13 +306,12 @@ class UpcomingExpenseView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-            serializer = ExpenseSerializer(result['added'], many=True)
         else:
             result = exp_svc.add_expense(
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-            serializer = ExpenseSerializer(result['added'])
+        serializer = ExpenseSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request, name: str = None):
@@ -363,7 +362,7 @@ class UpcomingExpenseView(APIView):
                     "Allows for multiple tags to be created at once."
                     "Tags are automatically generated when a transaction is created if a tag is assigned and not found.",
         request=TagSerializer,
-        responses={status.HTTP_201_CREATED: TagSerializer},
+        responses={status.HTTP_201_CREATED: TagSerializer(many=True)},
         tags=["Tags"]
     ),
     get=extend_schema(
@@ -376,13 +375,13 @@ class UpcomingExpenseView(APIView):
         summary="Update a tag",
         description="Updates an existing tag identified by its name.",
         request=TagSerializer,
-        responses={status.HTTP_200_OK: TagSerializer},
+        responses={status.HTTP_200_OK: TagSerializer(many=True)},
         tags=["Tags"]
     ),
     delete=extend_schema(
         summary="Delete a tag",
         description="Deletes an existing tag identified by its name.",
-        responses={status.HTTP_200_OK: TagSerializer},
+        responses={status.HTTP_200_OK: TagSerializer(many=True)},
         tags=["Tags"]
     )
 )
@@ -401,7 +400,7 @@ class TagView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-        serializer = TagSerializer(result['added'])
+        serializer = TagSerializer(result['added'],many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request):
@@ -438,7 +437,7 @@ class TagView(APIView):
     get=extend_schema(
         summary="Retrieve app profile",
         description="Retrieves the spend accounts and base currency for a user.",
-        responses={status.HTTP_200_OK: AppProfileSerializer},
+        responses={status.HTTP_200_OK: AppProfileSerializer(many=True)},
         tags=["App Profiles"]
     ),
     put=extend_schema(
@@ -463,10 +462,10 @@ class AppProfileView(APIView):
         uid = request.user.appprofile.user_id
         if snapshot:
             result = user_svc.user_get_totals(uid=uid)
-            serializer = SnapshotSerializer(result)
+            serializer = SnapshotSerializer(result, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         result = user_svc.user_get_info(uid=uid)
-        serializer = AppProfileSerializer(result)
+        serializer = AppProfileSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def put(self, request, base_currency: str=None, spend_accounts: list=None):

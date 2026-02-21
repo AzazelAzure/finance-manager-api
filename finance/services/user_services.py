@@ -68,7 +68,6 @@ def user_get_info(uid: str):
     base_currency = AppProfile.objects.for_user(uid).get_base_currency()
     return {'spend_accounts': spend_accounts, 'base_currency': base_currency}
 
-
 @transaction.atomic
 @validator.UserValidator
 def user_update_base_currency(uid: str, data: dict):
@@ -91,10 +90,9 @@ def user_update_base_currency(uid: str, data: dict):
         logger.debug(f"Currency does not exist: {data['code']}")
         raise ValidationError("Currency does not exist")
     # Update base currency
-    user.base_currency = data['code']
+    user.base_currency = Currency.objects.filter(code=data['code']).first()
     user.save()
     return {'base_currency': user.base_currency, 'message': "Base currency updated successfully"}
-
 
 # Data Getterss
 @validator.UserValidator
