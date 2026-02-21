@@ -40,12 +40,10 @@ def logging_config():
         "<level>{message}</level>"
     )
 
-    # Console sink.
-    # To stop logs from appearing in the terminal later (for example in prod),
-    # either remove this line or wrap it in an environment check, e.g.:
-    #   if os.getenv("DEBUG", "false").lower() == "true":
-    #       logger.add(sys.stderr, format=base_fmt, level=os.getenv("LOG_LEVEL", "INFO"))
-    logger.add(sys.stderr, format=base_fmt, level=os.getenv("LOG_LEVEL", "INFO"))
+
+    if os.getenv("DEBUG", "false").lower() == "true":
+        logger.add(sys.stderr, format=base_fmt, level=os.getenv("LOG_LEVEL", "INFO"))
+
 
     logger.add(
         config["DEBUG"],

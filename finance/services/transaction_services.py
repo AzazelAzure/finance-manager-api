@@ -22,7 +22,11 @@ from finance.models import Transaction, Tag, UpcomingExpense
 def get_transactions(uid,**kwargs):
     """
     Retrieves a list of transactions for a user with dynamic filtering and ordering.
-    if no tx_type is set, will return sum for all tx_type.
+    If no tx_type is set, will return sum for all tx_type.
+    If month is set with no year, will return transactions for current month.
+    If start_date is set with no end_date, will return all transactions after start_date.
+    If end_date is set with no start_date, will return all transactions before end_date.
+
 
     :param uid: The user id.
     :type uid: str
@@ -40,8 +44,14 @@ def get_transactions(uid,**kwargs):
         queryset = queryset.get_current_month()
     if kwargs.get('start_date') and kwargs.get('end_date'):
         queryset = queryset.get_by_period(kwargs['start_date'], kwargs['end_date'])
+    if kwargs.get('start_date') and not kwargs.get('end_date'):
+        queryset = queryset.get_all_after(kwargs['start_date'])
+    if kwargs.get('end_date') and not kwargs.get('start_date'):
+        queryset = queryset.get_all_before(kwargs['end_date'])
     if kwargs.get('month') and kwargs.get('year'):
         queryset = queryset.get_by_month(kwargs['month'], kwargs['year'])
+    if kwargs.get('month') and not kwargs.get('year'):
+        queryset = queryset.get_by_month(kwargs['month'], timezone.now().year)
 
     # Dynamically apply other single-argument filters using getattr
     # Mapping of query parameter names to manager method names
@@ -73,7 +83,7 @@ def add_transaction(uid,data:dict):
     :type uid: str
     :param data: The data for the transaction.
     :type data: dict
-    :returns: {'message': "Transaction added successfully"}
+    :returns: {'added': queryset}
     :rtype: dict
     """
     return _add_transaction(uid, data)
@@ -89,14 +99,16 @@ def add_bulk_transactions(uid, data: list):
     :type uid: str
     :param data: A list of dictionaries representing the transactions to add.
     :type data: list
-    :returns: {'message': "Bulk transactions added successfully"}
+    :returns: {'added': [queryset]}
     :rtype: dict
     """
     logger.debug(f"Adding bulk transactions: {data}")
+    added = []
     for item in data:
         logger.debug(f"Adding transaction: {item}")
         _add_transaction(uid, item)
-    return {'message': "Bulk transactions added successfully"}
+        added.append(Transaction.objects.for_user(uid).get_tx(item['tx_id']))
+    return {'added': added}
 
 @transaction.atomic
 @validator.TransactionValidator
@@ -112,7 +124,7 @@ def update_transaction(uid, tx_id: str, data: dict):
     :type tx_id: str
     :param data: The data to update the transaction with.
     :type data: dict
-    :returns: {'message': "{tx_id} updated successfully"}
+    :returns: {'updated': queryset}
     :rtype: dict
     """
     logger.debug(f"Updating transaction: {data}")
@@ -127,7 +139,7 @@ def update_transaction(uid, tx_id: str, data: dict):
             expense.paid_flag = True
             expense.save()
     update.new_transaction(uid=uid, tx_id=tx.tx_id)
-    return {f'message': "{tx_id} updated successfully"}
+    return {f'updated': tx}
 
 @transaction.atomic
 @validator.TransactionIDValidator
@@ -140,7 +152,7 @@ def delete_transaction(uid, tx_id: str):
     :type uid: str
     :param tx_id: The transaction id to delete.
     :type tx_id: str
-    :returns: {'message': "Deleted {tx_id} successfully"}
+    :returns: {'deleted': queryset}
     :rtype: dict
     """
     logger.debug(f"Deleting transaction: {tx_id}")
@@ -151,7 +163,7 @@ def delete_transaction(uid, tx_id: str):
     # Delete transaction
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
     tx.delete()
-    return {f'message': "Deleted {tx_id} successfully"}
+    return {f'deleted': tx}
 
 
 @validator.TransactionIDValidator
@@ -191,7 +203,7 @@ def _add_transaction(uid, data):
 
     # Update balances
     update.new_transaction(uid=uid, tx_id=tx.tx_id)
-    return {'message': "Transaction added successfully"}
+    return {'added': tx}
     
 def _calc_total(uid, tx_queryset): 
     logger.debug(f"Calculating total for {tx_queryset} for user {uid}")

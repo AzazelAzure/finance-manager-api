@@ -27,8 +27,6 @@ from finance.models import (
 
 from loguru import logger
 
-# TODO: Add tag validation
-
 # Transaction Validators
 def TransactionValidator(func):
     """
@@ -150,6 +148,7 @@ def UpcomingExpenseValidator(func):
         return func(uid, data)
     return _wrapped
 
+# Tag Validators
 def TagValidator(func):
     """
     Decorator to validate a tag.
@@ -177,7 +176,7 @@ def SourceValidator(func):
         if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
             logger.debug(f"Source does not exist: {data['source']}")
             raise ValidationError("Source does not exist")
-        if not PaymentSource.objects.for_user(uid).filter(acc_type=data['acc_type']).exists():
+        if not PaymentSource.objects.filter(acc_type=data['acc_type']).exists():
             logger.debug(f"Account type does not exist: {data['acc_type']}")
             raise ValidationError("Account type does not exist")
         return func(uid, data)
@@ -192,11 +191,12 @@ def _validate_transaction(uid, data:dict):
     if not Currency.objects.filter(code=data['currency']).exists():
         logger.debug(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
-    for tag in data['tags']:
-        if not Tag.objects.for_user(uid).filter(name=tag).exists():
-            logger.debug(f"Tag does not exist: {tag}.  Creating...")
-            uid_instance = AppProfile.objects.for_user(uid).get()
-            Tag.objects.create(name=tag, uid=uid_instance)
+    if data.get('tags'):
+        for tag in data['tags']:
+            if not Tag.objects.for_user(uid).filter(name=tag).exists():
+                logger.debug(f"Tag does not exist: {tag}.  Creating...")
+                uid_instance = AppProfile.objects.for_user(uid).get()
+                Tag.objects.create(name=tag.lower(), uid=uid_instance)
     if not data.get('date'):
         data['date'] = timezone.now().date()
     if data.get('bill'):
@@ -204,7 +204,7 @@ def _validate_transaction(uid, data:dict):
             logger.debug(f"Expense does not exist: {data['bill']}")
             raise ValidationError("Expense does not exist")
         # Fix this value here since it's not a required field, to avoid key errors in _fix_data()
-        data['bill'] = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill']).get()
+        data['bill'] = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill'])
     return
 
 def _validate_asset(uid, data:dict):

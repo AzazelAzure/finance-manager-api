@@ -20,6 +20,7 @@ from finance.models import UpcomingExpense, AppProfile
 
 @transaction.atomic
 @validator.UserValidator
+@validator.UpcomingExpenseValidator
 def add_expense(uid, data: dict):
     """
     Adds a planned expense to the user's account.
@@ -28,7 +29,7 @@ def add_expense(uid, data: dict):
     :type uid: str
     :param data: The data for the expense.
     :type data: dict
-    :returns: {'message': "Expense added successfully"}
+    :returns: {'added': queryset}
     :rtype: dict
     """
     logger.debug(f"Adding expense: {data}")
@@ -36,7 +37,29 @@ def add_expense(uid, data: dict):
     data['uid'] = uid
     UpcomingExpense.objects.create(**data)
     update.rebalance(uid)
-    return {'message': "Expense added successfully"}
+    return {'added': UpcomingExpense.objects.for_user(uid).get_by_name(data['name'])}
+
+@transaction.atomic    
+@validator.UserValidator
+def bulk_add_expenses(uid, data: list):
+    """
+    Adds a list of planned expenses to the user's account.
+
+    :param uid: The user id.
+    :type uid: str
+    :param data: A list of dictionaries representing the expenses to add.
+    :type data: list
+    :returns: {'added': [queryset]}
+    :rtype: dict
+    """
+    logger.debug(f"Adding bulk expenses: {data}")
+    added = []
+    for item in data:
+        logger.debug(f"Adding expense: {item}")
+        add_expense(uid, item)
+        added.append(UpcomingExpense.objects.for_user(uid).get_by_name(item['name']))
+    return {'added': added }
+
 
 @transaction.atomic
 @validator.UserValidator
@@ -49,14 +72,14 @@ def delete_expense(uid, expense_name: str):
     :type uid: str
     :param expense_name: The name of the expense to delete.
     :type expense_name: str
-    :returns: {'message': "Expense deleted successfully"}
+    :returns: {deleted: queryset}
     :rtype: dict
     """
     logger.debug(f"Deleting expense: {expense_name}")
     expense = UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)
     expense.delete()
     update.rebalance(uid)
-    return {'message': "Expense deleted successfully"}
+    return {'deleted': expense}
 
 @transaction.atomic
 @validator.UserValidator
@@ -71,14 +94,14 @@ def update_expense(uid, expense_name: str, data: dict):
     :type expense_name: str
     :param data: The data to update the expense with.
     :type data: dict
-    :returns: {'message': "Expense updated successfully"}
+    :returns: {'updated': queryset}
     :rtype: dict
     """
     logger.debug(f"Updating expense: {expense_name}")
     expense = UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)
     expense.update(**data)
     update.rebalance(uid)
-    return {'message': "Expense updated successfully"}
+    return {'updated': expense}
 
 
 @validator.UserValidator
@@ -86,6 +109,10 @@ def update_expense(uid, expense_name: str, data: dict):
 def get_expenses(uid, **kwargs):
     """
     Retrieves a list of planned expenses for a user with dynamic filtering and ordering.
+    If start is set with no end, will return all expenses after start.
+    If end is set with no start, will return all expenses before end.
+    If month is set, will return all expenses for the current month.
+
 
     :param uid: The user id.
     :type uid: str
@@ -96,15 +123,28 @@ def get_expenses(uid, **kwargs):
     """
     logger.debug(f"Getting expenses for {uid} with filters: {kwargs}")
     queryset = UpcomingExpense.objects.for_user(uid)
-    if kwargs.get('start_date') and kwargs.get('end_date'):
-        queryset = queryset.get_by_period(kwargs['start_date'], kwargs['end_date'])
+
+    # Handle specific filters that require multiple arguments or no arguments
+    if kwargs.get('start') and kwargs.get('end'):
+        queryset = queryset.get_by_period(kwargs['start'], kwargs['end'])
+    if kwargs.get('start') and not kwargs.get('end'):
+        queryset = queryset.get_expenses_by_period(kwargs['start'], None)
+    if kwargs.get('end') and not kwargs.get('start'):
+        queryset = queryset.get_expenses_by_period(None, kwargs['end'])
+    if kwargs.get('for_month'):
+        queryset = queryset.get_current_month()
+    if kwargs.get('remaining'):
+        queryset = queryset.get_by_remaining()
+    if kwargs.get('upcoming'):
+        queryset = queryset.get_all_upcoming()
+    
     SINGLE_ARG_FILTER_MAP = {
-        'status': 'get_by_status',
-        'month': 'get_current_month',
-        'remaining': 'get_by_remaining',
+        'due_date': 'get_by_due_date',
+        'end_date': 'get_by_end_date',
         'recurring': 'get_by_recurring',
         'paid_flag': 'get_by_paid_flag',
-        'all_upcoming': 'get_all_upcoming',
+        'start_date': 'get_by_start_date',
+        'currency_code': 'get_by_currency'
     }
     for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
         if kwargs.get(param_name):
@@ -130,18 +170,3 @@ def get_expense(uid, expense_name: str):
     """
     logger.debug(f"Getting expense: {expense_name} for {uid}")
     return {'expense': UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)}
-
-@transaction.atomic
-@validator.UserValidator
-def get_all_expenses(uid):
-    """
-    Retrieves a list of all planned expenses for a user.
-
-    :param uid: The user id.
-    :type uid: str
-    :returns: {'expenses': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Getting all expenses for {uid}")
-    return {'expenses': UpcomingExpense.objects.for_user(uid).all()}
-

@@ -36,47 +36,38 @@ def user_update_spend_accounts(uid: str, data: list):
     :type uid: str
     :param data: The data for the spend accounts.
     :type data: list
-    :returns: {'spend_accounts': queryset, 'message': "Spend accounts updated successfully"}
+    :returns: {'spend_accounts': [list], 'message': "Spend accounts updated successfully"}
     :rtype: dict
     """
     logger.debug(f"Updating spend accounts for {uid}")
     user = AppProfile.objects.for_user(uid).get()
     # Set all params to uppercase
-    data = {k.upper(): v for k, v in data.items()}
+    data = {item.lower() for item in data}
     # Check if sources exists
     for item in data:
         if not PaymentSource.objects.for_user(uid).filter(source=item).exists():
             logger.debug(f"Source does not exist: {item}")
             raise ValidationError("Source does not exist")
+        item = PaymentSource.objects.for_user(uid).get_by_source(source=item)
     # Update spend accounts    
-    user.spend_accounts.set(data)    
-    return {'spend_accounts': user.spend_accounts.all(), 'message': "Spend accounts updated successfully"}
+    user.spend_accounts.set(data)
+    return {'spend_accounts': user.spend_accounts, 'message': "Spend accounts updated successfully"}
         
-@validator.UserValidator
-def user_get_spend_accounts(uid: str):
-    """ 
-    Retrieves the spend accounts for a user.
+@validator.AppProfileValidator
+def user_get_info(uid: str):
+    """
+    Retrieves the spend accounts and base currency for a user.
     
     :param uid: The user id.
     :type uid: str
-    :returns: {'spend_accounts': queryset}
+    :returns: {'spend_accounts': list, 'base_currency': str}
     :rtype: dict
     """
-    logger.debug(f"Getting spend accounts for {uid}")
-    return {'spend_accounts': AppProfile.objects.for_user(uid).get_spend_accounts()}
+    logger.debug(f"Getting spend accounts and base currency for {uid}")
+    spend_accounts = AppProfile.objects.for_user(uid).get_spend_accounts()
+    base_currency = AppProfile.objects.for_user(uid).get_base_currency()
+    return {'spend_accounts': spend_accounts, 'base_currency': base_currency}
 
-@validator.UserValidator
-def user_get_base_currency(uid: str):
-    """
-    Retrieves the base currency for a user.
-    
-    :param uid: The user id.
-    :type uid: str
-    :returns: {'base_currency': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Getting base currency for {uid}")
-    return {'base_currency': AppProfile.objects.for_user(uid).get_base_currency()}
 
 @transaction.atomic
 @validator.UserValidator
@@ -88,7 +79,7 @@ def user_update_base_currency(uid: str, data: dict):
     :type uid: str
     :param data: The data for the base currency.
     :type data: dict
-    :returns: {'base_currency': queryset, 'message': "Base currency updated successfully"}
+    :returns: {'base_currency': model_instance, 'message': "Base currency updated successfully"}
     :rtype: dict
     """
     logger.debug(f"Updating base currency for {uid}")
@@ -113,19 +104,18 @@ def user_get_totals(uid):
     
     :param uid: The user id.
     :type uid: str
-    :returns: {'Snapshot': queryset, 'assets': queryset, 'transactions for month': queryset, 'total expenses for month': decimal, 'total income for month': decimal, 'total transfer out for month': decimal, 'total transfer in for month': decimal}
+    :returns: {'Snapshot': queryset, 'transactions for month': queryset, 'total expenses for month': decimal, 'total income for month': decimal, 'total transfer out for month': decimal, 'total transfer in for month': decimal}
     :rtype: dict
     """
     logger.debug(f"Getting all totals for {uid}")
     queryset = Transaction.objects.for_user(uid).get_current_month()
     return {
-        'Snapshot': FinancialSnapshot.objects.for_user(uid).first(), 
-        'assets': CurrentAsset.objects.for_user(uid).all(),
-        'transactions for month': queryset,
-        'total expenses for month': fc.calc_queryset(uid, queryset.get_by_tx_type('EXPENSE')),
-        'total income for month': fc.calc_queryset(uid, queryset.get_by_tx_type('INCOME')),
-        'total transfer out for month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_OUT')),
-        'total transfer in for month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_IN')),
+        'snapshot': FinancialSnapshot.objects.for_user(uid), 
+        'transactions_for_month': queryset,
+        'total_expenses_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('EXPENSE')),
+        'total_income_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('INCOME')),
+        'total_transfer_out_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_OUT')),
+        'total_transfer_in_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_IN')),
     }
 
 

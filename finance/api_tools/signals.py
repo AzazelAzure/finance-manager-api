@@ -46,8 +46,7 @@ def update_monthly(sender, instance, **kwargs):
     Signal receiver for UpcomingExpenses.
     Updates the due date of recurring expenses and resets paid flag.
     """
-    instance.appprofile = AppProfile.objects.get(username=instance)
-    uid = instance.appprofile.user_id
+    uid = instance.uid
     expenses = UpcomingExpense.objects.for_user(uid).get_by_paid_flag(True).get_by_recurring(True)
     # Update expenses if they exist
     if expenses:

@@ -159,13 +159,12 @@ class UpcomingExpense(models.Model):
 
     Attributes:
         name (CharField): Name of the expense.
-        estimated_cost (DecimalField): Estimated cost of the expense.
+        amount (DecimalField): Estimated cost of the expense.
         due_date (DateField): Date the expense is due.
         start_date (DateField): Date the expense starts.
         end_date (DateField): Date the expense ends.
         paid_flag (BooleanField): Flag indicating if the expense has been paid.
         expense_id (AutoField): Unique identifier for the expense.
-        status (CharField): Status of the expense, selected from a list of choices.
         is_recurring (BooleanField): Flag indicating if the expense is recurring.
         currency (ForeignKey): Foreign key to the Currency model.
         uid (ForeignKey): Foreign key to the AppProfile model.
@@ -180,7 +179,7 @@ class UpcomingExpense(models.Model):
 
 
     name = models.CharField(max_length=200)
-    estimated_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
     due_date = models.DateField(null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -240,7 +239,7 @@ class Transaction(models.Model):
     # Link to relationship models
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
-    tags = models.ManyToManyField("Tag", blank=True, on_delete=models.PROTECT)
+    tags = models.ManyToManyField("Tag", blank=True)
     entry_id = models.AutoField(primary_key=True, db_index=True)
     tx_id = models.CharField(max_length=20, editable=False)
     bill = models.ForeignKey('UpcomingExpense', on_delete=models.PROTECT, null=True, blank=True)
@@ -281,7 +280,7 @@ class Transaction(models.Model):
 
         # If bill is set, change paid_flag.
         if self.bill:
-            self.bill = UpcomingExpense.objects.for_user(self.uid).get_by_name(self.bill)
+            self.bill = UpcomingExpense.objects.for_user(self.uid).get_by_name(self.bill.name)
             self.bill.paid_flag = True
             self.bill.save()
 

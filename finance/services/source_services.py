@@ -17,7 +17,7 @@ from finance.models import PaymentSource, AppProfile
 
 # Payment Source Functions
 @transaction.atomic
-@validator.AssetValidator
+@validator.SourceValidator
 @validator.UserValidator
 def add_source(uid, data: dict):
     """
@@ -27,14 +27,36 @@ def add_source(uid, data: dict):
     :type uid: str
     :param data: The data for the payment source.
     :type data: dict
-    :returns: {'message': "Payment source added successfully"}
+    :returns: {'added': queryset}
     :rtype: dict
     """
     logger.debug(f"Adding asset: {data}")
     uid = AppProfile.objects.for_user(uid).get()
+    data['source'] = data['source'].lower()
     asset = PaymentSource.objects.create(uid=uid,**data)
     update.rebalance(uid=uid, acc_type=asset.acc_type)
-    return {'message': "Payment source added successfully"}
+    return {'added': asset}
+
+@transaction.atomic    
+@validator.UserValidator
+def bulk_add_sources(uid, data: list):
+    """
+    Adds a list of payment sources to the user's account.
+
+    :param uid: The user id.
+    :type uid: str
+    :param data: A list of dictionaries representing the payment sources to add.
+    :type data: list
+    :returns: {'added': [queryset]}
+    :rtype: dict
+    """
+    logger.debug(f"Adding bulk payment sources: {data}")
+    added = []
+    for item in data:
+        logger.debug(f"Adding payment source: {item}")
+        add_source(uid, item)
+        added.append(PaymentSource.objects.for_user(uid).get_by_source(source=item['source']))
+    return {'added': added }
 
 @transaction.atomic
 @validator.UserValidator
@@ -47,14 +69,14 @@ def delete_source(uid, source: str):
     :type uid: str
     :param source: The source of the payment source to delete.
     :type source: str
-    :returns: {'message': "Payment source deleted successfully"}
+    :returns: {'deleted': queryset}
     :rtype: dict
     """
     logger.debug(f"Deleting source: {source}")
     source_obj = PaymentSource.objects.for_user(uid).get_by_source(source=source)
     source_obj.delete()
     update.rebalance(uid=uid, acc_type=source_obj.acc_type)
-    return {'message': "Payment source deleted successfully"}
+    return {'deleted': source_obj}
 
 @transaction.atomic
 @validator.UserValidator
@@ -69,47 +91,32 @@ def update_source(uid, source: str, data: dict):
     :type source: str
     :param data: The data to update the payment source with.
     :type data: dict
-    :returns: {'message': "Payment source updated successfully"}
+    :returns: {'updated': queryset}
     :rtype: dict
     """
     logger.debug(f"Updating source: {source}")
     source_obj = PaymentSource.objects.for_user(uid).get_by_source(source=source)
     source_obj.update(**data)
     update.rebalance(uid=uid, acc_type=source_obj.acc_type)
-    return {'message': "Payment source updated successfully"}
+    return {'updated': source_obj}
 
 @validator.UserValidator
 @validator.SourceValidator
-def get_sources(uid, acc_type=None):
+def get_sources(uid, **kwargs):
     """
-    Retrieves a list of payment sources for a user.
+    Retrieves a list of payment sources for a user.  Accepts optional filters.
 
     :param uid: The user id.
     :type uid: str
-    :param acc_type: The account type of the payment sources to retrieve. Defaults to none.
-    :type acc_type: str
+    :param kwargs: A dictionary of filters.
+    :type kwargs: dict
     :returns: {'sources': queryset}
     :rtype: dict
     """
-    logger.debug(f"Getting all sources for {uid}")
-    source_obj = PaymentSource.objects.for_user(uid).all()
-    if acc_type:
-        source_obj = source_obj.get_by_acc_type(acc_type)
-    return {'sources': source_obj}
-
-@validator.UserValidator
-@validator.SourceValidator
-def get_source(uid, source: str):
-    """
-    Retrieves a single payment source for a user.
-
-    :param uid: The user id.
-    :type uid: str
-    :param source: The source of the payment source to retrieve.
-    :type source: str
-    :returns: {'source': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Getting source: {source} for {uid}")
-    return {'source': PaymentSource.objects.for_user(uid).get_by_source(source=source)}
+    sources = PaymentSource.objects.for_user(uid)
+    if kwargs.get('acc_type'):
+        sources = sources.get_by_acc_type(kwargs['acc_type'])
+    if kwargs.get('source'):
+        sources = sources.get_by_source(kwargs['source'])
+    return {'sources': sources}
 
