@@ -1,5 +1,15 @@
 """
 This module defines all models for the finance manager application.
+
+Attributes:
+    AppProfile: Model for user profiles.
+    Currency: Global model for currencies.
+    Tag: Model for tags.
+    PaymentSource: Model for payment sources.
+    UpcomingExpense: Model for upcoming expenses.
+    Transaction: Model for transactions.
+    CurrentAsset: Model for current assets.
+    FinancialSnapshot: Model for financial snapshots.
 """
 from django.db import models
 from django.utils import timezone
@@ -16,14 +26,12 @@ class AppProfile(models.Model):
         objects (AppProfileManager): Manager for the AppProfile model.
         username (OneToOneField): One-to-one relationship with the user model.
         user_id (UUIDField): Unique identifier for the user.
-        last_login (DateField): Date of the last login.
         spend_accounts (ManyToManyField): Many-to-many relationship with the PaymentSource model.
         base_currency (ForeignKey): Foreign key to the Currency model.
     """
     objects = AppProfileManager.as_manager()
     username = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    last_login = models.DateField(null=True, blank=True)
     spend_accounts = models.ManyToManyField("PaymentSource", blank=True)
     base_currency = models.ForeignKey(
         "finance.Currency",
@@ -232,7 +240,7 @@ class Transaction(models.Model):
     # Link to relationship models
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
-    tags = models.ManyToManyField("Tag", blank=True)
+    tags = models.ManyToManyField("Tag", blank=True, on_delete=models.PROTECT)
     entry_id = models.AutoField(primary_key=True, db_index=True)
     tx_id = models.CharField(max_length=20, editable=False)
     bill = models.ForeignKey('UpcomingExpense', on_delete=models.PROTECT, null=True, blank=True)
@@ -288,6 +296,8 @@ class CurrentAsset(models.Model):
     """
     Model for current assets. Allows users view assets in thier accounts.
     Automatically generated when a PaymentSource is created.
+    Since this is a one-to-one relationship to PaymentSource, no methods exist to create new CurrentAssets.
+    This ensures that there is only one CurrentAsset per PaymentSource, and no floating assets to sources that don't exist.
 
     Attributes:
         source (OneToOneField): One-to-one relationship with the PaymentSource model.

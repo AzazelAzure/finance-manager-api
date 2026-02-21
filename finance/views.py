@@ -22,6 +22,7 @@ class TransactionView(APIView):
         return Response(result, status=200)
 
     def get(self, request, tx_id: str = None):
+        # TODO: Fix this to user serializer
         uid = request.user.appprofile.user_id
         
         if tx_id: # If tx_id is provided in the URL path, get a single transaction

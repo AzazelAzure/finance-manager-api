@@ -1,5 +1,13 @@
 """
 This module handles all financial calculations for the finance manager application.
+
+Attributes:
+    calc_sts: Calculates 'safe to spend' totals by aggregating specific source types.
+    calc_leaks: Calculates leaks for transfers to monitor fees.
+    calc_queryset: Calculates the total amount for a queryset.
+    calc_new_balance: Calculates the new balance for a source.
+    calc_total_assets: Calculates the total assets for a user.
+    calc_asset_type: Calculates the total assets for a specific account type.
 """
 
 # TODO: Update docstrings

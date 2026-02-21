@@ -1,5 +1,13 @@
 """
 This module handles all transaction-related functionality for the finance manager application.
+
+Attributes:
+    get_transactions: Retrieves a list of transactions for a user.
+    add_transaction: Adds a transaction to the user's account.
+    add_bulk_transactions: Adds a list of transactions to the user's account.
+    update_transaction: Updates a transaction in the user's account.
+    delete_transaction: Deletes a transaction from the user's account.
+    get_transaction: Retrieves a single transaction for a user.
 """
 
 import finance.logic.validators as validator
@@ -11,7 +19,7 @@ from loguru import logger
 from finance.models import Transaction, Tag, UpcomingExpense
 
 @validator.UserValidator
-def user_get_transactions(uid,**kwargs):
+def get_transactions(uid,**kwargs):
     """
     Retrieves a list of transactions for a user with dynamic filtering and ordering.
     if no tx_type is set, will return sum for all tx_type.
@@ -52,12 +60,12 @@ def user_get_transactions(uid,**kwargs):
 
     # Default ordering
     queryset = queryset.order_by('-date', '-entry_id')
-    return {'transactions': queryset, 'amount': _user_calc_total(uid, queryset)}
+    return {'transactions': queryset, 'amount': _calc_total(uid, queryset)}
 
 @transaction.atomic
 @validator.TransactionValidator
 @validator.UserValidator
-def user_add_transaction(uid,data:dict):
+def add_transaction(uid,data:dict):
     """
     Adds a transaction to the user's account.
     
@@ -68,12 +76,12 @@ def user_add_transaction(uid,data:dict):
     :returns: {'message': "Transaction added successfully"}
     :rtype: dict
     """
-    return _user_add_transaction(uid, data)
+    return _add_transaction(uid, data)
 
 @transaction.atomic
 @validator.BulkTransactionValidator
 @validator.UserValidator
-def user_add_bulk_transactions(uid, data: list):
+def add_bulk_transactions(uid, data: list):
     """
     Adds a list of transactions to the user's account.
     
@@ -87,14 +95,14 @@ def user_add_bulk_transactions(uid, data: list):
     logger.debug(f"Adding bulk transactions: {data}")
     for item in data:
         logger.debug(f"Adding transaction: {item}")
-        _user_add_transaction(uid, item)
+        _add_transaction(uid, item)
     return {'message': "Bulk transactions added successfully"}
 
 @transaction.atomic
 @validator.TransactionValidator
 @validator.TransactionIDValidator
 @validator.UserValidator
-def user_update_transaction(uid, tx_id: str, data: dict):
+def update_transaction(uid, tx_id: str, data: dict):
     """
     Updates a transaction in the user's account.
     
@@ -124,7 +132,7 @@ def user_update_transaction(uid, tx_id: str, data: dict):
 @transaction.atomic
 @validator.TransactionIDValidator
 @validator.UserValidator
-def user_delete_transaction(uid, tx_id: str):
+def delete_transaction(uid, tx_id: str):
     """
     Deletes a transaction from the user's account.
     
@@ -148,7 +156,7 @@ def user_delete_transaction(uid, tx_id: str):
 
 @validator.TransactionIDValidator
 @validator.UserValidator
-def user_get_transaction(uid, tx_id: str):
+def get_transaction(uid, tx_id: str):
     """
     Retrieves a single transaction for a user.
 
@@ -166,7 +174,7 @@ def user_get_transaction(uid, tx_id: str):
 
 # Private Functions
 
-def _user_add_transaction(uid, data):
+def _add_transaction(uid, data):
     logger.debug(f"Adding transaction: {data} for {uid}")
     # Pull out tags
     tags = data.pop("tags", None)
@@ -185,6 +193,6 @@ def _user_add_transaction(uid, data):
     update.new_transaction(uid=uid, tx_id=tx.tx_id)
     return {'message': "Transaction added successfully"}
     
-def _user_calc_total(uid, tx_queryset): 
+def _calc_total(uid, tx_queryset): 
     logger.debug(f"Calculating total for {tx_queryset} for user {uid}")
     return fc.calc_queryset(uid, tx_queryset)

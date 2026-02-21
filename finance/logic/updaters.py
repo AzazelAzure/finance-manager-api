@@ -1,5 +1,10 @@
 """
 This module functions as the data manipulation layer for the financial manager application.
+
+Attributes:
+    new_transaction: Handles new transactions.
+    transaction_updated: Handles transaction updates.
+    rebalance: Rebalances the user's accounts.
 """
 
 import finance.logic.fincalc as fc
@@ -84,6 +89,9 @@ def rebalance(uid, acc_type=None):
 
 
 def _recalc_sts(uid):
+    """
+    Recalculates the safe to spend for a user and sets to Financial Snapshot.
+    """
     logger.debug(f"Recalculating safe to spend for {uid}")
     # Get spend accounts
     spend_accounts = AppProfile.objects.for_user(uid).get_spend_accounts(uid)

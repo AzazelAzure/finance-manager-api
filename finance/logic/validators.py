@@ -1,5 +1,16 @@
 """
 This module handles all validation logic for the finance manager application.
+Verifies that the data provided is valid, and cleans strings to proper formats.
+
+Attributes:
+    TransactionValidator: Decorator to validate a transaction.
+    BulkTransactionValidator: Decorator to validate a list of transactions.
+    TransactionIDValidator: Decorator to validate a transaction id.
+    TransactionTypeValidator: Decorator to validate a transaction type.
+    UserValidator: Decorator to validate a user.
+    AssetValidator: Decorator to validate an asset.
+    BulkAssetValidator: Decorator to validate a list of assets.
+    UpcomingExpenseValidator: Decorator to validate an upcoming expense.s
 """
 
 from functools import wraps
@@ -36,7 +47,7 @@ def TransactionValidator(func):
 def BulkTransactionValidator(func):
     """
     Decorator to validate a list of transactions.
-    Checks if all required fields are valid, and fixes any data that needs to be fixed.
+    Checks if all required fields are valid, and fixes any dataoes not that needs to be fixed.
     Raises a ValidationError if any validation fails.
     """
     @wraps(func)
@@ -139,6 +150,39 @@ def UpcomingExpenseValidator(func):
         return func(uid, data)
     return _wrapped
 
+def TagValidator(func):
+    """
+    Decorator to validate a tag.
+    Checks if the tag exists.
+    Raises a ValidationError if the tag already exists.
+    """
+    @wraps(func)
+    def _wrapped(uid, data:dict):
+        logger.debug(f"Validating tag: {data} with uid: {uid}")
+        if Tag.objects.for_user(uid).filter(name=data['name']).exists():
+            logger.debug(f"Tag already exists: {data['name']}")
+            raise ValidationError("Tag already exists.  Cannot add duplicates")
+        return func(uid, data)
+    return _wrapped
+
+def SourceValidator(func):
+    """
+    Decorator to validate a payment source.
+    Checks if the source exists.
+    Raises a ValidationError if the source does not exist.
+    """
+    @wraps(func)
+    def _wrapped(uid, data:dict):
+        logger.debug(f"Validating source: {data} with uid: {uid}")
+        if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
+            logger.debug(f"Source does not exist: {data['source']}")
+            raise ValidationError("Source does not exist")
+        if not PaymentSource.objects.for_user(uid).filter(acc_type=data['acc_type']).exists():
+            logger.debug(f"Account type does not exist: {data['acc_type']}")
+            raise ValidationError("Account type does not exist")
+        return func(uid, data)
+    return _wrapped
+
 # Private Functions
 def _validate_transaction(uid, data:dict):
     logger.debug(f"Validating transaction: {data} with uid: {uid}")
@@ -159,6 +203,7 @@ def _validate_transaction(uid, data:dict):
         if not UpcomingExpense.objects.for_user(uid).filter(name=data['bill']).exists():
             logger.debug(f"Expense does not exist: {data['bill']}")
             raise ValidationError("Expense does not exist")
+        # Fix this value here since it's not a required field, to avoid key errors in _fix_data()
         data['bill'] = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill']).get()
     return
 

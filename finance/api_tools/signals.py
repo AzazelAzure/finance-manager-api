@@ -38,11 +38,6 @@ def create_user(sender, instance, created, **kwargs):
         logger.debug(f"Created user: {instance}.  User: {instance.appprofile}.  Base currency: {default_currency}. Default source: {default_source}")
         return
     else:
-        # If not new creation, update the user's last login time
-        instance.appprofile = AppProfile.objects.get(username=instance)
-        instance.appprofile.last_login = timezone.now()
-        instance.appprofile.save()
-        logger.debug(f"Updating user: {instance}")
         return
     
 @receiver(post_save, sender=UpcomingExpense)

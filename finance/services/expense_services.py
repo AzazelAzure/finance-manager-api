@@ -1,5 +1,13 @@
 """
 This module handles all upcoming expense-related functionality for the finance manager application.
+
+Attributes:
+    add_expense: Adds a planned expense to the user's account.
+    delete_expense: Deletes a planned expense from the user's account.
+    update_expense: Updates a planned expense in the user's account.
+    get_expenses: Retrieves a list of planned expenses for a user.
+    get_expense: Retrieves a single planned expense for a user.
+    get_all_expenses: Retrieves a list of all planned expenses for a user.
 """
 
 import finance.logic.validators as validator
