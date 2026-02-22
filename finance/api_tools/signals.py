@@ -32,7 +32,8 @@ def create_user(sender, instance, created, **kwargs):
         default_currency = Currency.objects.filter(code="USD").first()
         instance.appprofile.base_currency = default_currency
         # PaymentSource.save() will automatically create the CurrentAsset
-        default_source = PaymentSource.objects.create(source="Cash", acc_type="CASH", uid=instance.appprofile)
+        default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=instance.appprofile)
+        PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=instance.appprofile)
         instance.appprofile.spend_accounts.set([default_source])
         instance.appprofile.save()
         logger.debug(f"Created user: {instance}.  User: {instance.appprofile}.  Base currency: {default_currency}. Default source: {default_source}")

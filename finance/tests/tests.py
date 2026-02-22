@@ -11,7 +11,17 @@ from currency_converter import CurrencyConverter
 from loguru import logger
 import random
 import os
- # TODO: Reformat docstrings to add line breaks
+ 
+# TODO: Reformat docstrings to add line breaks
+# TODO: Write tests for when a transaction has a bill
+# TODO: Write one test for if a user attempts to modify a transaction that doesn't belong to them.
+# TODO: Write one test for if a user attempts to delete a transaction that doesn't belong to them.
+# TODO: Write get tranactions tests. 
+# TODO: Write PaymentSource tests.
+    # TODO: Write tests for when a PaymentSource is deleted
+    # TODO: Write tests for when a PaymentSource is updated
+    # TODO: Write tests for when a PaymentSource is created
+    # TODO: Write tests for attempting to manipulate "uncategorized" PaymentSource
 
 class BaseTestCase(APITestCase):
     """

@@ -14,7 +14,9 @@ import finance.logic.validators as validator
 import finance.logic.updaters as update
 import finance.logic.fincalc as fc
 from django.db import transaction
+from django.db.models.functions import Abs
 from django.utils import timezone
+from decimal import Decimal
 from loguru import logger
 from finance.models import Transaction, Tag, UpcomingExpense
 
@@ -98,7 +100,7 @@ def add_bulk_transactions(uid, data: list):
     :param uid: The user id.
     :type uid: str
     :param data: A list of dictionaries representing the transactions to add.
-    :type data: list
+    :type data: list# TODO: Fix transactions to default to uncategorized if source is deleted. 
     :returns: {'added': [queryset]}
     :rtype: dict
     """
@@ -190,6 +192,11 @@ def _add_transaction(uid, data):
     logger.debug(f"Adding transaction: {data} for {uid}")
     # Pull out tags
     tags = data.pop("tags", None)
+
+    # Fix amount to positive/negative based on tx_type
+    data['amount'] = Decimal(Abs(data['amount']))
+    if data['tx_type'] in ['EXPENSE', 'XFER_OUT']:
+        data['amount'] = data['amount'] * -1
 
     # Create transaction
     tx = Transaction.objects.create(**data)

@@ -31,10 +31,7 @@ def new_transaction(uid, tx_id: str):
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
     tx_amount = tx.amount
     
-    # Set multiplier based on transaction type.
-    # Calculator always subtracts from balance, so to increase balance, need to multiply by -1
-    multiplier = -1 if tx.tx_type in ["INCOME", "XFER_IN"] else 1
-    _recalc_asset_amount(uid, tx.source, tx_amount, multiplier)
+    _recalc_asset_amount(uid, tx.source, tx_amount, tx.currency.code)
     rebalance(uid, tx.source.acc_type)
     return
 
@@ -62,7 +59,7 @@ def transaction_updated(uid, tx_id: str):
     # Invert transaction amount and recalculate
     multiplier = -1 if tx.tx_type in ["EXPENSE", "XFER_OUT"] else 1
     tx_amount = tx.amount * multiplier
-    _recalc_asset_amount(uid, tx.source, tx_amount, 1, tx.currency.code)
+    _recalc_asset_amount(uid, tx.source, tx_amount, tx.currency.code)
     rebalance(uid, tx.source.acc_type)
     return
 
@@ -136,13 +133,13 @@ def _recalc_leaks(uid):
     FinancialSnapshot.objects.for_user(uid).update(total_leaks=leaks)
     return
 
-def _recalc_asset_amount(uid, source, amount, multiplier, currency):
+def _recalc_asset_amount(uid, source, amount, currency):
     """
     Recalculates the asset amount for a source and sets to CurrentAsset.
     """
     logger.debug(f"Recalculating asset amount for {uid} with source {source} and amount {amount}")
     asset = CurrentAsset.objects.for_user(uid).get_asset(source)
-    new_balance = fc.calc_new_balance(uid, source, amount, multiplier, currency)
+    new_balance = fc.calc_new_balance(uid, source, amount, currency)
     asset.amount = new_balance
     asset.save()
     return

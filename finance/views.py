@@ -40,17 +40,20 @@ from .api_tools.serializers import (
 @extend_schema_view(
     post=extend_schema(
         summary="Create one or more transactions",
-        description="Allows creation of a single transaction or a list of transactions.",
+        description="Allows creation of a single transaction or a list of transactions.\n"
+                    "Transaction amounts are automically fixed by transaction type.\n"
+                    "For example, EXPENSE and XFER_OUT transactions are fixed to negative, and INCOME and XFER_IN transactions are fixed to positive.\n"
+                    "Allows for 0 value transactions.",
         request=TransactionSerializer,
         responses={status.HTTP_201_CREATED: TransactionSerializer}, 
         tags=["Transactions"]
     ),
     get=extend_schema(
         summary="Retrieve transactions",
-        description="Retrieves a single transaction by ID or a list of transactions with optional filters."
-                    "If month is set with no year, will return transactions for current month."
-                    "If start_date is set with no end_date, will return all transactions after start_date."
-                    "If end_date is set with no start_date, will return all transactions before end_date.",
+        description="Retrieves a single transaction by ID or a list of transactions with optional filters.\n"
+                    "If month is set with no year, will return transactions for current month.\n"
+                    "If start_date is set with no end_date, will return all transactions after start_date.\n"
+                    "If end_date is set with no start_date, will return all transactions before end_date.\n",
         parameters=[
             OpenApiParameter(name='tx_type', type=OpenApiTypes.STR, description='Filter by transaction type (e.g., EXPENSE, INCOME)'),
             OpenApiParameter(name='tag_name', type=OpenApiTypes.STR, description='Filter by tag name'),
@@ -74,9 +77,13 @@ from .api_tools.serializers import (
     ),
     put=extend_schema(
         summary="Update a transaction",
-        description="Updates an existing transaction identified by its ID.",
+        description="Updates an existing transaction identified by its ID.\n"
+                    "Forbidden for 'tx_id' and 'entry_id' as they are auto generated unique identifiers.  These cannot be changed.",
         request=TransactionSerializer,
-        responses={status.HTTP_200_OK: TransactionSerializer(many=True)},
+        responses={
+            status.HTTP_200_OK: TransactionSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: None,
+            },
         tags=["Transactions"]
     ),
     delete=extend_schema(
@@ -88,7 +95,7 @@ from .api_tools.serializers import (
 )
 class TransactionView(APIView):
     """
-    View for transactions. 
+    View for transactions.\n 
     Disallows patch methods for financial fidelity.
 
     Attributes:
@@ -99,9 +106,12 @@ class TransactionView(APIView):
         delete: Delete a transaction.
     """
     def post(self, request):
+        # Check if single or list of transactions and serialize
         is_many = isinstance(request.data, list)
         serializer = TransactionSerializer(data=request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
+
+        # Handle Transactions based of list or single
         if is_many:
             result = tx_svc.add_bulk_transactions(
                 data=serializer.data,
@@ -110,6 +120,8 @@ class TransactionView(APIView):
             result = tx_svc.add_transaction(
                 data=serializer.data,
                 uid=request.user.appprofile.user_id)
+            
+        # Serialize and return
         serializer = TransactionSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -146,17 +158,27 @@ class TransactionView(APIView):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def put(self, request, tx_id: str):
+        # Reject attempts to modify tx_id or entry_id
+        if request.data.get('tx_id') or request.data.get('entry_id'):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        
+        # Update transaction
         result = tx_svc.user_update_transaction(
             uid=request.user.appprofile.user_id,
             tx_id=tx_id,
             data=request.data)
+        
+        # Serialize and return
         serializer = TransactionSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, tx_id: str):
+        # Delete transaction
         result = tx_svc.user_delete_transaction(
             uid=request.user.appprofile.user_id,
             tx_id=tx_id)
+        
+        # Serialize and return
         serializer = TransactionSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -165,7 +187,7 @@ class TransactionView(APIView):
     post=extend_schema(
         summary="Not allowed.",
         description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        responses={status.HTTP_403_FORBIDDEN: None},
         tags=["Assets"]
     ),
     get=extend_schema(
@@ -175,42 +197,46 @@ class TransactionView(APIView):
         tags=["Assets"]
     ),
     patch=extend_schema(
-        summary="Not allowed.",
-        description="For tfinancial fidelity, this endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        summary='Update and asset source',
+        description="Updates an existing asset identified by its source. Source passed in must exist in PaymentSources, or will raise Validation error.\n"
+                    "Forbidden for 'amount' as it is auto calculated based on other fields."
+                    "Forbidden to set source to 'unknown' as that is a default empty source.",
+        responses = {
+            status.HTTP_200_OK: AssetSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: None
+        },
         tags=["Assets"]
     ),
     put=extend_schema(
-        summary="Update an asset",
-        description="Updates an existing asset identified by its source. Source passed in must exist in PaymentSources, or will raise Validation error.",
-        request=AssetSerializer,
-        responses={status.HTTP_200_OK: AssetSerializer(many=True)},
+        summary="Not allowed.",
+        description="For financial fidelity, this endpoint is not allowed.",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Assets"]
     ),
     delete=extend_schema(
         summary="Not allowed.",
         description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        responses={status.HTTP_403_FORBIDDEN: None},
         tags=["Assets"]
     )
 )
 class AssetView(APIView):
     """
-    View for assets. Directly linked to PaymentSources.
-    Disallows patch methods for financial fidelity.
-    Disallows post methods due to automatic asset generation.
-    Disallows delete methods due to automatic asset generation.
+    View for assets. Directly linked to PaymentSources.\n
+    Disallows put methods for financial fidelity.\n
+    Disallows post methods due to automatic asset generation.\n
+    Disallows delete methods due to automatic asset generation.\n
 
     Attributes:
         post: Not allowed.
         get: Retrieve either a single asset by source or all assets for user.
-        put: Update an asset.
-        patch: Not allowed.
+        put: Not allowed.
+        patch: Update an asset.
         delete: Not allowed.
     """
     def post(self, request):
         """Not allowed."""
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(status=status.HTTP_403_FORBIDDEN)
     
     def get(self, request, source=None):
         """
@@ -222,32 +248,49 @@ class AssetView(APIView):
         :param source: Optional source to filter by.
         :return: Serialized asset or serialized set of all assets.
         """
+        # Check if source provided, otherwise return all assets
         if not source:
             result = asset_svc.get_all_assets(uid=request.user.appprofile.user_id)
             serializer = AssetSerializer(result['asset'], many=True)
         else:
             result = asset_svc.get_asset(uid=request.user.appprofile.user_id, source=source)
             serializer = AssetSerializer(result['assets'], many=True)
+        
+        # Return serialized asset or all assets
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def patch(self, request):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    def put(self, request, source: str):
+    def patch(self, request, source: str):
+        # Catch if source is 'unknown' and return error
+        source = source.lower()
+        if source == "unknown":
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        
+        # Reject attempts to modify amount
+        if request.data.get('amount'):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        
         result = asset_svc.update_asset_source(
             uid=request.user.appprofile.user_id,
-            data=request.data)
+            data=request.data,
+            source=source
+        )
         serializer = AssetSerializer(result['updated'])
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, source: str):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
     def delete(self, request):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(status=status.HTTP_403_FORBIDDEN)
     
 # Source View
 @extend_schema_view(
     post=extend_schema(
         summary="Add a payment source",
-        description="Adds a payment source to the user's account.",
+        description="Adds a payment source to the user's account.\n"
+                    "Allows for multiple sources to be created at once.\n"
+                    "Forbidden to add 'unknown' source as that is a default empty source.\n"
+                    "If forbidden, will return HTTP 400 Bad Request during creation and not add any sources.",
         request=SourceSerializer,
         responses={status.HTTP_201_CREATED: SourceSerializer},
         tags=["Sources"]
@@ -265,38 +308,50 @@ class AssetView(APIView):
     patch=extend_schema(
         summary="Not allowed.",
         description="For financial fidelity, this endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        responses={status.HTTP_403_FORBIDDEN: None},
         tags=["Sources"]
     ),
     put=extend_schema(
         summary="Update a payment source",
-        description="Updates an existing payment source identified by its source.",
+        description="Updates an existing payment source identified by its source.\n"
+                    "Forbidden for 'unknown' source as that is a default empty source.",
         request=SourceSerializer,
-        responses={status.HTTP_200_OK: SourceSerializer(many=True)},
+        responses={
+            status.HTTP_200_OK: SourceSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: None,
+            },
         tags=["Sources"]
     ),
     delete=extend_schema(
         summary="Delete a payment source",
-        description="Deletes an existing payment source identified by its source.",
-        responses={status.HTTP_200_OK: SourceSerializer(many=True)},
+        description="Deletes an existing payment source identified by its source.\n"
+                    "Forbidden for 'unknown' source as that is a default empty source.",
+        responses={
+            status.HTTP_200_OK: SourceSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: None,
+            },
         tags=["Sources"]
     )
 )
 class SourceView(APIView):
     """
-    View for payment sources.
+    View for payment sources.\n
     Disallows patch methods for financial fidelity.
 
     Attributes:
         post: Add a payment source.
         get: Retrieve sources.
+        patch: Not allowed.
         put: Update a payment source.
         delete: Delete a payment source.
     """
     def post(self, request):
+        # Check if single or list of sources and serialize
         is_many = isinstance(request.data, list)
         serializer = SourceSerializer(request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
+
+        # Handle Sources based of list or single
         if is_many:
             result = src_svc.bulk_add_sources(
                 uid=request.user.appprofile.user,
@@ -307,26 +362,34 @@ class SourceView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
+        
+        # Serialize and return
         serializer = SourceSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def patch(self, request):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
     def get(self, request):
+        # Get sources, filter by params, serialize, return
         result = src_svc.get_sources(uid=request.user.appprofile.user, **request.query_params)
         serializer = SourceSerializer(result['sources'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def put(self, request):
+    def put(self, request, src: str):
+        if src == "unknown":
+            return Response(status=status.HTTP_403_FORBIDDEN)
         result = src_svc.update_source(
             uid=request.user.appprofile.user,
+            source=src,
             data=request.data
         )
         serializer = SourceSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def delete(self, request):
+        if request.data['source'] == "unknown":
+            return Response(status=status.HTTP_403_FORBIDDEN)
         result = src_svc.delete_source(
             uid=request.user.appprofile.user,
             source=request.data['source']
@@ -345,9 +408,9 @@ class SourceView(APIView):
     ),
     get=extend_schema(
         summary="Retrieve an expense",
-        description="Retrieves a single planned expense for a user.  Accepts optional filters."
-                    "If start is set with no end, will return all expenses after start."
-                    "If end is set with no start, will return all expenses before end."
+        description="Retrieves a single planned expense for a user.  Accepts optional filters.\n"
+                    "If start is set with no end, will return all expenses after start.\n"
+                    "If end is set with no start, will return all expenses before end.\n"
                     "If for_month is set, will return expenses for current month.",
         parameters=[
             OpenApiParameter(name='name', type=OpenApiTypes.STR, description='Filter by expense name'),
@@ -450,8 +513,8 @@ class UpcomingExpenseView(APIView):
 @extend_schema_view(    
     post=extend_schema(
         summary="Add a tag",
-        description="Adds a tag to the user's account."  
-                    "Allows for multiple tags to be created at once."
+        description="Adds a tag to the user's account.\n"  
+                    "Allows for multiple tags to be created at once.\n"
                     "Tags are automatically generated when a transaction is created if a tag is assigned and not found.",
         request=TagSerializer,
         responses={status.HTTP_201_CREATED: TagSerializer(many=True)},
@@ -461,6 +524,13 @@ class UpcomingExpenseView(APIView):
         summary="Retrieve tags",
         description="Retrieves a list of tags for a user.",
         responses={status.HTTP_200_OK: TagSerializer(many=True)},
+        tags=["Tags"]
+    ),
+    patch=extend_schema(
+        summary="Not allowed.",
+        description="Not allowed for consistency and redundancy.\n"
+                    "Tags are single names, making patch and put exactly the same.",
+        responses={status.HTTP_403_FORBIDDEN: None},
         tags=["Tags"]
     ),
     put=extend_schema(
@@ -478,10 +548,23 @@ class UpcomingExpenseView(APIView):
     )
 )
 class TagView(APIView):
+    """
+    View for tags.
+
+    Attributes:
+        post: Add a tag.
+        get: Retrieve tags.
+        patch: Not allowed.
+        put: Update a tag.
+        delete: Delete a tag.
+    """
     def post(self, request):
+        # Check if single or list of tags and serialize
         is_many = isinstance(request.data, list)
         serializer = TagSerializer(data=request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
+
+        # Handle Tags based of list or single
         if is_many:
             result = tag_svc.bulk_add_tags(
                 uid=request.user.appprofile.user,
@@ -492,15 +575,22 @@ class TagView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
+
+        # Serialize and return
         serializer = TagSerializer(result['added'],many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request):
+        # Get tags, serialize, return
         result = tag_svc.get_tags(uid=request.user.appprofile.user)
         serializer = TagSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    def patch(self, request):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
     def put(self, request, name: str):
+        # Change name of tag, serialize, return
         result = tag_svc.update_tag(
             uid=request.user.appprofile.user,
             name=name,
@@ -511,6 +601,7 @@ class TagView(APIView):
         
     
     def delete(self, request):
+        # Delete tag, serialize, return
         result = tag_svc.delete_tag(
             uid=request.user.appprofile.user,
             tag_name=request.data['name']
@@ -523,7 +614,7 @@ class TagView(APIView):
     post=extend_schema(
         summary="Not allowed.",
         description="All app profiles are generated automatically.  This endpoint is not allowed. Automatically generated on user creation.",
-        responses={status.HTTP_501_NOT_IMPLEMENTED: None},
+        responses={status.HTTP_403_FORBIDDEN: None},
         tags=["App Profiles"]
     ),
     get=extend_schema(
@@ -532,11 +623,21 @@ class TagView(APIView):
         responses={status.HTTP_200_OK: AppProfileSerializer(many=True)},
         tags=["App Profiles"]
     ),
-    put=extend_schema(
+    patch=extend_schema(
         summary="Update app profile",
-        description="Updates the spend accounts and base currency for a user.",
+        description="Updates the spend accounts and base currency for a user.\n"
+                    "Forbidden for 'unknown' source as that is a default empty source.  This cannot be used as spend account.",
         request=AppProfileSerializer,
-        responses={status.HTTP_200_OK: AppProfileSerializer},
+        responses={
+            status.HTTP_200_OK: AppProfileSerializer,
+            status.HTTP_403_FORBIDDEN: None,
+            },
+        tags=["App Profiles"]
+    ),
+    put=extend_schema(
+        summary="Not allowed.",
+        description="Not allowed as only fields that can be updated for user are spend accounts and base currency.\n",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["App Profiles"]
     ),
     delete=extend_schema(
@@ -547,30 +648,49 @@ class TagView(APIView):
     )
 )
 class AppProfileView(APIView):
+    """
+    App profile view.
+
+    Attributes:
+        post: Not allowed.
+        get: Retrieve app profile.
+        patch: Update app profile.
+        put: Not allowed
+        delete: Not allowed.
+    """
     def post(self, request):
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(status=status.HTTP_403_FORBIDDEN)
     
     def get(self, request, snapshot: bool = False):
         uid = request.user.appprofile.user_id
+        # Return the snapshot if requested, otherwise return the app profile
         if snapshot:
             result = user_svc.user_get_totals(uid=uid)
             serializer = SnapshotSerializer(result, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        # Return the app profile.  Only returns spend account and base currency.
         result = user_svc.user_get_info(uid=uid)
         serializer = AppProfileSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def put(self, request, base_currency: str=None, spend_accounts: list=None):
+    def patch(self, request, base_currency: str=None, spend_accounts: list=None):
         uid = request.user.appprofile.user_id
         if base_currency:
             result = user_svc.user_update_base_currency(uid=uid, data={'code': base_currency})
             serializer = AppProfileSerializer(result)
             return Response(serializer.data, status=status.HTTP_200_OK)
         if spend_accounts:
+            for item in spend_accounts:
+                item = item.lower()
+            if "unknown" in spend_accounts:
+                return Response(status=status.HTTP_403_FORBIDDEN)
             result = user_svc.user_update_spend_accounts(uid=uid, data=spend_accounts)
             serializer = AppProfileSerializer(data=result)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def put(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    
     def delete(self, request):
         return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
 
@@ -585,7 +705,7 @@ class AppProfileView(APIView):
     ),
     get=extend_schema(
         summary="Retrieves users email.",
-        description="Retrieves the email for a user.",
+        description="Retrieves the email for the currently logged in user.",
         responses={status.HTTP_200_OK: OpenApiTypes.OBJECT},
         tags=["Users"]
     ),
@@ -595,7 +715,7 @@ class AppProfileView(APIView):
         request=UserSerializer,
         responses={
             status.HTTP_200_OK: UserSerializer,
-            status.HTTP_400_BAD_REQUEST: OpenApiTypes.OBJECT,
+            status.HTTP_403_FORBIDDEN: OpenApiTypes.OBJECT,
             },
         tags=["Users"]
     ),
@@ -604,16 +724,21 @@ class AppProfileView(APIView):
         description="Deletes an existing user identified by its username.",
         responses={
             status.HTTP_200_OK: UserSerializer,
-            status.HTTP_400_BAD_REQUEST: OpenApiTypes.OBJECT,
+            status.HTTP_403_FORBIDDEN: OpenApiTypes.OBJECT,
             },
         tags=["Users"]
     )
 )
 class UserView(APIView):
     def post(self, request):
+        # Get user model
         User = get_user_model()
+
+        # Check if all user credentials provided
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Create user
         user = User.objects.create_user(
             username=serializer.data['username'],
             email=serializer.data['user_email'],
@@ -629,16 +754,16 @@ class UserView(APIView):
     def patch(self, request):
         User = get_user_model()
         if request.data['username'] != request.user.username:
-            return Response({'message': "Incorrect user."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': "Incorrect user."}, status=status.HTTP_403_FORBIDDEN)
         user = User.objects.get(username=request.data['username'])
         user.set_password(request.data['password'])
         user.save()
-        return Response({'message': "Password updated successfully"}, status=200)
+        return Response({'message': "Password updated successfully"}, status=status.HTTP_200_OK)
     
     def delete(self, request):
         User = get_user_model()
         if request.data['username'] != request.user.username:
-            return Response({'message': "Incorrect user."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': "Incorrect user."}, status=status.HTTP_403_FORBIDDEN)
         user = User.objects.get(username=request.data['username'])
         user.delete()
-        return Response({'message': "User deleted successfully"}, status=200)
+        return Response({'message': "User deleted successfully"}, status=status.HTTP_200_OK)

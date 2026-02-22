@@ -12,6 +12,7 @@ Attributes:
 import finance.logic.validators as validator
 import finance.logic.updaters as update
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from loguru import logger
 from finance.models import PaymentSource, AppProfile
 
@@ -33,6 +34,8 @@ def add_source(uid, data: dict):
     logger.debug(f"Adding asset: {data}")
     uid = AppProfile.objects.for_user(uid).get()
     data['source'] = data['source'].lower()
+    if data['source'] == "unknown":
+        raise ValidationError("Cannot add unknown source")
     asset = PaymentSource.objects.create(uid=uid,**data)
     update.rebalance(uid=uid, acc_type=asset.acc_type)
     return {'added': asset}

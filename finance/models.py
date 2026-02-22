@@ -17,6 +17,7 @@ from django.conf import settings
 from finance.management.managers import *
 import uuid
 
+# TODO: Create User Abstract model to force emails to be unique
 
 class AppProfile(models.Model):
     """
@@ -113,6 +114,7 @@ class PaymentSource(models.Model):
         CASH = "CASH", "Cash"
         INVESTMENT = "INVESTMENT", "Investment"
         EWALLET = "EWALLET", "Mobile Wallet"
+        UNKNOWN = "UNKNOWN", "Unknown"
 
     source = models.CharField(max_length=50)
     acc_type = models.CharField(max_length=10, choices=AccType.choices)
@@ -237,12 +239,12 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     # Link to relationship models
-    source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
+    source = models.ForeignKey("PaymentSource", on_delete=models.SET_DEFAULT, default=PaymentSource.objects.get(acc_type="UNKNOWN"))
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
     entry_id = models.AutoField(primary_key=True, db_index=True)
     tx_id = models.CharField(max_length=20, editable=False)
-    bill = models.ForeignKey('UpcomingExpense', on_delete=models.PROTECT, null=True, blank=True)
+    bill = models.ForeignKey('UpcomingExpense', on_delete=models.SET_NULL, null=True, blank=True)
 
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)

@@ -88,7 +88,7 @@ def calc_queryset(uid, queryset):
     total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), total_by_currency))
     return Decimal(total).quantize(Decimal("0.01"))
 
-def calc_new_balance(uid, source, amount, multiplier, currency):
+def calc_new_balance(uid, source, amount, currency):
     """
     Calculates the new balance for a source.
 
@@ -109,7 +109,6 @@ def calc_new_balance(uid, source, amount, multiplier, currency):
     old_balance = CurrentAsset.objects.filter(uid=uid, source__source=source).values_list("amount", flat=True).first()
     logger.debug(f"Old balance: {old_balance}")
     asset_currency = Currency.objects.for_user(uid).get_by_code(code=currency).get()
-    amount = amount * multiplier
     if currency != asset_currency.code:
         amount = _convert_currency(amount, currency, asset_currency.code)
     new_balance = old_balance - amount
@@ -128,7 +127,7 @@ def calc_total_assets(uid):
     """
     base_currency = AppProfile.objects.for_user(uid).get_base_currency().code
     logger.debug(f"Calculating total assets for {uid} with base currency {base_currency}")
-    assets = CurrentAsset.objects.filter(uid=uid)
+    assets = CurrentAsset.objects.filter(uid=uid).exclude(source__acc_type="UNKNOWN")
     asset_by_currency = assets.values("currency__code").annotate(total=Sum("amount"))
     logger.debug(f"Asset by currency: {asset_by_currency}")
     asset_total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), asset_by_currency))
