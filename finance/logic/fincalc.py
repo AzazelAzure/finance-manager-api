@@ -17,7 +17,8 @@ from finance.models import (
     CurrentAsset, 
     UpcomingExpense, 
     Transaction,
-    AppProfile
+    AppProfile,
+    Currency
 )
 from django.db.models import Sum
 from django.conf import settings
@@ -87,7 +88,7 @@ def calc_queryset(uid, queryset):
     total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), total_by_currency))
     return Decimal(total).quantize(Decimal("0.01"))
 
-def calc_new_balance(uid, source, amount):
+def calc_new_balance(uid, source, amount, multiplier, currency):
     """
     Calculates the new balance for a source.
 
@@ -97,12 +98,20 @@ def calc_new_balance(uid, source, amount):
     :type source: str
     :param amount: The amount to subtract from the balance.
     :type amount: Decimal
+    :param multiplier: The multiplier to apply to the amount.
+    :type multiplier: int
+    :param currency: The currency of the amount.
+    :type currency: str
     :returns: The new balance for the source.
     :rtype: Decimal
     """
     logger.debug(f"Calculating new balance for {source} with amount {amount}")
     old_balance = CurrentAsset.objects.filter(uid=uid, source__source=source).values_list("amount", flat=True).first()
     logger.debug(f"Old balance: {old_balance}")
+    asset_currency = Currency.objects.for_user(uid).get_by_code(code=currency).get()
+    amount = amount * multiplier
+    if currency != asset_currency.code:
+        amount = _convert_currency(amount, currency, asset_currency.code)
     new_balance = old_balance - amount
     logger.debug(f"New balance: {new_balance}")
     return Decimal(new_balance).quantize(Decimal("0.01"))

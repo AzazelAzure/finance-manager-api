@@ -1,3 +1,15 @@
+"""
+This module defines all views for the finance manager application.
+
+Attributes:
+    TransactionView: View for transactions.
+    AssetView: View for assets.
+    SourceView: View for sources.
+    UpcomingExpenseView: View for upcoming expenses.
+    TagView: View for tags.
+    AppProfileView: View for app profiles.
+    UserView: View for users.
+"""
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -54,6 +66,12 @@ from .api_tools.serializers import (
         responses={status.HTTP_200_OK: SpectacularTxSerializer},
         tags=["Transactions"]
     ),
+    patch=extend_schema(
+        summary="Not allowed.",
+        description="For transactional fidelity, this endpoint is not allowed.",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        tags=["Transactions"]
+    ),
     put=extend_schema(
         summary="Update a transaction",
         description="Updates an existing transaction identified by its ID.",
@@ -69,6 +87,16 @@ from .api_tools.serializers import (
     )
 )
 class TransactionView(APIView):
+    """
+    View for transactions. 
+    Disallows patch methods for financial fidelity.
+
+    Attributes:
+        post: Create one or more transactions.
+        get: Retrieve transactions.
+        put: Update a transaction.
+        delete: Delete a transaction.
+    """
     def post(self, request):
         is_many = isinstance(request.data, list)
         serializer = TransactionSerializer(data=request.data, many=is_many)
@@ -112,6 +140,9 @@ class TransactionView(APIView):
         result = tx_svc.user_get_transactions(uid=uid, **filter_params)
         serializer = TransactionSerializer(result['transactions'], many=True)
         return Response({'transactions': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
+    
+    def patch(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def put(self, request, tx_id: str):
         result = tx_svc.user_update_transaction(
@@ -133,13 +164,19 @@ class TransactionView(APIView):
     post=extend_schema(
         summary="Not allowed.",
         description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_501_NOT_IMPLEMENTED: None},
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Assets"]
     ),
     get=extend_schema(
         summary="Retrieve all assets",
         description="Retrieves either a single asset by source or a list of all assets.",
         responses={status.HTTP_200_OK: AssetSerializer(many=True)},
+        tags=["Assets"]
+    ),
+    patch=extend_schema(
+        summary="Not allowed.",
+        description="For tfinancial fidelity, this endpoint is not allowed.",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Assets"]
     ),
     put=extend_schema(
@@ -152,15 +189,38 @@ class TransactionView(APIView):
     delete=extend_schema(
         summary="Not allowed.",
         description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_501_NOT_IMPLEMENTED: None},
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Assets"]
     )
 )
 class AssetView(APIView):
+    """
+    View for assets. Directly linked to PaymentSources.
+    Disallows patch methods for financial fidelity.
+    Disallows post methods due to automatic asset generation.
+    Disallows delete methods due to automatic asset generation.
+
+    Attributes:
+        post: Not allowed.
+        get: Retrieve either a single asset by source or all assets for user.
+        put: Update an asset.
+        patch: Not allowed.
+        delete: Not allowed.
+    """
     def post(self, request):
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
+        """Not allowed."""
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
     def get(self, request, source=None):
+        """
+        Retrieve either a single asset by source or all assets for user.
+        If source is provided, return a single asset.
+        If no source is provided, return all assets for user.
+
+        :param request: HTTP request.
+        :param source: Optional source to filter by.
+        :return: Serialized asset or serialized set of all assets.
+        """
         if not source:
             result = asset_svc.get_all_assets(uid=request.user.appprofile.user_id)
             serializer = AssetSerializer(result['asset'], many=True)
@@ -168,6 +228,9 @@ class AssetView(APIView):
             result = asset_svc.get_asset(uid=request.user.appprofile.user_id, source=source)
             serializer = AssetSerializer(result['assets'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def put(self, request, source: str):
         result = asset_svc.update_asset_source(
@@ -177,7 +240,7 @@ class AssetView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def delete(self, request):
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
 # Source View
 @extend_schema_view(
@@ -198,6 +261,12 @@ class AssetView(APIView):
         responses={status.HTTP_200_OK: SourceSerializer(many=True)},
         tags=["Sources"]
     ),
+    patch=extend_schema(
+        summary="Not allowed.",
+        description="For financial fidelity, this endpoint is not allowed.",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        tags=["Sources"]
+    ),
     put=extend_schema(
         summary="Update a payment source",
         description="Updates an existing payment source identified by its source.",
@@ -213,6 +282,16 @@ class AssetView(APIView):
     )
 )
 class SourceView(APIView):
+    """
+    View for payment sources.
+    Disallows patch methods for financial fidelity.
+
+    Attributes:
+        post: Add a payment source.
+        get: Retrieve sources.
+        put: Update a payment source.
+        delete: Delete a payment source.
+    """
     def post(self, request):
         is_many = isinstance(request.data, list)
         serializer = SourceSerializer(request.data, many=is_many)
@@ -230,6 +309,9 @@ class SourceView(APIView):
         serializer = SourceSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
+    def patch(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
     def get(self, request):
         result = src_svc.get_sources(uid=request.user.appprofile.user, **request.query_params)
         serializer = SourceSerializer(result['sources'], many=True)
@@ -280,6 +362,12 @@ class SourceView(APIView):
             OpenApiParameter(name='upcoming', type=OpenApiTypes.BOOL, description='Filter by upcoming'),
         ],
         responses={status.HTTP_200_OK: SpectacularExpenseSerializer(many=True)},
+        tags=["Upcoming Expenses"]
+    ),
+    patch=extend_schema(
+        summary="Not allowed.",
+        description="For financial fidelity, this endpoint is not allowed.",
+        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Upcoming Expenses"]
     ),
     put=extend_schema(
@@ -337,6 +425,9 @@ class UpcomingExpenseView(APIView):
         serializer = ExpenseSerializer(result['expenses'], many=True)
         return Response({'expenses': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
 
+    def patch(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    
     def put(self, request):
         result = exp_svc.update_expense(
             uid=request.user.appprofile.user,
@@ -488,26 +579,32 @@ class AppProfileView(APIView):
         summary="Create one or more users",
         description="Allows creation of a single user or a list of users.",
         request=UserSerializer,
-        responses={status.HTTP_201_CREATED: UserSerializer}, 
+        responses={status.HTTP_201_CREATED: OpenApiTypes.OBJECT}, 
         tags=["Users"]
     ),
     get=extend_schema(
         summary="Retrieves users email.",
         description="Retrieves the email for a user.",
-        responses={status.HTTP_200_OK: UserSerializer},
+        responses={status.HTTP_200_OK: OpenApiTypes.OBJECT},
         tags=["Users"]
     ),
-    put=extend_schema(
+    patch=extend_schema(
         summary="Update a user",
-        description="Updates an existing user identified by its username and password.",
+        description="Updates an existing user identified by its username and password.  Used to update password.",
         request=UserSerializer,
-        responses={status.HTTP_200_OK: UserSerializer},
+        responses={
+            status.HTTP_200_OK: UserSerializer,
+            status.HTTP_400_BAD_REQUEST: OpenApiTypes.OBJECT,
+            },
         tags=["Users"]
     ),
     delete=extend_schema(
         summary="Delete a user",
         description="Deletes an existing user identified by its username.",
-        responses={status.HTTP_200_OK: UserSerializer},
+        responses={
+            status.HTTP_200_OK: UserSerializer,
+            status.HTTP_400_BAD_REQUEST: OpenApiTypes.OBJECT,
+            },
         tags=["Users"]
     )
 )
@@ -521,26 +618,26 @@ class UserView(APIView):
             email=serializer.data['user_email'],
             password=serializer.data['password']
         )
-        return Response({'message': "User created successfully"}, status=201)
+        return Response({'message': "User created successfully"}, status=status.HTTP_201_CREATED)
     
     def get(self, request):
         serialzer = UserSerializer(data=request.user)
         serialzer.is_valid(raise_exception=True)
         return Response({'email': request.user.email}, status=status.HTTP_200_OK)
 
-    def put(self, request):
+    def patch(self, request):
         User = get_user_model()
-        serializer = UserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = User.objects.get(username=serializer.data['username'])
-        user.set_password(serializer.data['password'])
+        if request.data['username'] != request.user.username:
+            return Response({'message': "Incorrect user."}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.get(username=request.data['username'])
+        user.set_password(request.data['password'])
         user.save()
         return Response({'message': "Password updated successfully"}, status=200)
     
     def delete(self, request):
         User = get_user_model()
-        serializer = UserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if request.data['username'] != request.user.username:
+            return Response({'message': "Incorrect user."}, status=status.HTTP_400_BAD_REQUEST)
         user = User.objects.get(username=request.data['username'])
         user.delete()
         return Response({'message': "User deleted successfully"}, status=200)

@@ -46,7 +46,7 @@ def user_update_spend_accounts(uid: str, data: list):
     # Check if sources exists
     for item in data:
         if not PaymentSource.objects.for_user(uid).filter(source=item).exists():
-            logger.debug(f"Source does not exist: {item}")
+            logger.error(f"Source does not exist: {item}")
             raise ValidationError("Source does not exist")
         item = PaymentSource.objects.for_user(uid).get_by_source(source=item)
     # Update spend accounts    
@@ -87,7 +87,7 @@ def user_update_base_currency(uid: str, data: dict):
     data = {k.upper(): v for k, v in data.items()}
     # Check if currency exists
     if not Currency.objects.filter(code=data['code']).exists():
-        logger.debug(f"Currency does not exist: {data['code']}")
+        logger.error(f"Currency does not exist: {data['code']}")
         raise ValidationError("Currency does not exist")
     # Update base currency
     user.base_currency = Currency.objects.filter(code=data['code']).first()

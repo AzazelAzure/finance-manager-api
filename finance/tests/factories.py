@@ -20,9 +20,8 @@ class CurrencyFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Currency
 
-    uid = factory.SubFactory(AppProfileFactory)
     code = factory.Faker("currency_code")
-    name = factory.Faker("word")
+    name = factory.Faker("currency_name")
     symbol = factory.Faker("currency_symbol")
 
 
@@ -38,7 +37,7 @@ class TagFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Tag
     uid = factory.SubFactory(AppProfileFactory)
-    name = factory.Faker("word")
+    name = factory.Faker("word", optional=True)
 
 class TransactionFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -50,7 +49,9 @@ class TransactionFactory(factory.django.DjangoModelFactory):
     amount = factory.Faker("random_int", min=100, max=1000)
     source = factory.SubFactory(PaymentSourceFactory, uid=factory.SelfAttribute('..uid'))
     currency = factory.SubFactory(CurrencyFactory, uid=factory.SelfAttribute('..uid'))
-    tx_type = factory.Faker("random_element", elements=("EXPENSE", "INCOME"))
+    tx_type = factory.Faker("random_element", elements=("EXPENSE", "INCOME", "XFER_OUT", "XFER_IN"))
+    bill = factory.SubFactory("finance.tests.factories.UpcomingExpenseFactory", uid=factory.SelfAttribute('..uid'), optional=True)
+
 
 class CurrentAssetFactory(factory.django.DjangoModelFactory):
     class Meta:

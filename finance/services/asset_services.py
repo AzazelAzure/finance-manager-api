@@ -18,7 +18,6 @@ from loguru import logger
 from finance.models import (
     PaymentSource, 
     CurrentAsset,
-    Currency
 )
 
 @transaction.atomic
@@ -45,6 +44,7 @@ def update_asset_source(uid, data:dict, source: str):
         update.rebalance(uid=uid, acc_type=asset_instance.source.acc_type)
         return {'updated': asset_instance}
     else:
+        logger.error(f"Cannot update asset.  Source {source} does not exist.")
         raise ValidationError("Cannot update asset.  Source does not exist.")
 
 @transaction.atomic

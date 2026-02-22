@@ -68,6 +68,7 @@ def TransactionIDValidator(func):
     def _wrapped(uid, tx_id: str):
         logger.debug(f"Validating transaction id: {tx_id} with uid: {uid}")
         if not Transaction.objects.for_user(uid).filter(tx_id=tx_id).exists():
+            logger.error(f"Transaction does not exist: {tx_id}")
             raise ValidationError("Transaction does not exist")
         return func(uid, tx_id)
     return _wrapped
@@ -82,6 +83,7 @@ def TransactionTypeValidator(func):
     def _wrapped(uid, tx_type: str):
         logger.debug(f"Validating transaction type: {tx_type} with uid: {uid}")
         if not Transaction.objects.for_user(uid).filter(tx_type=tx_type).exists():
+            logger.error(f"Transaction type does not exist: {tx_type}")
             raise ValidationError("Transaction type does not exist")
         return func(uid, tx_type)
     return _wrapped
@@ -97,6 +99,7 @@ def UserValidator(func):
     def _wrapped(uid, data:dict):
         logger.debug(f"Validating user with uid: {uid}")
         if not AppProfile.objects.for_user(uid).exists():
+            logger.error(f"User does not exist: {uid}")
             raise ValidationError("User does not exist")
         return func(uid, data)
     return _wrapped
@@ -143,7 +146,7 @@ def UpcomingExpenseValidator(func):
     def _wrapped(uid, data:dict):
         logger.debug(f"Validating expense: {data} with uid: {uid}")
         if not UpcomingExpense.objects.for_user(uid).filter(name=data['name']).exists():
-            logger.debug(f"Expense does not exist: {data['name']}")
+            logger.error(f"Expense does not exist: {data['name']}")
             raise ValidationError("Expense does not exist")
         return func(uid, data)
     return _wrapped
@@ -158,8 +161,8 @@ def TagValidator(func):
     @wraps(func)
     def _wrapped(uid, data:dict):
         logger.debug(f"Validating tag: {data} with uid: {uid}")
-        if Tag.objects.for_user(uid).filter(name=data['name']).exists():
-            logger.debug(f"Tag already exists: {data['name']}")
+        if Tag.objects.for_user(uid).filter(name=data['name'].lower()).exists():
+            logger.error(f"Tag already exists: {data['name']}")
             raise ValidationError("Tag already exists.  Cannot add duplicates")
         return func(uid, data)
     return _wrapped
@@ -174,10 +177,10 @@ def SourceValidator(func):
     def _wrapped(uid, data:dict):
         logger.debug(f"Validating source: {data} with uid: {uid}")
         if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
-            logger.debug(f"Source does not exist: {data['source']}")
+            logger.error(f"Source does not exist: {data['source']}")
             raise ValidationError("Source does not exist")
         if not PaymentSource.objects.filter(acc_type=data['acc_type']).exists():
-            logger.debug(f"Account type does not exist: {data['acc_type']}")
+            logger.error(f"Account type does not exist: {data['acc_type']}")
             raise ValidationError("Account type does not exist")
         return func(uid, data)
     return _wrapped
@@ -186,34 +189,34 @@ def SourceValidator(func):
 def _validate_transaction(uid, data:dict):
     logger.debug(f"Validating transaction: {data} with uid: {uid}")
     if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
-        logger.debug(f"Source does not exist: {data['source']}")
+        logger.error(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
     if not Currency.objects.filter(code=data['currency']).exists():
-        logger.debug(f"Currency does not exist: {data['currency']}")
+        logger.error(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
     if data.get('tags'):
         for tag in data['tags']:
             if not Tag.objects.for_user(uid).filter(name=tag).exists():
-                logger.debug(f"Tag does not exist: {tag}.  Creating...")
+                logger.warning(f"Tag does not exist: {tag}.  Creating...")
                 uid_instance = AppProfile.objects.for_user(uid).get()
                 Tag.objects.create(name=tag.lower(), uid=uid_instance)
     if not data.get('date'):
         data['date'] = timezone.now().date()
     if data.get('bill'):
         if not UpcomingExpense.objects.for_user(uid).filter(name=data['bill']).exists():
-            logger.debug(f"Expense does not exist: {data['bill']}")
+            logger.error(f"Expense does not exist: {data['bill']}")
             raise ValidationError("Expense does not exist")
         # Fix this value here since it's not a required field, to avoid key errors in _fix_data()
         data['bill'] = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill'])
-    return
+    return data
 
 def _validate_asset(uid, data:dict):
     logger.debug(f"Validating asset: {data} with uid: {uid}")
     if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
-        logger.debug(f"Source does not exist: {data['source']}")
+        logger.error(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
     if not Currency.objects.filter(code=data['currency']).exists():
-        logger.debug(f"Currency does not exist: {data['currency']}")
+        logger.error(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
     data['uid'] = AppProfile.objects.for_user(uid).get()
     data['currency'] = AppProfile.objects.for_user(uid).get_base_currency()
@@ -223,7 +226,7 @@ def _validate_asset(uid, data:dict):
 def _fix_data(uid, data:dict):
     logger.debug(f"Fixing data for {uid}")
     data['source'] = PaymentSource.objects.for_user(uid).get_by_source(source=data['source']).get()
-    data['currency'] = AppProfile.objects.for_user(uid).get_base_currency()
+    data['currency'] = Currency.objects.for_user(uid).get_by_code(code=data['currency']).get()
     data['uid'] = AppProfile.objects.for_user(uid).get()
     return data
 
