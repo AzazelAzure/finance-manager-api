@@ -95,6 +95,7 @@ class TransactionView(APIView):
         post: Create one or more transactions.
         get: Retrieve transactions.
         put: Update a transaction.
+        patch: Not allowed.
         delete: Delete a transaction.
     """
     def post(self, request):

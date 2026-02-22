@@ -1557,6 +1557,60 @@ class TransactionTestCase(BaseTestCase):
         # Assertion 3: Check if the asset amount is correct
         self.assertEqual(self.asset.amount, expected_amount)
 
+    def test_delete_tx(self):
+        """
+        Tests deleting a transaction.\n
+        The delete endpoint returns the deleted transaction with the response.\n
+        This allows testing to verify the deleted transaction was correct.
+        
+        Passes if:
+            - The transaction is deleted
+            - The transaction is correct to what was sent
+            - The transaction is not in the database
+            - The asset amount is correct
+            - The database is correct
+        
+        Fails if:
+            - The transaction is not deleted
+            - The transaction is not correct to what was sent
+            - The transaction is in the database
+            - The asset amount is not correct
+            - The database is not correct
+        """
+        logger.info("Beginning delete transaction test")
+        old_amount = self.asset.amount
+        tx = TransactionFactory.build(
+            uid=self.profile, 
+            tx_type='EXPENSE',
+            currency=self.currency,
+            source=self.source,
+            amount=100,
+            )
+        data ={
+            "uid": str(self.profile.user_id),
+            "date": tx.date,
+            "description": tx.description,
+            "amount": tx.amount,
+            "source": tx.source.source,     
+            "currency": tx.currency.code,
+            "tx_type": tx.tx_type,
+            "tags": self.tag_list,
+        }
+        response = self.client.delete(self.url, data, format='json')
+        logger.info(f'Delete Transaction Response: {response.data}')
+
+        # Assertion 1: General assertions
+        self._assert_tx(response, data, code=200)
+
+        # Assertion 2: Check if the transaction is deleted correctly
+        if Transaction.objects.filter(tx_id=response.data['tx_id']).exists():
+            self.fail("Transaction not deleted")
+        else:
+            self.assertTrue("Transaction deleted")
+
+        # Assertion 3: Check if the asset amount is correct
+        self.assertEqual(self.asset.amount, old_amount)
+        
     def _assert_tx(self, response, tx, code=200):
 
         # Assertion 1: Check if proper response code was returned
