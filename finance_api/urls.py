@@ -1,3 +1,4 @@
+
 """
 URL configuration for hive_hub project.
 
@@ -26,12 +27,21 @@ from finance.views import(
     AppProfileView,
     UserView
 )
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView
+)
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+h 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/token/auth/', TokenObtainPairView.as_view(), name='token_auth'),
+    path('api/toke/verify/', TokenRefreshView.as_view(), name='token_verify'),
     path("finance/transactions/", TransactionView.as_view(), name="transactions_list_create"), # Handles GET (list with filters) and POST (new transaction)
     path("finance/transactions/<str:tx_id>/", TransactionView.as_view(), name="transaction_detail_update_delete"), # Handles GET (single), PUT, DELETE
     path("finance/appprofile/", AppProfileView.as_view(), name="appprofile"), # Handles GET (single)

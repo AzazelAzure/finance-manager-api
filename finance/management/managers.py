@@ -3,6 +3,11 @@ This module defines all managers for the finance manager application.
 """
 from django.db import models
 from django.utils import timezone
+from datetime import date
+from django.utils import relativedelta
+
+# TODO: Add get_last_week and get_last_day
+# TODO: Add get_by_date
 
 class TransactionManager(models.QuerySet):
     """Manager for Transaction model."""
@@ -32,6 +37,21 @@ class TransactionManager(models.QuerySet):
         first_of_month = today.replace(day=1)
         return self.filter(date__range=[first_of_month, today])
     
+    def get_last_month(self):
+        """Returns a queryset for transactions in the last month."""
+        today = timezone.now().date()
+        today.replace(day=1)
+        last_month_start = today - relativedelta(months=1)
+        last_month_end = today - relativedelta(days=1)
+        return self.filter(date__range=[last_month_start, last_month_end])
+    
+    def get_previous_week(self):
+        """Returns a queryset for transactions in the previous week."""
+        # TODO: Fix logic later to account for user defined start of week
+        start_of_week = timezone.now().date() - relativedelta(weekday=6)
+        end_of_week = start_of_week + relativedelta(days=7)
+        return self.filter(date__range=[start_of_week, end_of_week])
+    
     def get_tx_id(self, entry_id):
         """Returns a transaction id for a given entry id."""
         return self.get(entry_id=entry_id).tx_id
@@ -59,6 +79,10 @@ class TransactionManager(models.QuerySet):
     def get_by_currency(self, code):
         """Returns a queryset for transactions with a given currency."""
         return self.filter(currency__code=code)
+    
+    def get_by_date(self, date):
+        """Returns a queryset for transactions with a given date."""
+        return self.filter(date=date)
     
     def get_by_month(self, month, year):
         """Returns a queryset for transactions in a given month."""

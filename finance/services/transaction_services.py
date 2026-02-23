@@ -20,6 +20,8 @@ from decimal import Decimal
 from loguru import logger
 from finance.models import Transaction, Tag, UpcomingExpense
 
+# TODO: Add ability to filter by weeks and days
+
 @validator.UserValidator
 def get_transactions(uid,**kwargs):
     """
@@ -54,6 +56,10 @@ def get_transactions(uid,**kwargs):
         queryset = queryset.get_by_month(kwargs['month'], kwargs['year'])
     if kwargs.get('month') and not kwargs.get('year'):
         queryset = queryset.get_by_month(kwargs['month'], timezone.now().year)
+    if kwargs.get('last_month'):
+        queryset = queryset.get_last_month()
+    if kwargs.get('previous_week'):
+        queryset = queryset.get_previous_week()
 
     # Dynamically apply other single-argument filters using getattr
     # Mapping of query parameter names to manager method names
@@ -64,6 +70,7 @@ def get_transactions(uid,**kwargs):
         'source': 'get_by_source',
         'currency_code': 'get_by_currency',
         'year': 'get_by_year',
+        'date': 'get_by_date',
     }
     for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
         if kwargs.get(param_name):

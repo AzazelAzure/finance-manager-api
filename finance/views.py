@@ -26,6 +26,7 @@ from .api_tools.serializers import (
     SourceSerializer,
     AssetSerializer,
     TransactionSerializer,
+    TransactionGetSerializer,
     TagSerializer,
     AppProfileSerializer,
     UserSerializer,
@@ -70,8 +71,14 @@ from .api_tools.serializers import (
             OpenApiParameter(name='current_month', type=OpenApiTypes.BOOL, description='Filter by current month'),
             OpenApiParameter(name='month', type=OpenApiTypes.INT, description='Filter by month'),
             OpenApiParameter(name='year', type=OpenApiTypes.INT, description='Filter by year'),
+            OpenApiParameter(name='last_month', type=OpenApiTypes.BOOL, description='Filter by last month'),
+            OpenApiParameter(name='previous_week', type=OpenApiTypes.BOOL, description='Filter by previous week'),
+            OpenApiParameter(name='date', type=OpenApiTypes.STR, description='Filter by date'),
         ],
-        responses={status.HTTP_200_OK: SpectacularTxSerializer},
+        responses={
+            status.HTTP_200_OK: SpectacularTxSerializer,
+            status.HTTP_200_OK: TransactionGetSerializer
+            },
         tags=["Transactions"]
     ),
     put=extend_schema(
@@ -149,7 +156,7 @@ class TransactionView(APIView):
         uid = request.user.appprofile.user_id
         
         if tx_id: # If tx_id is provided in the URL path, get a single transaction
-            result = tx_svc.user_get_transaction(uid=uid, tx_id=tx_id)
+            result = tx_svc.get_transaction(uid=uid, tx_id=tx_id)
             serializer = TransactionSerializer(result['transaction'])
             return Response({'transaction': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
         
@@ -165,14 +172,17 @@ class TransactionView(APIView):
             'current_month': request.query_params.get('current_month'),
             'month': request.query_params.get('month'),
             'year': request.query_params.get('year'),
+            'last_month': request.query_params.get('last_month'),
+            'previous_week': request.query_params.get('previous_week'),
+            'date': request.query_params.get('date'),
         }
         
         # Remove None values to avoid passing none to the service function if not provided
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
         # If no filters are provided, returns all transactions
-        result = tx_svc.user_get_transactions(uid=uid, **filter_params)
-        serializer = TransactionSerializer(result['transactions'], many=True)
-        return Response({'transactions': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
+        result = tx_svc.get_transactions(uid=uid, **filter_params)
+        serializer = TransactionGetSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request, tx_id: str):
         # Reject attempts to modify tx_id or entry_id
