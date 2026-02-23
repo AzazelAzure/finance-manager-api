@@ -79,7 +79,13 @@ def get_transactions(uid,**kwargs):
 
     # Default ordering
     queryset = queryset.order_by('-date', '-entry_id')
-    return {'transactions': queryset, 'amount': _calc_total(uid, queryset)}
+    return {'transactions': queryset, 
+            'total_expenses': _calc_total(uid, queryset.filter(tx_type='EXPENSE')),
+            'total_income': _calc_total(uid, queryset.filter(tx_type='INCOME')),
+            'total_transfer_out': _calc_total(uid, queryset.filter(tx_type='XFER_OUT')),
+            'total_transfer_in': _calc_total(uid, queryset.filter(tx_type='XFER_IN')),
+            'total_leaks': _calc_total(uid, queryset.filter(tx_type__in=['XFER_OUT', 'XFER_IN'])),
+            }
 
 @transaction.atomic
 @validator.TransactionValidator

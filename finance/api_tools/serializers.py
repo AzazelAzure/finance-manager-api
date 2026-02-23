@@ -42,6 +42,14 @@ class TransactionSerializer(serializers.Serializer):
     tx_id = serializers.CharField(max_length=200, required=False)
     entry_id = serializers.CharField(max_length=200, required=False)
 
+class TransactionGetSerializer(serializers.Serializer):
+    transactions = TransactionSerializer(many=True)
+    total_expenses = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_income = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_transfer_out = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_transfer_in = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_leaks = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 class AssetSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=50)
     currency = serializers.CharField(max_length=3)

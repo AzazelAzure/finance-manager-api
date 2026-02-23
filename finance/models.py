@@ -55,6 +55,7 @@ class AppProfile(models.Model):
         blank=True,
     )
     # timezone = models.ForeignKey("Timezone", on_delete=models.DEFAULT, default='America/New_York')
+    # start_of_week = models.IntegerField(default=1)
 
     def __str__(self):
         return f"{self.user_id}"
