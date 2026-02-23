@@ -239,7 +239,7 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     # Link to relationship models
-    source = models.ForeignKey("PaymentSource", on_delete=models.SET_DEFAULT, default=PaymentSource.objects.get(acc_type="UNKNOWN"))
+    source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
     entry_id = models.AutoField(primary_key=True, db_index=True)

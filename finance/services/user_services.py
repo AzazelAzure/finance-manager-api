@@ -53,7 +53,7 @@ def user_update_spend_accounts(uid: str, data: list):
     user.spend_accounts.set(data)
     return {'spend_accounts': user.spend_accounts, 'message': "Spend accounts updated successfully"}
         
-@validator.AppProfileValidator
+@validator.UserValidator
 def user_get_info(uid: str):
     """
     Retrieves the spend accounts and base currency for a user.

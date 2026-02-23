@@ -43,9 +43,14 @@ from .api_tools.serializers import (
         description="Allows creation of a single transaction or a list of transactions.\n"
                     "Transaction amounts are automically fixed by transaction type.\n"
                     "For example, EXPENSE and XFER_OUT transactions are fixed to negative, and INCOME and XFER_IN transactions are fixed to positive.\n"
-                    "Allows for 0 value transactions.",
+                    "Allows for 0 value transactions.\n"
+                    "Transaction ids and entry ids are auto generated, and cannot be set.\n"
+                    "Will return HTTP 403 Forbidden if either is set.",
         request=TransactionSerializer,
-        responses={status.HTTP_201_CREATED: TransactionSerializer}, 
+        responses={
+            status.HTTP_201_CREATED: TransactionSerializer,
+            status.HTTP_403_FORBIDDEN: None,
+            }, 
         tags=["Transactions"]
     ),
     get=extend_schema(
@@ -69,16 +74,18 @@ from .api_tools.serializers import (
         responses={status.HTTP_200_OK: SpectacularTxSerializer},
         tags=["Transactions"]
     ),
-    patch=extend_schema(
+    put=extend_schema(
         summary="Not allowed.",
         description="For transactional fidelity, this endpoint is not allowed.",
         responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["Transactions"]
     ),
-    put=extend_schema(
+    patch=extend_schema(
         summary="Update a transaction",
         description="Updates an existing transaction identified by its ID.\n"
-                    "Forbidden for 'tx_id' and 'entry_id' as they are auto generated unique identifiers.  These cannot be changed.",
+                    "Forbidden for 'tx_id' and 'entry_id' as they are auto generated unique identifiers.  These cannot be changed.\n"
+                    "If no date is provided, will return HTTP 400 Bad Request.\n" 
+                    "This is to prevent accidentally changing the date to date of transaction.",
         request=TransactionSerializer,
         responses={
             status.HTTP_200_OK: TransactionSerializer(many=True),
@@ -96,7 +103,7 @@ from .api_tools.serializers import (
 class TransactionView(APIView):
     """
     View for transactions.\n 
-    Disallows patch methods for financial fidelity.
+    Disallows put methods for financial fidelity.
 
     Attributes:
         post: Create one or more transactions.
@@ -113,10 +120,23 @@ class TransactionView(APIView):
 
         # Handle Transactions based of list or single
         if is_many:
+            for item in serializer.data:
+                if item.get('tags'):
+                    # Check if tags is a list, if not, make it a list
+                    if not isinstance(item['tags'], list):
+                        item['tags'] = [item['tags']]
+                if item.get('tx_id') or item.get('entry_id'):
+                    return Response(status=status.HTTP_403_FORBIDDEN)
             result = tx_svc.add_bulk_transactions(
                 data=serializer.data,
                 uid=request.user.appprofile.user_id)
         else:
+            if serializer.data.get('tags'):
+                # Check if tags is a list, if not, make it a list
+                if not isinstance(serializer.data['tags'], list):
+                    serializer.data['tags'] = [serializer.data['tags']]
+            if serializer.data.get('tx_id') or serializer.data.get('entry_id'):
+                return Response(status=status.HTTP_403_FORBIDDEN)
             result = tx_svc.add_transaction(
                 data=serializer.data,
                 uid=request.user.appprofile.user_id)
@@ -154,14 +174,19 @@ class TransactionView(APIView):
         serializer = TransactionSerializer(result['transactions'], many=True)
         return Response({'transactions': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
     
-    def patch(self, request):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    def put(self, request, tx_id: str):
+    def patch(self, request, tx_id: str):
         # Reject attempts to modify tx_id or entry_id
         if request.data.get('tx_id') or request.data.get('entry_id'):
             return Response(status=status.HTTP_403_FORBIDDEN)
         
+        # Ensure date is provided
+        if not request.date.get('date'):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if tags is a list, if not, make it a list
+        if not isinstance(request.data['tags'], list):
+            request.data['tags'] = [request.data['tags']]
+
         # Update transaction
         result = tx_svc.user_update_transaction(
             uid=request.user.appprofile.user_id,
@@ -171,6 +196,9 @@ class TransactionView(APIView):
         # Serialize and return
         serializer = TransactionSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    def put(self, request):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def delete(self, request, tx_id: str):
         # Delete transaction
@@ -181,6 +209,7 @@ class TransactionView(APIView):
         # Serialize and return
         serializer = TransactionSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 # Asset View
 @extend_schema_view(
@@ -282,7 +311,8 @@ class AssetView(APIView):
     
     def delete(self, request):
         return Response(status=status.HTTP_403_FORBIDDEN)
-    
+
+
 # Source View
 @extend_schema_view(
     post=extend_schema(
@@ -397,6 +427,7 @@ class SourceView(APIView):
         serializer = SourceSerializer(result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+
 # Upcoming Expense View
 @extend_schema_view(    
     post=extend_schema(
@@ -509,6 +540,7 @@ class UpcomingExpenseView(APIView):
         serializer = ExpenseSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 # Tag View
 @extend_schema_view(    
     post=extend_schema(
@@ -609,6 +641,7 @@ class TagView(APIView):
         serializer = TagSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 # AppProfile View
 @extend_schema_view(
     post=extend_schema(
@@ -693,6 +726,7 @@ class AppProfileView(APIView):
     
     def delete(self, request):
         return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
+
 
 # User View
 @extend_schema_view(

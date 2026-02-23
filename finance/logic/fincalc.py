@@ -10,9 +10,8 @@ Attributes:
     calc_asset_type: Calculates the total assets for a specific account type.
 """
 
-# TODO: Update docstrings
 # TODO: Update logging
-# TODO: Refactor calculators to remove redundant code
+
 from finance.models import (
     CurrentAsset, 
     UpcomingExpense, 
@@ -21,11 +20,10 @@ from finance.models import (
     Currency
 )
 from django.db.models import Sum
-from django.conf import settings
-from currency_converter import CurrencyConverter
+from finance.logic.convert_currency import convert_currency
 from decimal import Decimal
 from loguru import logger
-import os
+
 
 
 
@@ -110,8 +108,8 @@ def calc_new_balance(uid, source, amount, currency):
     logger.debug(f"Old balance: {old_balance}")
     asset_currency = Currency.objects.for_user(uid).get_by_code(code=currency).get()
     if currency != asset_currency.code:
-        amount = _convert_currency(amount, currency, asset_currency.code)
-    new_balance = old_balance - amount
+        amount = convert_currency(amount, currency, asset_currency.code)
+    new_balance = old_balance + amount
     logger.debug(f"New balance: {new_balance}")
     return Decimal(new_balance).quantize(Decimal("0.01"))
 
@@ -154,21 +152,11 @@ def calc_asset_type(uid, acc_type):
     asset_total = sum(map(lambda x: _calc_totals(x["currency__code"], base_currency, x["total"]), asset_by_currency))
     return Decimal(asset_total).quantize(Decimal("0.01"))
 
-def _convert_currency(from_code, to_code, amount):
-    logger.debug(f"Converting {amount} from {from_code} to {to_code}")
-    rate = os.path.join(settings.BASE_DIR, 'finance', 'data', 'exchange_rates.zip')
-    if amount is None:
-        return 0
-    c = CurrencyConverter(rate, decimal=True)
-    converted = c.convert(amount, from_code, to_code)
-    logger.debug(f"Converted: {converted}")
-    return converted
-
 def _calc_totals(item_currency, base_currency, amount):
     logger.debug(f"Calculating totals for {item_currency} with base currency {base_currency} from {amount}")
     total = 0
     if item_currency != base_currency:
-        total += _convert_currency(item_currency, base_currency, amount)
+        total += convert_currency(amount, item_currency, base_currency)
     else:
         total += amount or Decimal("0")
     logger.debug(f"Totals: {total}")

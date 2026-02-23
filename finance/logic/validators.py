@@ -179,7 +179,7 @@ def SourceValidator(func):
         if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
             logger.error(f"Source does not exist: {data['source']}")
             raise ValidationError("Source does not exist")
-        if not PaymentSource.objects.filter(acc_type=data['acc_type']).exists():
+        if data['acc_type'] not in PaymentSource.AccType.choices:
             logger.error(f"Account type does not exist: {data['acc_type']}")
             raise ValidationError("Account type does not exist")
         return func(uid, data)

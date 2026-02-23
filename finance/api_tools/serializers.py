@@ -5,7 +5,7 @@ class TagSerializer(serializers.Serializer):
 
 class SourceSerializer(serializers.Serializer):
     source = serializers.CharField()
-    acc_type = serializers.ChoiceField(max_length=10)
+    acc_type = serializers.CharField(max_length=10)
 
 class CurrencySerializer(serializers.Serializer):
     code = serializers.CharField(max_length=3)
@@ -20,7 +20,10 @@ class ExpenseSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
     paid_flag = serializers.BooleanField(required=False)
-    currency = CurrencySerializer(required=False)
+    currency = serializers.CharField(max_length=3)
+    start = serializers.DateField(required=False, allow_null=True)
+    end = serializers.DateField(required=False, allow_null=True)
+    recurring = serializers.BooleanField(required=False)
     is_recurring = serializers.BooleanField(required=False)
 
 class TransactionSerializer(serializers.Serializer):
@@ -31,25 +34,26 @@ class TransactionSerializer(serializers.Serializer):
         max_length=200
         )
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    source = SourceSerializer()
-    currency = CurrencySerializer()
-    tags = TagSerializer(many=True)
+    source = serializers.CharField(max_length=50)
+    currency = serializers.CharField(max_length=3)
+    tags = serializers.ListField(child=serializers.CharField(max_length=200))
     tx_type = serializers.CharField(max_length=10)
-    bill = ExpenseSerializer(required=False)
+    bill = serializers.CharField(max_length=200, required=False)
     tx_id = serializers.CharField(max_length=200, required=False)
     entry_id = serializers.CharField(max_length=200, required=False)
 
 class AssetSerializer(serializers.Serializer):
-    source = SourceSerializer()
-    currency = CurrencySerializer()
+    source = serializers.CharField(max_length=50)
+    currency = serializers.CharField(max_length=3)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
 
 class AppProfileSerializer(serializers.Serializer):
     username = serializers.CharField(required=False)
     user_id = serializers.UUIDField(required=False)
-    spend_accounts = SourceSerializer(many=True, required=False)
-    base_currency = CurrencySerializer(required=False)
+    spend_accounts = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
+    base_currency = serializers.CharField(max_length=3, required=False)
+
 
 
 class UserSerializer(serializers.Serializer):
