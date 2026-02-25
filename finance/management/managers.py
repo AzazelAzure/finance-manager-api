@@ -49,10 +49,6 @@ class TransactionManager(models.QuerySet):
         end_of_week = start_of_week + relativedelta(days=7)
         return self.filter(date__range=[start_of_week, end_of_week])
     
-    def get_tx_id(self, entry_id):
-        """Returns a transaction id for a given entry id."""
-        return self.get(entry_id=entry_id).tx_id
-    
     def get_by_tx_type(self, tx_type):
         """Returns a queryset for transactions of a given type."""
         return self.filter(tx_type=tx_type)
@@ -211,7 +207,15 @@ class AppProfileManager(models.QuerySet):
     
     def get_spend_accounts(self, uid):
         """Returns a list of spend accounts for a user."""
-        return self.filter(user_id=uid).values_list("spend_accounts__acc_type", flat=True)
+        return self.filter(user_id=uid).values_list("spend_accounts__source", flat=True)
+    
+    def get_timezone(self):
+        """Returns the timezone for a user."""
+        return self.get().timezone
+
+    def get_start_of_week(self):
+        """Returns the start of week for a user."""
+        return self.get().start_of_week
         
 class FinancialSnapshotManager(models.QuerySet):
     """Manager for FinancialSnapshot model."""
@@ -229,4 +233,17 @@ class FinancialSnapshotManager(models.QuerySet):
         field_name = f"total_{acc_type.lower()}"
         self.update(**{field_name: total})
 
+class PastDueManager(models.QuerySet):
+    """Manager for PastDue model."""
+    def for_user(self, uid):
+        return self.filter(uid=uid)
+    
+    def get_by_expense(self, expense):
+        return self.filter(past_due_expense=expense)
+    
+    def get_by_missed_due_date(self, expense, date):
+        return self.filter(missed_due_date=date, past_due_expense=expense)
+    
+    def get_total_past_due(self, expense):
+        return self.filter(past_due_expense=expense).values_list("total_past_due", flat=True).first()
 

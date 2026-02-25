@@ -78,7 +78,7 @@ def get_transactions(uid,**kwargs):
             queryset = method(kwargs[param_name])
 
     # Default ordering
-    queryset = queryset.order_by('-date', '-entry_id')
+    queryset = queryset.order_by('tx_id')
     return {'transactions': queryset, 
             'total_expenses': _calc_total(uid, queryset.filter(tx_type='EXPENSE')),
             'total_income': _calc_total(uid, queryset.filter(tx_type='INCOME')),
@@ -118,11 +118,11 @@ def add_bulk_transactions(uid, data: list):
     :rtype: dict
     """
     logger.debug(f"Adding bulk transactions: {data}")
-    added = []
-    for item in data:
-        logger.debug(f"Adding transaction: {item}")
-        _add_transaction(uid, item)
-        added.append(Transaction.objects.for_user(uid).get_tx(item['tx_id']))
+    # added = []
+    # for item in data:
+    #     logger.debug(f"Adding transaction: {item}")
+    #     _add_transaction(uid, item)
+    #     added.append(Transaction.objects.for_user(uid).get_tx(item['tx_id']))
     return {'added': added}
 
 @transaction.atomic

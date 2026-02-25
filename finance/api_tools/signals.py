@@ -1,7 +1,7 @@
 """
 This module handles all signal receivers for the finance manager application.
 """
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save, pre_delete, pre_save
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 from django.contrib.auth.models import User
@@ -17,7 +17,63 @@ from finance.models import (
     UpcomingExpense
 )
 from loguru import logger
+import uuid
 
+
+# Transaction signals
+@receiver(pre_save, sender=Transaction)
+def generate_new_tx_data(sender, instance, **kwargs):
+    date_suffix = timezone.now(AppProfile.for_user(instance.uid).get_timezone()).date()
+    if not instance.tx_id:
+        # Get and set a tx_id for unique transaction identifiers
+        unique_id = str(uuid.uuid4())[:8].upper()
+        instance.tx_id = f"{date_suffix}-{unique_id}"
+    if not instance.created_on:
+        instance.created_on = date_suffix
+    return
+
+@receiver(post_save, sender=Transaction)
+def update_bill_status(sender, instance, **kwargs):
+    if instance.bill:
+        instance.bill.paid_flag = True
+        instance.bill.save()
+    return
+
+
+# Upcoming expense signals
+@receiver(pre_save, sender=UpcomingExpense)
+def update_upcoming_expense(sender, instance, created, **kwargs):
+    """
+    Signal that updates bills that are paid.
+    """
+    if created:
+        # Do nothing for new expenses
+        return
+    else:
+        # Handle bills that are paid and update
+        if instance.paid_flag:
+            user_timezone = AppProfile.for_user(instance.uid).get_timezone()
+            if instance.end_date and timezone.now(user_timezone).date() >= instance.end_date:
+                instance.is_recurring = False
+            if instance.is_recurring:
+                instance.due_date = instance.due_date + relativedelta(months=1)
+                instance.paid_flag = False
+
+
+@receiver(pre_delete, sender=PaymentSource)
+def delete_source(sender, instance, **kwargs):
+    """
+    Signal receiver for PaymentSource deletion.
+    Converts any transactions with the deleted source to uncategorized.
+    """
+    # Get the 'unknown' source
+    unknown_source = PaymentSource.objects.filter(uid=instance.uid, source="unknown").first()
+
+    # Update all transactions that reference the deleted source to the 'unknown' source
+    Transaction.objects.filter(source=instance).update(source=unknown_source)
+
+
+# User signals
 @receiver(post_save, sender=User)
 def create_user(sender, instance, created, **kwargs):
     """
@@ -32,37 +88,6 @@ def create_user(sender, instance, created, **kwargs):
         return
     else:
         return
-    
-@receiver(post_save, sender=UpcomingExpense)
-def update_monthly(sender, instance, **kwargs):
-    """
-    Signal receiver for UpcomingExpenses.
-    Updates the due date of recurring expenses and resets paid flag.
-    """
-    uid = instance.uid
-    expenses = UpcomingExpense.objects.for_user(uid).get_by_paid_flag(True).get_by_recurring(True)
-    # Update expenses if they exist
-    if expenses:
-        for expense in expenses:
-            if  expense.due_date <= timezone.now().date():
-                expense.due_date = expense.due_date + relativedelta(months=1)
-                expense.paid_flag = False
-                expense.save()
-    return
-
-@receiver(pre_delete, sender=PaymentSource)
-def delete_source(sender, instance, **kwargs):
-    """
-    Signal receiver for PaymentSource deletion.
-    Converts any transactions with the deleted source to uncategorized.
-    """
-    # Get the 'unknown' source
-    unknown_source = PaymentSource.objects.filter(uid=instance.uid, source="unknown").first()
-
-    # Update all transactions that reference the deleted source to the 'unknown' source
-    Transaction.objects.filter(source=instance).update(source=unknown_source)
-
-    return
 
 @receiver(user_logged_in)
 def user_logged_in(sender, request, user, **kwargs):
@@ -90,6 +115,8 @@ def user_logged_in(sender, request, user, **kwargs):
 
     return
 
+
+# Helper Functions
 def _generate_base_profile(app_profile):
     """
     Seeds a new app profile with default values.

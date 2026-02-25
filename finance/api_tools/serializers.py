@@ -40,12 +40,17 @@ class TransactionSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     tags = serializers.ListField(child=serializers.CharField(max_length=200))
     tx_type = serializers.CharField(max_length=10)
-    bill = serializers.CharField(max_length=200, required=False)
-    tx_id = serializers.CharField(max_length=200, required=False)
-    entry_id = serializers.CharField(max_length=200, required=False)
+    
 
-class TransactionGetSerializer(serializers.Serializer):
-    transactions = TransactionSerializer(many=True)
+class TransactionSetSerializer(TransactionSerializer):
+    bill = serializers.CharField(max_length=200, required=False)
+
+class TransactionGetSerializer(TransactionSerializer):
+    tx_id = serializers.CharField(max_length=20)
+    created_on = serializers.DateTimeField()
+
+class TransactionReturnSerializer(serializers.Serializer):
+    transactions = TransactionGetSerializer(many=True)
     total_expenses = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_income = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_transfer_out = serializers.DecimalField(max_digits=10, decimal_places=2)

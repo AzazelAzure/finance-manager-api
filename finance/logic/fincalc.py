@@ -161,3 +161,4 @@ def _calc_totals(item_currency, base_currency, amount):
         total += amount or Decimal("0")
     logger.debug(f"Totals: {total}")
     return total
+

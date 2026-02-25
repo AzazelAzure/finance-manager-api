@@ -40,6 +40,8 @@ config.json
 financial_snapshot.json
 db.sqlite3
 
+notes.txt
+
 ### 6. Needless Data
 finance/data/
 finance/logs/

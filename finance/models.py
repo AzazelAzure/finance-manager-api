@@ -19,8 +19,7 @@ import uuid
 
 
 
-"""
-# Commented out for framing skeleton
+
 
 class Timezone(models.Model):
     
@@ -29,7 +28,6 @@ class Timezone(models.Model):
 
     timezone = models.CharField(max_length=100)
 
-"""
 
 class AppProfile(models.Model):
     # TODO: Add field for users to set their own start of week
@@ -54,8 +52,9 @@ class AppProfile(models.Model):
         null=True,
         blank=True,
     )
-    # timezone = models.ForeignKey("Timezone", on_delete=models.DEFAULT, default='America/New_York')
-    # start_of_week = models.IntegerField(default=1)
+    timezone = models.ForeignKey("Timezone", on_delete=models.DEFAULT, default='America/New_York')
+    start_of_week = models.IntegerField(default=1)
+    
 
     def __str__(self):
         return f"{self.user_id}"
@@ -203,6 +202,7 @@ class UpcomingExpense(models.Model):
     end_date = models.DateField(null=True, blank=True)
     paid_flag = models.BooleanField(default=False)
     expense_id = models.AutoField(primary_key=True)
+
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
@@ -213,15 +213,7 @@ class UpcomingExpense(models.Model):
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
 
-    def save(self, *args, **kwargs):
-        """
-        Check if the current date has surpassed the end_date.
-        If so, we flip recurring to False so it doesn't spawn next month.
-        """
-        if self.end_date and timezone.now().date() > self.end_date:
-            self.is_recurring = False
 
-        super().save(*args, **kwargs)
 
 
 class Transaction(models.Model):
@@ -253,13 +245,13 @@ class Transaction(models.Model):
     date = models.DateField()
     description = models.CharField(max_length=200, null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    created_on = models.DateTimeField()
 
     # Link to relationship models
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
     currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
     tags = models.ManyToManyField("Tag", blank=True)
-    entry_id = models.AutoField(primary_key=True, db_index=True)
-    tx_id = models.CharField(max_length=20, editable=False)
+    tx_id = models.CharField(max_length=20, editable=False, db_index=True)
     bill = models.ForeignKey('UpcomingExpense', on_delete=models.SET_NULL, null=True, blank=True)
 
     # User dependancy
@@ -285,25 +277,6 @@ class Transaction(models.Model):
 
     tx_type = models.CharField(max_length=10, choices=TxType.choices)
 
-    def save(self, *args, **kwargs):
-        # Get and set a tx_id for unique transaction identifiers
-        if not self.tx_id:
-            day_suffix = timezone.now().year
-            unique_id = str(uuid.uuid4())[:8].upper()
-            self.tx_id = f"{day_suffix}-{unique_id}"
-
-        # Set date if not set (should be done by validators)
-        if not self.date:
-            self.date = timezone.now().date()
-
-        # If bill is set, change paid_flag. 
-        if self.bill:
-            self.bill = UpcomingExpense.objects.for_user(self.uid).get_by_name(self.bill.name)
-            self.bill.paid_flag = True
-            self.bill.save()
-
-
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.tx_id
