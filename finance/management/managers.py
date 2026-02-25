@@ -4,10 +4,7 @@ This module defines all managers for the finance manager application.
 from django.db import models
 from django.utils import timezone
 from datetime import date
-from django.utils import relativedelta
-
-# TODO: Add get_last_week and get_last_day
-# TODO: Add get_by_date
+from dateutil.relativedelta import relativedelta
 
 class TransactionManager(models.QuerySet):
     """Manager for Transaction model."""

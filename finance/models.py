@@ -17,7 +17,7 @@ from django.conf import settings
 from finance.management.managers import *
 import uuid
 
-# TODO: Create User Abstract model to force emails to be unique
+
 
 """
 # Commented out for framing skeleton
@@ -150,8 +150,8 @@ class PaymentSource(models.Model):
             # Get the user's base currency (should always exist)
             base_currency = self.uid.base_currency
             if not base_currency:
-                # Fallback: get first currency for user if base_currency not set
-                base_currency = Currency.objects.filter(uid=self.uid).first()
+                # Fallback: set to USD
+                base_currency = Currency.objects.filter(code='USD').first()
             
             if base_currency:
                 # Create CurrentAsset with initial amount of 0
@@ -296,7 +296,7 @@ class Transaction(models.Model):
         if not self.date:
             self.date = timezone.now().date()
 
-        # If bill is set, change paid_flag.
+        # If bill is set, change paid_flag. 
         if self.bill:
             self.bill = UpcomingExpense.objects.for_user(self.uid).get_by_name(self.bill.name)
             self.bill.paid_flag = True
@@ -373,3 +373,4 @@ class FinancialSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"
+ 

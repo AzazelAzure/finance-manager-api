@@ -37,6 +37,10 @@ from .api_tools.serializers import (
 
 # TODO: Add documentation
 # TODO: Add logging
+# TODO: Fix extend schemas to look better/more professional.
+
+# TODO: Add views for each URL to fix routing issues
+# TODO: Fix get AppProfile to not require different URLS based on what they are updating
 
 @extend_schema_view(
     post=extend_schema(
@@ -190,7 +194,7 @@ class TransactionView(APIView):
             return Response(status=status.HTTP_403_FORBIDDEN)
         
         # Ensure date is provided
-        if not request.date.get('date'):
+        if not request.data.get('date'):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         # Check if tags is a list, if not, make it a list

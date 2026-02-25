@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+# TODO:  Add get calendar serializer for Transactions
+
 class TagSerializer(serializers.Serializer):
     name = serializers.CharField()
 

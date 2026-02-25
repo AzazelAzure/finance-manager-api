@@ -20,7 +20,7 @@ from decimal import Decimal
 from loguru import logger
 from finance.models import Transaction, Tag, UpcomingExpense
 
-# TODO: Add ability to filter by weeks and days
+# TODO: Add get calendar view.  Will need to be it's own function.
 
 @validator.UserValidator
 def get_transactions(uid,**kwargs):

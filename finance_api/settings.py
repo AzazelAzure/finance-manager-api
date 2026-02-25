@@ -13,11 +13,15 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 from finance.management.logging_config import logging_config
+from dotenv import load_dotenv
 
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up logging configuration
 logging_config()
@@ -48,7 +52,7 @@ INSTALLED_APPS = [
     # My apps
     "rest_framework",
     "rest_framework_simplejwt",
-    "rest_framework_simplejwt.blacklist",
+    "rest_framework_simplejwt.token_blacklist",
     "finance",
     "drf_spectacular"
 ]
