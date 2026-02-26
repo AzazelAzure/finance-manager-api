@@ -26,6 +26,9 @@ from finance.models import (
 )
 
 from loguru import logger
+from decimal import Decimal
+from django.db.models.functions import Abs
+
 
 # Transaction Validators
 def TransactionValidator(func):
@@ -35,33 +38,34 @@ def TransactionValidator(func):
     Raises a ValidationError if any validation fails.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data):
+        sources = PaymentSource.objects.for_user(uid)
+        currencies = Currency.objects.all()
+        tags = Tag.objects.for_user(uid)
+        upcoming = UpcomingExpense.objects.for_user(uid)
+        profile = AppProfile.objects.for_user(uid)
+        if isinstance(data, list):
+            rejected = []
+            for item in data:
+                logger.debug(f"Validating transaction: {item} with uid: {uid}")
+                try:
+                    _validate_transaction(uid, item, sources, currencies, tags, upcoming)
+                    _fix_data(uid, item, sources, currencies, tags, upcoming, profile)
+                except ValidationError as e:
+                    logger.error(f"Transaction validation failed: {e}")
+                    rejected.append(item)
+            return func(uid, data, rejected)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
-        _validate_transaction(uid, data)
+        _validate_transaction(uid, data, sources, currencies, tags, upcoming)
         _fix_data(uid, data)
         return func(uid, data)
     return _wrapped
 
-def BulkTransactionValidator(func):
-    """
-    Decorator to validate a list of transactions.
-    Checks if all required fields are valid, and fixes any dataoes not that needs to be fixed.
-    Raises a ValidationError if any validation fails.
-    """
-    @wraps(func)
-    def _wrapped(uid, data:list):
-        logger.debug(f"Validating bulk transaction: {data} with uid: {uid}")
-        for item in data:
-            logger.debug(f"Validating transaction: {item}")
-            _validate_transaction(uid, item)
-            _fix_data(uid, item)
-        return func(uid, data)
-    return _wrapped
 
 def TransactionIDValidator(func):
     """
     Decorator to validate a transaction id.
-    Checks if the transaction exists.
+    Checks if the transaction exists.nsaction.objects.bulk_create([Transaction(**item) for item in data])
     Raises a ValidationError if the transaction does not exist.
     """
     @wraps(func)
@@ -113,25 +117,21 @@ def AssetValidator(func):
     Raises a ValidationError if any validation fails.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data):
+        sources = PaymentSource.objects.for_user(uid)
+        currencies = Currency.objects.all()
+        profile = AppProfile.objects.for_user(uid)
+        if isinstance(data, list):
+            rejected = []
+            for item in data:
+                logger.debug(f"Validating asset: {item} with uid: {uid}")
+                try:
+                    _validate_asset(uid, item, sources, currencies, profile)
+                except ValidationError:
+                    rejected.append(item)
+            return func(uid, data, rejected)
         logger.debug(f"Validating asset: {data} with uid: {uid}")
-        _validate_asset(uid, data)
-        return func(uid, data)
-    return _wrapped
-
-def BulkAssetValidator(func):
-    """
-    Decorator to validate a list of assets.
-    Checks if all required fields are valid.
-    Fixes any data that needs to be fixed.
-    Raises a ValidationError if any validation fails.
-    """
-    @wraps(func)
-    def _wrapped(uid, data:list):
-        logger.debug(f"Validating bulk asset: {data} with uid: {uid}")
-        for item in data:
-            logger.debug(f"Validating asset: {item}")
-            _validate_asset(uid, item)
+        _validate_asset(uid, data, sources, currencies, profile)
         return func(uid, data)
     return _wrapped
 
@@ -186,47 +186,58 @@ def SourceValidator(func):
     return _wrapped
 
 # Private Functions
-def _validate_transaction(uid, data:dict):
+def _validate_transaction(uid, data:dict, sources, currencies, tags, upcoming):
     logger.debug(f"Validating transaction: {data} with uid: {uid}")
-    if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
+    if not sources.filter(source=data['source']).exists():
         logger.error(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
-    if not Currency.objects.filter(code=data['currency']).exists():
+    if not currencies.filter(code=data['currency']).exists():
         logger.error(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
     if data.get('tags'):
         for tag in data['tags']:
-            if not Tag.objects.for_user(uid).filter(name=tag).exists():
+            if not tags.filter(name=tag).exists():
                 logger.warning(f"Tag does not exist: {tag}.  Creating...")
                 uid_instance = AppProfile.objects.for_user(uid).get()
                 Tag.objects.create(name=tag.lower(), uid=uid_instance)
     if not data.get('date'):
         data['date'] = timezone.now().date()
+    if data['date'] > timezone.now().date():
+       raise ValidationError("Date cannot be in the future")
     if data.get('bill'):
-        if not UpcomingExpense.objects.for_user(uid).filter(name=data['bill']).exists():
+        if not upcoming.filter(name=data['bill']).exists():
             logger.error(f"Expense does not exist: {data['bill']}")
             raise ValidationError("Expense does not exist")
-        # Fix this value here since it's not a required field, to avoid key errors in _fix_data()
-        data['bill'] = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill'])
+        if data['tx_type'] != 'EXPENSE':
+            logger.error(f"Expense must be an expense: {data['tx_type']}")
+            raise ValidationError("Expense must be an expense")
     return data
 
-def _validate_asset(uid, data:dict):
+def _validate_asset(uid, data:dict, sources, currencies, profile):
     logger.debug(f"Validating asset: {data} with uid: {uid}")
-    if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
+    if not sources.filter(source=data['source']).exists():
         logger.error(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
-    if not Currency.objects.filter(code=data['currency']).exists():
+    if not currencies.filter(code=data['currency']).exists():
         logger.error(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
-    data['uid'] = AppProfile.objects.for_user(uid).get()
-    data['currency'] = AppProfile.objects.for_user(uid).get_base_currency()
-    data['source'] = PaymentSource.objects.for_user(uid).get_by_source(source=data['source']).get()
+    data['uid'] = profile.get()
+    data['currency'] = profile.get_base_currency()
+    data['source'] = sources.get_by_source(source=data['source']).get()
     return data
 
-def _fix_data(uid, data:dict):
+def _fix_data(uid, data:dict, sources, currencies, tags, upcoming, profile):
     logger.debug(f"Fixing data for {uid}")
-    data['source'] = PaymentSource.objects.for_user(uid).get_by_source(source=data['source']).get()
-    data['currency'] = Currency.objects.for_user(uid).get_by_code(code=data['currency']).get()
-    data['uid'] = AppProfile.objects.for_user(uid).get()
+    data['uid'] = profile.get()
+    data['amount'] = Decimal(Abs(data['amount']))
+    if data['tx_type'] in ['EXPENSE', 'XFER_OUT']:
+        data['amount'] = data['amount'] * -1
+    data['source'] = sources.get_by_source(source=data['source']).get()
+    data['currency'] = currencies.get_by_code(code=data['currency']).get()
+    data['uid'] = profile.for_user(uid).get()
+    if data.get('tags'):
+        data['tags'] = tags.filter(name__in=data['tags'])
+    if data.get['bill']:
+        data['bill'] = upcoming.get_by_name(data['bill']).get()
     return data
 

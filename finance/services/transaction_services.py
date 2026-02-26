@@ -19,16 +19,45 @@ from django.utils import timezone
 from decimal import Decimal
 from loguru import logger
 from finance.models import Transaction, Tag, UpcomingExpense
+from dateutil.relativedelta import relativedelta
 
-# TODO: Add get calendar view.  Will need to be it's own function.
+# Private Functions
+def _calc_total(uid, tx_queryset): 
+    logger.debug(f"Calculating total for {tx_queryset} for user {uid}")
+    return fc.calc_queryset(uid, tx_queryset)
+
+
+def _handle_upcoming(queryset):
+    if isinstance(queryset, list):
+        for expense in queryset:
+            expense = expense.get()
+            expense.paid_flag = True
+            if expense.end_date and timezone.now().date() >= expense.end_date:
+                expense.is_recurring = False
+            if expense.is_recurring:
+                expense.due_date = expense.due_date + relativedelta(months=1)
+        queryset.bulk_update(queryset, ['paid_flag', 'due_date', 'is_recurring'])
+        return
+    else:
+        queryset = queryset.get()
+        queryset.paid_flag = True
+        if queryset.end_date and timezone.now().date() >= queryset.end_date:
+            queryset.is_recurring = False
+        if queryset.is_recurring:
+            queryset.due_date = queryset.due_date + relativedelta(months=1)
+        queryset.save()
+        return
+
+# Public Functions
 
 @validator.UserValidator
 def get_transactions(uid,**kwargs):
     """
-    Retrieves a list of transactions for a user with dynamic filtering and ordering.
-    If no tx_type is set, will return sum for all tx_type.
-    If month is set with no year, will return transactions for current month.
-    If start_date is set with no end_date, will return all transactions after start_date.
+    Retrieves a list of transactions for a user with dynamic filtering and ordering.\n
+    If no tx_type is set, will return sum for rejected = serializersall tx_type.\n
+    If month is set with no year, will return transactions for current month.\n
+    If year is set with no month, will function the same as by_year.\n
+    If start_date is set with no end_date, will return all transactions after start_date.\n
     If end_date is set with no start_date, will return all transactions before end_date.
 
 
@@ -48,18 +77,23 @@ def get_transactions(uid,**kwargs):
         queryset = queryset.get_current_month()
     if kwargs.get('start_date') and kwargs.get('end_date'):
         queryset = queryset.get_by_period(kwargs['start_date'], kwargs['end_date'])
-    if kwargs.get('start_date') and not kwargs.get('end_date'):
-        queryset = queryset.get_all_after(kwargs['start_date'])
-    if kwargs.get('end_date') and not kwargs.get('start_date'):
-        queryset = queryset.get_all_before(kwargs['end_date'])
     if kwargs.get('month') and kwargs.get('year'):
         queryset = queryset.get_by_month(kwargs['month'], kwargs['year'])
-    if kwargs.get('month') and not kwargs.get('year'):
-        queryset = queryset.get_by_month(kwargs['month'], timezone.now().year)
     if kwargs.get('last_month'):
         queryset = queryset.get_last_month()
     if kwargs.get('previous_week'):
         queryset = queryset.get_previous_week()
+
+    # Handle special case filters due to multiple use arguments
+    if kwargs.get('start_date') and not kwargs.get('end_date'):
+        queryset = queryset.get_all_after(kwargs['start_date'])
+    if kwargs.get('end_date') and not kwargs.get('start_date'):
+        queryset = queryset.get_all_before(kwargs['end_date'])
+    if kwargs.get('month') and not kwargs.get('year'):
+        queryset = queryset.get_current_month()
+    if kwargs.get('year') and not kwargs.get('month'):
+        queryset = queryset.get_by_year(kwargs['year'])
+    
 
     # Dynamically apply other single-argument filters using getattr
     # Mapping of query parameter names to manager method names
@@ -69,8 +103,11 @@ def get_transactions(uid,**kwargs):
         'category': 'get_by_category',
         'source': 'get_by_source',
         'currency_code': 'get_by_currency',
-        'year': 'get_by_year',
-        'date': 'get_by_date',
+        'by_year': 'get_by_year',
+        'by_date': 'get_by_date',
+        'by_date': 'get_by_date',
+        'gte': 'get_gte',
+        'lte': 'get_lte',
     }
     for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
         if kwargs.get(param_name):
@@ -90,7 +127,7 @@ def get_transactions(uid,**kwargs):
 @transaction.atomic
 @validator.TransactionValidator
 @validator.UserValidator
-def add_transaction(uid,data:dict):
+def add_transaction(uid,data, rejected=None):
     """
     Adds a transaction to the user's account.
     
@@ -101,29 +138,29 @@ def add_transaction(uid,data:dict):
     :returns: {'added': queryset}
     :rtype: dict
     """
-    return _add_transaction(uid, data)
-
-@transaction.atomic
-@validator.BulkTransactionValidator
-@validator.UserValidator
-def add_bulk_transactions(uid, data: list):
-    """
-    Adds a list of transactions to the user's account.
-    
-    :param uid: The user id.
-    :type uid: str
-    :param data: A list of dictionaries representing the transactions to add.
-    :type data: list# TODO: Fix transactions to default to uncategorized if source is deleted. 
-    :returns: {'added': [queryset]}
-    :rtype: dict
-    """
-    logger.debug(f"Adding bulk transactions: {data}")
-    # added = []
-    # for item in data:
-    #     logger.debug(f"Adding transaction: {item}")
-    #     _add_transaction(uid, item)
-    #     added.append(Transaction.objects.for_user(uid).get_tx(item['tx_id']))
-    return {'added': added}
+    upcoming = UpcomingExpense.objects.for_user(uid)
+    if isinstance(data, list):
+        logger.debug(f"Adding bulk transactions: {data}")
+        accepted = [item for item in data if item not in rejected]
+        paid_bills = [item['bill'] for item in accepted if item.get('bill')]
+        if paid_bills:
+            _handle_upcoming(paid_bills)
+        Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
+        to_update = Transaction.objects.filter(tx_id__in=[item['tx_id'] for item in accepted])
+        for tx in to_update:
+            update.new_transaction(uid, tx)
+        if rejected:
+            return {'accepted': accepted, 'rejected': rejected}
+        else:
+            return {'accepted': accepted}
+    else:
+        logger.debug(f"Adding transaction: {data}")
+        tx = Transaction.objects.create(**data)
+        tx = Transaction.objects.for_user(uid).get(tx_id=tx.tx_id)
+        if tx.bill: # Access 'bill' attribute directly from the model instance
+            _handle_upcoming(upcoming.filter(name=tx.bill)) # Pass a QuerySet
+        update.new_transaction(uid, tx)
+        return {'accepted': tx}
 
 @transaction.atomic
 @validator.TransactionValidator
@@ -146,14 +183,14 @@ def update_transaction(uid, tx_id: str, data: dict):
     update.transaction_updated(uid=uid, tx_id=tx_id)
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
     tx.update(**data)
-    if data.get('bill'):
+    if data.get('bill'): # TODO: This doesn't work, fix this.
         expense = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill']).get()
         expense_month = expense.due_date
         expense_month.replace(day=1)
         if expense_month >= timezone.now().date():
             expense.paid_flag = True
             expense.save()
-    update.new_transaction(uid=uid, tx_id=tx.tx_id)
+    update.new_transaction(uid, tx)
     return {f'updated': tx}
 
 @transaction.atomic
@@ -197,34 +234,3 @@ def get_transaction(uid, tx_id: str):
     logger.debug(f"Getting transaction: {tx_id} for {uid}")
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
     return {'transaction': tx}
-
-
-# Private Functions
-
-def _add_transaction(uid, data):
-    logger.debug(f"Adding transaction: {data} for {uid}")
-    # Pull out tags
-    tags = data.pop("tags", None)
-
-    # Fix amount to positive/negative based on tx_type
-    data['amount'] = Decimal(Abs(data['amount']))
-    if data['tx_type'] in ['EXPENSE', 'XFER_OUT']:
-        data['amount'] = data['amount'] * -1
-
-    # Create transaction
-    tx = Transaction.objects.create(**data)
-
-    # Set tags if provided
-    if tags:
-        logger.debug("Setting tags.  Tags: {tags}")
-        tag_obj = Tag.objects.filter(name__in=tags)
-        logger.debug(f"Tag objects: {tag_obj}.  Tag to be set: {tags}")
-        tx.tags.set(tag_obj)
-
-    # Update balances
-    update.new_transaction(uid=uid, tx_id=tx.tx_id)
-    return {'added': tx}
-    
-def _calc_total(uid, tx_queryset): 
-    logger.debug(f"Calculating total for {tx_queryset} for user {uid}")
-    return fc.calc_queryset(uid, tx_queryset)

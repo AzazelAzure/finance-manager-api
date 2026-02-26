@@ -84,6 +84,14 @@ class TransactionManager(models.QuerySet):
     def get_by_year(self, year):
         """Returns a queryset for transactions in a given year."""
         return self.filter(date__year=year)
+
+    def get_gte(self, amount):
+        """Returns a queryset for transactions with an amount greater than or equal to a given amount."""
+        return self.filter(amount__gte=amount)
+    
+    def get_lte(self, amount):
+        """Returns a queryset for transactions with an amount less than or equal to a given amount."""
+        return self.filter(amount__lte=amount)
     
 class CurrentAssetManager(models.QuerySet):
     """Manager for CurrentAsset model."""
@@ -232,18 +240,4 @@ class FinancialSnapshotManager(models.QuerySet):
         """Sets the total for a given account type."""
         field_name = f"total_{acc_type.lower()}"
         self.update(**{field_name: total})
-
-class PastDueManager(models.QuerySet):
-    """Manager for PastDue model."""
-    def for_user(self, uid):
-        return self.filter(uid=uid)
-    
-    def get_by_expense(self, expense):
-        return self.filter(past_due_expense=expense)
-    
-    def get_by_missed_due_date(self, expense, date):
-        return self.filter(missed_due_date=date, past_due_expense=expense)
-    
-    def get_total_past_due(self, expense):
-        return self.filter(past_due_expense=expense).values_list("total_past_due", flat=True).first()
 

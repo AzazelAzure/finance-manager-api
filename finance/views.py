@@ -26,7 +26,10 @@ from .api_tools.serializers import (
     SourceSerializer,
     AssetSerializer,
     TransactionSerializer,
+    TransactionSetSerializer,
     TransactionGetSerializer,
+    TransactionSetReturnSerializer,
+    TransactionGetReturnSerializer,
     TagSerializer,
     AppProfileSerializer,
     UserSerializer,
@@ -38,9 +41,11 @@ from .api_tools.serializers import (
 # TODO: Add documentation
 # TODO: Add logging
 # TODO: Fix extend schemas to look better/more professional.
+    # use description = textwrap.dedent("""example""") and markdown
 
 # TODO: Add views for each URL to fix routing issues
 # TODO: Fix get AppProfile to not require different URLS based on what they are updating
+
 
 @extend_schema_view(
     post=extend_schema(
@@ -78,6 +83,10 @@ from .api_tools.serializers import (
             OpenApiParameter(name='last_month', type=OpenApiTypes.BOOL, description='Filter by last month'),
             OpenApiParameter(name='previous_week', type=OpenApiTypes.BOOL, description='Filter by previous week'),
             OpenApiParameter(name='date', type=OpenApiTypes.STR, description='Filter by date'),
+            OpenApiParameter(name='gte', type=OpenApiTypes.INT, description='Filter by greater than or equal to'),
+            OpenApiParameter(name='lte', type=OpenApiTypes.INT, description='Filter by less than or equal to'),
+            OpenApiParameter(name='by_year', type=OpenApiTypes.INT, description='Filter by year'),
+            OpenApiParameter(name='by_date', type=OpenApiTypes.STR, description='Filter by date'),
         ],
         responses={
             status.HTTP_200_OK: SpectacularTxSerializer,
@@ -126,34 +135,19 @@ class TransactionView(APIView):
     def post(self, request):
         # Check if single or list of transactions and serialize
         is_many = isinstance(request.data, list)
-        serializer = TransactionSerializer(data=request.data, many=is_many)
+        serializer = TransactionSetSerializer(data=request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
-
+        check = self._txset_check(serializer.data)
+        if isinstance(check, Response):
+            return check
+        
         # Handle Transactions based of list or single
-        if is_many:
-            for item in serializer.data:
-                if item.get('tags'):
-                    # Check if tags is a list, if not, make it a list
-                    if not isinstance(item['tags'], list):
-                        item['tags'] = [item['tags']]
-                if item.get('tx_id') or item.get('entry_id'):
-                    return Response(status=status.HTTP_403_FORBIDDEN)
-            result = tx_svc.add_bulk_transactions(
-                data=serializer.data,
-                uid=request.user.appprofile.user_id)
-        else:
-            if serializer.data.get('tags'):
-                # Check if tags is a list, if not, make it a list
-                if not isinstance(serializer.data['tags'], list):
-                    serializer.data['tags'] = [serializer.data['tags']]
-            if serializer.data.get('tx_id') or serializer.data.get('entry_id'):
-                return Response(status=status.HTTP_403_FORBIDDEN)
-            result = tx_svc.add_transaction(
-                data=serializer.data,
-                uid=request.user.appprofile.user_id)
+        result = tx_svc.add_transaction(
+            data=serializer.data,
+            uid=request.user.appprofile.user_id)
             
         # Serialize and return
-        serializer = TransactionSerializer(result['added'], many=True)
+        serializer = TransactionSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def get(self, request, tx_id: str = None):
@@ -179,6 +173,10 @@ class TransactionView(APIView):
             'last_month': request.query_params.get('last_month'),
             'previous_week': request.query_params.get('previous_week'),
             'date': request.query_params.get('date'),
+            'gte': request.query_params.get('gte'),
+            'lte': request.query_params.get('lte'),
+            'by_year': request.query_params.get('by_year'),
+            'by_date': request.query_params.get('by_date'),
         }
         
         # Remove None values to avoid passing none to the service function if not provided
@@ -189,26 +187,24 @@ class TransactionView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request, tx_id: str):
-        # Reject attempts to modify tx_id or entry_id
-        if request.data.get('tx_id') or request.data.get('entry_id'):
-            return Response(status=status.HTTP_403_FORBIDDEN)
+        # Fix tags and reject altering tx_id
+        check = self._txset_check(request.data)
+        if isinstance(check, Response):
+            return check
         
         # Ensure date is provided
         if not request.data.get('date'):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if tags is a list, if not, make it a list
-        if not isinstance(request.data['tags'], list):
-            request.data['tags'] = [request.data['tags']]
 
         # Update transaction
-        result = tx_svc.user_update_transaction(
+        result = tx_svc.update_transaction(
             uid=request.user.appprofile.user_id,
             tx_id=tx_id,
             data=request.data)
         
         # Serialize and return
-        serializer = TransactionSerializer(result['updated'], many=True)
+        serializer = TransactionSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
     def put(self, request):
@@ -223,6 +219,22 @@ class TransactionView(APIView):
         # Serialize and return
         serializer = TransactionSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def _txset_check(data):
+        if isinstance(data, list):
+            for item in data:
+                if item.get('tags'):
+                    if not isinstance(item['tags'], list):
+                        item['tags'] = [item['tags']]
+                if item.get('tx_id'):
+                    return Response(status=status.HTTP_403_FORBIDDEN)
+        else:
+            if data.get('tags'):
+                if not isinstance(data['tags'], list):
+                    data['tags'] = [data['tags']]
+                if data.get('tx_id'):
+                    return Response(status=status.HTTP_403_FORBIDDEN)
+        return data
 
 
 # Asset View
@@ -815,3 +827,5 @@ class UserView(APIView):
         user = User.objects.get(username=request.data['username'])
         user.delete()
         return Response({'message': "User deleted successfully"}, status=status.HTTP_200_OK)
+    
+

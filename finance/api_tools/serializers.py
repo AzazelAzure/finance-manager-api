@@ -45,11 +45,17 @@ class TransactionSerializer(serializers.Serializer):
 class TransactionSetSerializer(TransactionSerializer):
     bill = serializers.CharField(max_length=200, required=False)
 
+class TransactionSetReturnSerializer(TransactionSetSerializer):
+    rejected = TransactionSetSerializer(many=True, required=False)
+    accepted = TransactionSetSerializer(many=True, required=False)
+    updated = TransactionSetSerializer(many=True, required=False)
+
+
 class TransactionGetSerializer(TransactionSerializer):
     tx_id = serializers.CharField(max_length=20)
     created_on = serializers.DateTimeField()
 
-class TransactionReturnSerializer(serializers.Serializer):
+class TransactionGetReturnSerializer(serializers.Serializer):
     transactions = TransactionGetSerializer(many=True)
     total_expenses = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_income = serializers.DecimalField(max_digits=10, decimal_places=2)
