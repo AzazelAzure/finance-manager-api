@@ -11,42 +11,13 @@ Attributes:
 """
 
 import finance.logic.validators as validator
-import finance.logic.updaters as update
-import finance.logic.fincalc as fc
+from finance.logic.updaters import Updater
+from finance.logic.fincalc import Calculator
 from django.db import transaction
-from django.db.models.functions import Abs
-from django.utils import timezone
-from decimal import Decimal
 from loguru import logger
-from finance.models import Transaction, Tag, UpcomingExpense
-from dateutil.relativedelta import relativedelta
+from finance.models import Transaction, UpcomingExpense, AppProfile
 
-# Private Functions
-def _calc_total(uid, tx_queryset): 
-    logger.debug(f"Calculating total for {tx_queryset} for user {uid}")
-    return fc.calc_queryset(uid, tx_queryset)
-
-
-def _handle_upcoming(queryset):
-    if isinstance(queryset, list):
-        for expense in queryset:
-            expense = expense.get()
-            expense.paid_flag = True
-            if expense.end_date and timezone.now().date() >= expense.end_date:
-                expense.is_recurring = False
-            if expense.is_recurring:
-                expense.due_date = expense.due_date + relativedelta(months=1)
-        queryset.bulk_update(queryset, ['paid_flag', 'due_date', 'is_recurring'])
-        return
-    else:
-        queryset = queryset.get()
-        queryset.paid_flag = True
-        if queryset.end_date and timezone.now().date() >= queryset.end_date:
-            queryset.is_recurring = False
-        if queryset.is_recurring:
-            queryset.due_date = queryset.due_date + relativedelta(months=1)
-        queryset.save()
-        return
+# TODO: Update Docstrings here too.  Again...
 
 # Public Functions
 
@@ -71,6 +42,8 @@ def get_transactions(uid,**kwargs):
     
     logger.debug(f"Getting transactions for {uid} with filters: {kwargs}")
     queryset = Transaction.objects.for_user(uid=uid)
+    profile = AppProfile.objects.for_user(uid)
+    fc = Calculator(profile)
 
     # Handle specific filters that require multiple arguments or no arguments
     if kwargs.get('current_month'):
@@ -117,11 +90,11 @@ def get_transactions(uid,**kwargs):
     # Default ordering
     queryset = queryset.order_by('tx_id')
     return {'transactions': queryset, 
-            'total_expenses': _calc_total(uid, queryset.filter(tx_type='EXPENSE')),
-            'total_income': _calc_total(uid, queryset.filter(tx_type='INCOME')),
-            'total_transfer_out': _calc_total(uid, queryset.filter(tx_type='XFER_OUT')),
-            'total_transfer_in': _calc_total(uid, queryset.filter(tx_type='XFER_IN')),
-            'total_leaks': _calc_total(uid, queryset.filter(tx_type__in=['XFER_OUT', 'XFER_IN'])),
+            'total_expenses': fc.calc_queryset(queryset.filter(tx_type='EXPENSE')),
+            'total_income': fc.calc_queryset(queryset.filter(tx_type='INCOME')),
+            'total_transfer_out': fc.calc_queryset(queryset.filter(tx_type='XFER_OUT')),
+            'total_transfer_in': fc.calc_queryset(queryset.filter(tx_type='XFER_IN')),
+            'total_leaks': fc.calc_queryset(queryset.filter(tx_type__in=['XFER_OUT', 'XFER_IN'])),
             }
 
 @transaction.atomic
@@ -142,13 +115,10 @@ def add_transaction(uid,data, rejected=None):
     if isinstance(data, list):
         logger.debug(f"Adding bulk transactions: {data}")
         accepted = [item for item in data if item not in rejected]
-        paid_bills = [item['bill'] for item in accepted if item.get('bill')]
-        if paid_bills:
-            _handle_upcoming(paid_bills)
         Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
         to_update = Transaction.objects.filter(tx_id__in=[item['tx_id'] for item in accepted])
-        for tx in to_update:
-            update.new_transaction(uid, tx)
+        update = Updater(uid, transactions=to_update, upcoming=upcoming)
+        update.new_transaction()
         if rejected:
             return {'accepted': accepted, 'rejected': rejected}
         else:
@@ -157,8 +127,7 @@ def add_transaction(uid,data, rejected=None):
         logger.debug(f"Adding transaction: {data}")
         tx = Transaction.objects.create(**data)
         tx = Transaction.objects.for_user(uid).get(tx_id=tx.tx_id)
-        if tx.bill: # Access 'bill' attribute directly from the model instance
-            _handle_upcoming(upcoming.filter(name=tx.bill)) # Pass a QuerySet
+        update = Updater(uid, transactions=tx, upcoming=upcoming)
         update.new_transaction(uid, tx)
         return {'accepted': tx}
 
@@ -180,17 +149,12 @@ def update_transaction(uid, tx_id: str, data: dict):
     :rtype: dict
     """
     logger.debug(f"Updating transaction: {data}")
-    update.transaction_updated(uid=uid, tx_id=tx_id)
     tx = Transaction.objects.for_user(uid).get_tx(tx_id)
+    profile = AppProfile.objects.for_user(uid)
+    update = Updater(uid, profile=profile, transactions=tx)
+    update.transaction_updated()
     tx.update(**data)
-    if data.get('bill'): # TODO: This doesn't work, fix this.
-        expense = UpcomingExpense.objects.for_user(uid).get_by_name(data['bill']).get()
-        expense_month = expense.due_date
-        expense_month.replace(day=1)
-        if expense_month >= timezone.now().date():
-            expense.paid_flag = True
-            expense.save()
-    update.new_transaction(uid, tx)
+    update.new_transaction()
     return {f'updated': tx}
 
 @transaction.atomic
@@ -208,12 +172,14 @@ def delete_transaction(uid, tx_id: str):
     :rtype: dict
     """
     logger.debug(f"Deleting transaction: {tx_id}")
-
+    tx = Transaction.objects.for_user(uid).get_tx(tx_id)
+    profile = AppProfile.objects.for_user(uid)
+    update = Updater(uid, profile=profile, transactions=tx)
     # Update balances to reverse changes
-    update.transaction_updated(uid=uid, tx_id=tx_id)
+    update.transaction_updated()
 
     # Delete transaction
-    tx = Transaction.objects.for_user(uid).get_tx(tx_id)
+    tx = list(tx)
     tx.delete()
     return {f'deleted': tx}
 

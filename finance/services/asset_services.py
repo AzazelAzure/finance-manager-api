@@ -10,8 +10,7 @@ Attributes:
 
 
 import finance.logic.validators as validator
-import finance.logic.updaters as update
-import finance.logic.fincalc as fc
+from finance.logic.updaters import Updater
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from loguru import logger
@@ -34,9 +33,23 @@ def update_asset_source(uid, data:dict, source: str):
     :returns: {'asset': model instance}
     :rtype: dict
     """
+    # TODO: Fix this to work with the new Updater class
+        # This will likely follow transaction logic. 
+        # Just need to figure out how to pipe this back and forth to Updater
+        # As written currently, this is bad. 
+
+    # TODO: Potentially add bulk asset change as well
+        # I'm still stuck on if this is actually necessary
+        # I'll probably add it anyway.  
+        # If I do:
+            # TODO: Update Serializers to handle this
+            # TODO: Update views to allow it
+            # TODO: Make sure tests actually test bulk changes.
     logger.debug(f"Updating asset: {data}")
     data['source'] = data['source'].lower()
-    asset_instance = CurrentAsset.objects.for_user(uid).get_asset(source=data['source']).get()
+    assets = CurrentAsset.objects.for_user(uid)
+    update = Updater(uid, assets=assets)
+    asset_instance = assets.get_asset(source=data['source']).get()
     if PaymentSource.objects.filter(uid=uid, source=source).exists():
         source = PaymentSource.objects.filter(uid=uid, source=source).get()
         asset_instance.source = source

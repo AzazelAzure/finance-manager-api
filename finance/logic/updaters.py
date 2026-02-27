@@ -7,9 +7,13 @@ Attributes:
     rebalance: Rebalances the user's accounts.
 """
 
-import finance.logic.fincalc as fc
+from finance.logic.fincalc import Calculator
 from dateutil.relativedelta import relativedelta
+from decimal import Decimal
+from django.db.models.functions import Abs
+from django.utils import timezone
 from finance.models import (
+    Tag,
     Transaction, 
     CurrentAsset, 
     AppProfile,
@@ -20,21 +24,52 @@ from finance.models import (
 )
 from loguru import logger
 
-class Updaters:
+# TODO:  Docstrings... again
+
+class Updater:
     """
     Class to handle data manipulation for the finance manager application.
     """
     def __init__(self, uid, **kwargs):
-        self.profile = AppProfile.objects.for_user(uid)
-        self.uid = uid
+        self.profile = kwargs.get("profile") or AppProfile.objects.for_user(uid)
+        self.uid = self.profile.user_id
+        self.tags = kwargs.get("tags") or Tag.objects.for_user(uid)
         self.assets = kwargs.get("assets") or CurrentAsset.objects.for_user(uid)
         self.transactions = kwargs.get('transactions') or Transaction.objects.for_user(uid)
         self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(uid)
         self.snapshots = kwargs.get('snapshots') or FinancialSnapshot.objects.for_user(uid)
-        self.currencies = kwargs.get('currencies') or Currency.objects.for_user(uid)
+        self.currencies = kwargs.get('currencies') or Currency.objects.all()
         self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(uid)
+        self.fc = Calculator(self.profile)
+        return
+
+    # Data fixers
+    def fix_tx_data(self, data):
+        for item in data:
+            item['uid'] = self.profile.get().user_id
+            item['amount'] = Decimal(Abs(item['amount']))
+            if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
+                item['amount'] = item['amount'] * -1
+            item['source'] = self.sources.get(source=item['source'])
+            item['currency'] = self.currencies.get(code=item['currency'])
+            if item.get('tags'):
+                item['tags'] = self.tags.filter(name__in=item['tags'])
+            if item.get('bill'):
+                item['bill'] = self.upcoming.get(name=item['bill'])
+        return data
+
+    def fix_asset_data(self, data):
+        for item in data:
+            item['uid'] = self.profile.user_id
+            # Get the PaymentSource instance based on the source name
+            payment_source_instance = self.sources.get(source=item['source'])
+            item['source'] = payment_source_instance
+            # Get the Currency instance associated with the PaymentSource (via CurrentAsset)
+            item['currency'] = self.assets.get_asset(payment_source_instance.source).get().currency
+        return data
 
 
+    # Transaction Handlers
     def new_transaction(self):
         """
         Function to handle new transactions.
@@ -45,18 +80,12 @@ class Updaters:
         :type transaction_queryset: queryset
         :returns: None
         """
-        if isinstance(self.transactions, list):
-            for tx in self.transactions:
-                self._recalc_asset_amount(tx.source, tx.amount, tx.currency.code)
-                self.rebalance(tx.source.acc_type)
-            return
-        else:
-            self._recalc_asset_amount(self.transactions.source, self.transactions.amount, self.transactions.currency.code)
-            self.rebalance(self.transactions.source.acc_type)
-            return
+        self._recalc_asset_amount()
+        self._handle_upcoming()
+        self.rebalance(acc_type=True)
+        return
 
-
-    def transaction_updated(uid, tx_id: str):
+    def transaction_updated(self):
         """
         Function to handle transaction updates.
         Reverses the transaction effect to user account.
@@ -68,23 +97,36 @@ class Updaters:
         :type tx_id: str
         :returns: None
         """
-        tx = Transaction.objects.for_user(uid).get_tx(tx_id)
 
-        # If bill was changed, check if transaction is past due
-        if tx.bill: # TODO: This is likely fine, but verify
-            if tx.date >= (tx.bill.due_date - relativedelta(months=1)):
-                tx.bill.paid_flag = False
-                tx.bill.due_date = tx.bill.due_date - relativedelta(months=1)
-                tx.bill.save()
+        tx = self.transactions.get()
+        # If bill was changed, check if transaction is past the adjusted due date
+        if tx.bill: 
+            # This decides if anything SHOULD be changed.
+            # Since on payment, it pushes the duedate up one month automatically
+            # We check if we undid that change would this tx have paid it.
+            # This makes sure if this tx is older than the current billing cycle
+            # Nothing is changed
+            self._updated_affected_upcomings(tx)
 
         # Invert transaction amount and recalculate
-        multiplier = -1 if tx.tx_type in ["EXPENSE", "XFER_OUT"] else 1
-        tx_amount = tx.amount * multiplier
-        _recalc_asset_amount(uid, tx.source, tx_amount, tx.currency.code)
-        rebalance(uid, tx.source.acc_type)
+        tx.amount = tx.amount * -1
+        tx.save()
+        self._recalc_asset_amount()
+        self.rebalance(acc_type=True)
         return
 
-    def rebalance(uid, acc_type=None):
+    # Asset Handlers
+    def asset_source_updated(self):
+        asset = self.assets.get()
+        # TODO: Fix this later.  
+            # Basic logic should follow transaction logic
+            # Subtract the total of the asset before it's changed
+            # Then add the new total to the new source
+        return
+
+
+    # Rebalance Handler
+    def rebalance(self,acc_type=False):
         """
         Rebalances the user's accounts.
         
@@ -94,74 +136,122 @@ class Updaters:
         :type acc_type: str
         :returns: None
         """
-        logger.debug(f"Rebalancing {uid} with acc_type {acc_type}")
+        logger.debug(f"Rebalancing.  Acc_type is {acc_type}")
 
         # Recalculate asset type if provided
         # Ordered this way due to how calculations are done
         if acc_type:
-            _recalc_asset_type(uid, acc_type)
-        _recalc_total_assets(uid)
-        _recalc_leaks(uid)
-        _recalc_sts(uid)
+            self._recalc_asset_type()
+        self._recalc_total_assets()
+        self._recalc_leaks()
+        self._recalc_sts()
         return
 
+        
 
-    def _recalc_sts(uid):
+    # Private Functions
+    def _recalc_sts(self):
         """
         Recalculates the safe to spend for a user and sets to Financial Snapshot.
         """
-        logger.debug(f"Recalculating safe to spend for {uid}")
-        # Get spend accounts
-        spend_accounts = AppProfile.objects.for_user(uid).get_spend_accounts(uid)
-        logger.debug(f"Spend accounts: {spend_accounts.uidaccounts}")
-        # Convert to tuple
-        spend_accounts = tuple(spend_accounts)
-        sts = fc.calc_sts(uid, spend_accounts)
-        logger.warning(f"Changed safe to spend to: {sts}")
+        logger.debug(f"Recalculating safe to spend for {self.uid}")
+        # Calc the new safe to spend total
+        sts = self.fc.calc_sts() 
+
         # Update FinancialSnapshot
-        FinancialSnapshot.objects.for_user(uid).update(safe_to_spend=sts)
+        self.snapshots.update(safe_to_spend=sts)
+        logger.warning(f"Changed safe to spend to: {sts}")
         return
 
-
-    def _recalc_total_assets(uid):
+    def _recalc_total_assets(self):
         """
         Recalculates the total assets for a user and sets to Financial Snapshot.
         """
-        logger.debug(f"Recalculating total assets for {uid}")
-        total_assets = fc.calc_total_assets(uid)
-        FinancialSnapshot.objects.for_user(uid).update(total_assets=total_assets)
+        logger.debug(f"Recalculating total assets for {self.uid}")
+        total_assets = self.fc.calc_total_assets() 
+        self.snapshots.update(total_assets=total_assets)
         logger.warning(f"Changed total assets to: {total_assets}")
         return
 
-
-    def _recalc_asset_type(uid, acc_type):
+    def _recalc_asset_type(self):
         """
         Recalculates the total assets for a specific account type and sets to Financial Snapshot.
         """
-        acc_type = acc_type.acc_type
-        logger.debug(f"Recalculating asset type {acc_type} for {uid}")
-        asset = fc.calc_asset_type(uid, acc_type)
-        FinancialSnapshot.objects.for_user(uid).set_totals(acc_type, asset)
+        to_update = {}
+        logger.debug(f"Recalculating asset type for {self.uid}")
+        affected_accs = self.transactions.values_list('source__acc_type', flat=True).distinct()
+        logger.debug(f"Affected accounts: {affected_accs}")
+        for item in affected_accs:
+            to_update[f'total_{item.lower()}'] = self.fc.calc_asset_type(self.uid, item) 
+        logger.debug(f"To update: {to_update}") 
+        self.snapshots.update(**to_update)
         return
 
-
-    def _recalc_leaks(uid):
+    def _recalc_leaks(self):
         """
         Recalculates the leaks for a user and sets to Financial Snapshot.
         """
-        logger.debug(f"Recalculating leaks for {uid}")
-        leaks = fc.calc_leaks(uid)
-        FinancialSnapshot.objects.for_user(uid).update(total_leaks=leaks)
+        logger.debug(f"Recalculating leaks for {self.uid}")
+        leaks = self.fc.calc_leaks()
+        self.snapshots.update(total_leaks=leaks)
         return
 
-    def _recalc_asset_amount(uid, source, amount, currency):
+    def _recalc_asset_amount(self):
         """
         Recalculates the asset amount for a source and sets to CurrentAsset.
         """
-        logger.debug(f"Recalculating asset amount for {uid} with source {source} and amount {amount}")
-        asset = CurrentAsset.objects.for_user(uid).get_asset(source)
-        new_balance = fc.calc_new_balance(uid, source, amount, currency)
-        asset.amount = new_balance
-        asset.save()
+        logger.debug(f"Recalculating asset amount with source {source} ")
+        
+        affected_sources = self.transactions.values_list('source', flat=True).distinct()
+        logger.debug(f"Affected sources: {affected_sources}")
+
+        for source in affected_sources: 
+
+            # TODO: FIX BOTH OF THESE!!!  Concept is there, implementation needs fixed.
+            aggregate = self.fc.calc_queryset(self.transactions.filter(source=source))                
+            source.amount = self.fc.calc_new_balance(self.assets.filter(source__source=source), aggregate)
+        self.assets.bulk_update(affected_sources, ['amount'])
         return
 
+    def _handle_upcoming(self):
+        
+        # Grab Upcoming Expense based on if they were paid in the transaction queryset 
+        paid_bills = self.transactions.filter(bill__in=self.upcoming.filter(paid_flag=False))
+        logger.debug(f"Paid bills: {paid_bills}")
+
+        # If none, just return
+        if not paid_bills:
+            return
+        
+        # Otherwise, handle the bill logic
+        for bill in paid_bills:
+
+            # Mark it paid
+            bill.paid_flag = True
+
+            # Flip the is recurring if the end date has passed
+            if bill.end_date and timezone.now(self.profile.timezone).date() >= bill.end_date:
+                bill.is_recurring = False
+            
+            # If this is recurring, move the due date up one month
+            if bill.is_recurring:
+                bill.due_date = bill.due_date + relativedelta(months=1)
+
+        # Update whatever was changed
+        self.upcoming.bulk_update(paid_bills, ['paid_flag', 'due_date', 'is_recurring'])
+        return
+    
+    def _updated_affected_upcomings(self, tx):
+
+        # Check if paid flag should be changed
+        if tx.date >= tx.bill.due_date - relativedelta(months=1):
+            tx.bill.paid_flag = False
+            tx.bill.due_date = tx.bill.due_date - relativedelta(months=1)
+        
+        # Check if current due date is before the end date
+        # If it is, fix the is recurring
+        if tx.bill.end_date and tx.bill.due_date <= tx.bill.end_date:
+            tx.bill.is_recurring = True
+        
+        tx.bill.save()
+        return

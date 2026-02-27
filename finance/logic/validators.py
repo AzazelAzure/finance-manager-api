@@ -24,10 +24,9 @@ from finance.models import (
     Currency, 
     Tag
 )
-
+from finance.logic.updaters import Updater
 from loguru import logger
-from decimal import Decimal
-from django.db.models.functions import Abs
+
 
 
 # Transaction Validators
@@ -44,20 +43,21 @@ def TransactionValidator(func):
         tags = Tag.objects.for_user(uid)
         upcoming = UpcomingExpense.objects.for_user(uid)
         profile = AppProfile.objects.for_user(uid)
+        update = Updater(uid, sources=sources, currencies=currencies, tags=tags, upcoming=upcoming, profile=profile)
         if isinstance(data, list):
             rejected = []
             for item in data:
                 logger.debug(f"Validating transaction: {item} with uid: {uid}")
                 try:
                     _validate_transaction(uid, item, sources, currencies, tags, upcoming)
-                    _fix_data(uid, item, sources, currencies, tags, upcoming, profile)
+                    update.fix_tx_data(data)
                 except ValidationError as e:
                     logger.error(f"Transaction validation failed: {e}")
                     rejected.append(item)
             return func(uid, data, rejected)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
         _validate_transaction(uid, data, sources, currencies, tags, upcoming)
-        _fix_data(uid, data)
+        update.fix_data(data)
         return func(uid, data)
     return _wrapped
 
@@ -118,20 +118,25 @@ def AssetValidator(func):
     """
     @wraps(func)
     def _wrapped(uid, data):
+        # Currently set up to allow for updating multiple assets
+        # Bulk updates are currently not implemented, but framework exists
         sources = PaymentSource.objects.for_user(uid)
         currencies = Currency.objects.all()
         profile = AppProfile.objects.for_user(uid)
+        update = Updater(uid, sources=sources, currencies=currencies, profile=profile)
         if isinstance(data, list):
             rejected = []
             for item in data:
                 logger.debug(f"Validating asset: {item} with uid: {uid}")
                 try:
                     _validate_asset(uid, item, sources, currencies, profile)
+                    update.fix_asset_data(data)
                 except ValidationError:
                     rejected.append(item)
             return func(uid, data, rejected)
         logger.debug(f"Validating asset: {data} with uid: {uid}")
         _validate_asset(uid, data, sources, currencies, profile)
+        update.fix_asset_data(data)
         return func(uid, data)
     return _wrapped
 
@@ -221,23 +226,6 @@ def _validate_asset(uid, data:dict, sources, currencies, profile):
     if not currencies.filter(code=data['currency']).exists():
         logger.error(f"Currency does not exist: {data['currency']}")
         raise ValidationError("Currency does not exist")
-    data['uid'] = profile.get()
-    data['currency'] = profile.get_base_currency()
-    data['source'] = sources.get_by_source(source=data['source']).get()
     return data
 
-def _fix_data(uid, data:dict, sources, currencies, tags, upcoming, profile):
-    logger.debug(f"Fixing data for {uid}")
-    data['uid'] = profile.get()
-    data['amount'] = Decimal(Abs(data['amount']))
-    if data['tx_type'] in ['EXPENSE', 'XFER_OUT']:
-        data['amount'] = data['amount'] * -1
-    data['source'] = sources.get_by_source(source=data['source']).get()
-    data['currency'] = currencies.get_by_code(code=data['currency']).get()
-    data['uid'] = profile.for_user(uid).get()
-    if data.get('tags'):
-        data['tags'] = tags.filter(name__in=data['tags'])
-    if data.get['bill']:
-        data['bill'] = upcoming.get_by_name(data['bill']).get()
-    return data
 

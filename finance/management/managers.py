@@ -213,9 +213,9 @@ class AppProfileManager(models.QuerySet):
         """Returns the base currency for a user."""
         return self.get().base_currency
     
-    def get_spend_accounts(self, uid):
-        """Returns a list of spend accounts for a user."""
-        return self.filter(user_id=uid).values_list("spend_accounts__source", flat=True)
+    def get_spend_accounts(self):
+        """Returns a tuple of spend accounts for a user."""
+        return self.get().values_list("spend_accounts__source")
     
     def get_timezone(self):
         """Returns the timezone for a user."""
