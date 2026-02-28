@@ -10,17 +10,19 @@ Attributes:
 """
 
 import finance.logic.validators as validator
-import finance.logic.updaters as update
+from finance.logic.updaters import Updater 
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from loguru import logger
-from finance.models import PaymentSource, AppProfile
+from finance.models import PaymentSource, CurrentAsset
+
+# TODO:  GUESS WHAT?!?!?!  Fix the docstrings, commments, and logger
 
 # Payment Source Functions
-@transaction.atomic
-@validator.SourceValidator
 @validator.UserValidator
-def add_source(uid, data: dict):
+@validator.SourceValidator
+@transaction.atomic
+def add_source(uid, data, *args, **kwargs):
     """
     Adds a payment source to the user's account.
 
@@ -32,39 +34,27 @@ def add_source(uid, data: dict):
     :rtype: dict
     """
     logger.debug(f"Adding asset: {data}")
-    uid = AppProfile.objects.for_user(uid).get()
-    data['source'] = data['source'].lower()
-    if data['source'] == "unknown":
-        raise ValidationError("Cannot add unknown source")
-    asset = PaymentSource.objects.create(uid=uid,**data)
-    update.rebalance(uid=uid, acc_type=asset.acc_type)
-    return {'added': asset}
+    update = Updater(profile=kwargs.get('profile'))
+    sources = kwargs.get('sources')
+    if isinstance(data, list):
+        rejected = kwargs.get('rejected')
+        accepted = kwargs.get('accepted')
+        sources.bulk_create([PaymentSource(**item) for item in accepted])
+        update.new_source(accepted)
+        CurrentAsset.objects.bulk_create([CurrentAsset(**item['source']) for item in accepted])
+        return {'added': accepted, 'rejected': rejected}
 
-@transaction.atomic    
-@validator.UserValidator
-def bulk_add_sources(uid, data: list):
-    """
-    Adds a list of payment sources to the user's account.
+    else:
+        sources.create(**data)
+        update.new_source(data)
+        CurrentAsset.objects.create(**data['source'])
+    return {'added': data}
 
-    :param uid: The user id.
-    :type uid: str
-    :param data: A list of dictionaries representing the payment sources to add.
-    :type data: list
-    :returns: {'added': [queryset]}
-    :rtype: dict
-    """
-    logger.debug(f"Adding bulk payment sources: {data}")
-    added = []
-    for item in data:
-        logger.debug(f"Adding payment source: {item}")
-        add_source(uid, item)
-        added.append(PaymentSource.objects.for_user(uid).get_by_source(source=item['source']))
-    return {'added': added }
 
 @transaction.atomic
 @validator.UserValidator
 @validator.SourceValidator
-def delete_source(uid, source: str):
+def delete_source(uid, source: str, *args, **kwargs):
     """
     Deletes a payment source from the user's account.
 
@@ -76,15 +66,17 @@ def delete_source(uid, source: str):
     :rtype: dict
     """
     logger.debug(f"Deleting source: {source}")
-    source_obj = PaymentSource.objects.for_user(uid).get_by_source(source=source)
-    source_obj.delete()
-    update.rebalance(uid=uid, acc_type=source_obj.acc_type)
-    return {'deleted': source_obj}
+    sources = kwargs.get('checked').get()
+    source.delete()
+    update = Updater(profile=kwargs.get('profile'), source_type=sources.acc_type)
+    update.source_deleted()
+    return {'deleted': source}
 
 @transaction.atomic
 @validator.UserValidator
+@validator.SourceGetValidator
 @validator.SourceValidator
-def update_source(uid, source: str, data: dict):
+def update_source(uid, source: str, data: dict, *args, **kwargs):
     """
     Updates a payment source in the user's account.
 
@@ -98,14 +90,15 @@ def update_source(uid, source: str, data: dict):
     :rtype: dict
     """
     logger.debug(f"Updating source: {source}")
-    source_obj = PaymentSource.objects.for_user(uid).get_by_source(source=source)
+    source_obj = kwargs.get('checked').get()
+    update = Updater(profile=kwargs.get('profile'))
     source_obj.update(**data)
     update.rebalance(uid=uid, acc_type=source_obj.acc_type)
     return {'updated': source_obj}
 
 @validator.UserValidator
 @validator.SourceValidator
-def get_sources(uid, **kwargs):
+def get_sources(uid, data:dict, *args, **kwargs):
     """
     Retrieves a list of payment sources for a user.  Accepts optional filters.
 
@@ -116,10 +109,10 @@ def get_sources(uid, **kwargs):
     :returns: {'sources': queryset}
     :rtype: dict
     """
-    sources = PaymentSource.objects.for_user(uid)
-    if kwargs.get('acc_type'):
-        sources = sources.get_by_acc_type(kwargs['acc_type'])
-    if kwargs.get('source'):
-        sources = sources.get_by_source(kwargs['source'])
+    sources = kwargs.get('sources')
+    if data.get('acc_type'):
+        sources = sources.filter(acc_type=data['acc_type'])
+    if data.get('source'):
+        sources = sources.filter(source__icontains=data['source'])
     return {'sources': sources}
 

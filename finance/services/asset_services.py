@@ -15,14 +15,13 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from loguru import logger
 from finance.models import (
-    PaymentSource, 
     CurrentAsset,
 )
 
-@transaction.atomic
-@validator.AssetValidator
 @validator.UserValidator
-def update_asset_source(uid, data:dict, source: str):
+@validator.AssetValidator
+@transaction.atomic
+def update_asset(uid, data:dict, source: str, **kwargs):
     """
     Updates a source for an asset.
     
@@ -30,38 +29,32 @@ def update_asset_source(uid, data:dict, source: str):
     :type uid: str
     :param data: The data for the asset source.
     :type data: dict
+    :param source: The source of the asset to update.
+    :type source: str
     :returns: {'asset': model instance}
     :rtype: dict
     """
-    # TODO: Fix this to work with the new Updater class
-        # This will likely follow transaction logic. 
-        # Just need to figure out how to pipe this back and forth to Updater
-        # As written currently, this is bad. 
 
-    # TODO: Potentially add bulk asset change as well
-        # I'm still stuck on if this is actually necessary
-        # I'll probably add it anyway.  
-        # If I do:
-            # TODO: Update Serializers to handle this
-            # TODO: Update views to allow it
-            # TODO: Make sure tests actually test bulk changes.
     logger.debug(f"Updating asset: {data}")
-    data['source'] = data['source'].lower()
-    assets = CurrentAsset.objects.for_user(uid)
-    update = Updater(uid, assets=assets)
-    asset_instance = assets.get_asset(source=data['source']).get()
-    if PaymentSource.objects.filter(uid=uid, source=source).exists():
-        source = PaymentSource.objects.filter(uid=uid, source=source).get()
-        asset_instance.source = source
-        asset_instance.save()
-        update.rebalance(uid=uid, acc_type=asset_instance.source.acc_type)
-        return {'updated': asset_instance}
-    else:
-        logger.error(f"Cannot update asset.  Source {source} does not exist.")
-        raise ValidationError("Cannot update asset.  Source does not exist.")
 
-@transaction.atomic
+    # First database hit to get values
+    assets = CurrentAsset.objects.for_user(uid).get_asset(source)
+    profile = kwargs.get('profile')
+
+    # Set up Updater and asset to be changed
+    update = Updater(uid, assets=assets, profile=profile)
+    asset_instance = assets.get_asset(source=data['source'])
+
+    # Get the previous type, in case it changes
+    prev_type = asset_instance.get().source.acc_type
+
+    # Update and return
+    asset_instance.update(**data)
+    update.asset_updated(prev_type)
+    return {'updated': asset_instance}
+
 @validator.UserValidator
+@transaction.atomic
 def get_asset(uid, source: str):
     """
     Retrieves a single asset.
@@ -77,8 +70,8 @@ def get_asset(uid, source: str):
     asset = CurrentAsset.objects.for_user(uid).get_asset(source)
     return {'asset': asset}
 
-@transaction.atomic
 @validator.UserValidator
+@transaction.atomic
 def get_all_assets(uid):
     """
     Retrieves a list of all assets.

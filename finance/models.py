@@ -19,14 +19,8 @@ import uuid
 
 
 
+# TODO: Fix docstrings
 
-
-class Timezone(models.Model):
-    
-    class Meta:
-        verbose_name_plural = "Timezones"
-
-    timezone = models.CharField(max_length=100)
 
 
 class AppProfile(models.Model):
@@ -46,44 +40,13 @@ class AppProfile(models.Model):
     username = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     spend_accounts = models.ManyToManyField("PaymentSource", blank=True)
-    base_currency = models.ForeignKey(
-        "finance.Currency",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-    timezone = models.ForeignKey("Timezone", on_delete=models.DEFAULT, default='America/New_York')
+    base_currency = models.CharField(max_length=3, default="USD")
+    timezone = models.CharField(default='America/New_York')
     start_of_week = models.IntegerField(default=1)
     
 
     def __str__(self):
         return f"{self.user_id}"
-
-class Currency(models.Model):
-    """
-    Global model for currencies.
-    Requires population with mamangement/commands/load_currencies.py.
-
-    Attributes:
-        code (CharField): Currency code.
-        name (CharField): Currency name.
-        symbol (CharField): Currency symbol.
-    """
-    class Meta:
-        verbose_name_plural = "Currencies"
-        ordering = ["code"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=['code', 'name', 'symbol'],
-                name='unique_currency_per_code'
-            )
-        ]
-    code = models.CharField(max_length=3, default="USD")
-    name = models.CharField(max_length=50, default="USD")
-    symbol = models.CharField(max_length=5, default="$", null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.code} ({self.symbol})"
 
 
 class Tag(models.Model):
@@ -137,33 +100,6 @@ class PaymentSource(models.Model):
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
 
-    def save(self, *args, **kwargs):
-        """
-        Automatically create a CurrentAsset when a PaymentSource is created.
-        This ensures every PaymentSource has a corresponding asset tracking its balance.
-        """
-        created = self.pk is None
-        super().save(*args, **kwargs)
-        
-        if created:
-            # Get the user's base currency (should always exist)
-            base_currency = self.uid.base_currency
-            if not base_currency:
-                # Fallback: set to USD
-                base_currency = Currency.objects.filter(code='USD').first()
-            
-            if base_currency:
-                # Create CurrentAsset with initial amount of 0
-                # User can update the amount later via user_add_asset or transactions
-                CurrentAsset.objects.get_or_create(
-                    source=self,
-                    defaults={
-                        'amount': 0,
-                        'currency': base_currency,
-                        'uid': self.uid
-                    }
-                )
-
     def __str__(self):
         return f"{self.source} ({self.AccType})"
 
@@ -202,10 +138,10 @@ class UpcomingExpense(models.Model):
     end_date = models.DateField(null=True, blank=True)
     paid_flag = models.BooleanField(default=False)
     expense_id = models.AutoField(primary_key=True)
+    currency = models.CharField(max_length=3, default="USD")
 
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)
-    currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
 
     # Boolean for recurring logic
     is_recurring = models.BooleanField(default=False)
@@ -249,7 +185,7 @@ class Transaction(models.Model):
 
     # Link to relationship models
     source = models.ForeignKey("PaymentSource", on_delete=models.PROTECT)
-    currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
+    currency = models.CharField(max_length=3)
     tags = models.ManyToManyField("Tag", blank=True)
     tx_id = models.CharField(max_length=20, editable=False, db_index=True)
     bill = models.ForeignKey('UpcomingExpense', on_delete=models.SET_NULL, null=True, blank=True)
@@ -302,7 +238,8 @@ class CurrentAsset(models.Model):
 
     source = models.OneToOneField("PaymentSource", on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    currency = models.ForeignKey("Currency", on_delete=models.PROTECT)
+    currency = models.CharField(max_length=3, default="USD")
+
 
     # User dependancy
     uid = models.ForeignKey("AppProfile", on_delete=models.CASCADE)

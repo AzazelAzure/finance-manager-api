@@ -16,30 +16,68 @@ from finance.models import (
     Tag,
     Transaction, 
     CurrentAsset, 
-    AppProfile,
     PaymentSource,
     FinancialSnapshot,
-    Currency,
     UpcomingExpense
 )
 from loguru import logger
+import uuid
+
+
 
 # TODO:  Docstrings... again
 
 class Updater:
     """
     Class to handle data manipulation for the finance manager application.
+
+    Required Params:
+        - profile: The user AppProfile queryset
+        - sources: The PaymentSource queryset
+        - currencies: The Currency queryset
+
+
+    Optional Params:
+        - transactions: The Transaction queryset
+        - assets: The CurrentAsset queryset
+
+
+    Conditional Params:
+        If Transactions:
+            - tags: Tags queryset
+            - upcoming: UpcomingExpense queryset
+
     """
-    def __init__(self, uid, **kwargs):
-        self.profile = kwargs.get("profile") or AppProfile.objects.for_user(uid)
+    def __init__(self, profile, **kwargs):
+        
+        # Required arguments
+        self.profile = profile
+        
+
+        # Ease for profile to set applicable info
         self.uid = self.profile.user_id
-        self.tags = kwargs.get("tags") or Tag.objects.for_user(uid)
-        self.assets = kwargs.get("assets") or CurrentAsset.objects.for_user(uid)
-        self.transactions = kwargs.get('transactions') or Transaction.objects.for_user(uid)
-        self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(uid)
-        self.snapshots = kwargs.get('snapshots') or FinancialSnapshot.objects.for_user(uid)
-        self.currencies = kwargs.get('currencies') or Currency.objects.all()
-        self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(uid)
+        self.base_currency = self.profile.base_currency.code
+        self.spend_accounts = self.profile.get_spend_accounts()
+
+        # Situational settings
+        if kwargs.get('transactions'):
+            self.transactions = kwargs.get('transactions')
+            self.tags = kwargs.get("tags") or Tag.objects.for_user(self.uid)
+            self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(self.uid)
+            self.tx_sources = self.transactions.values_list('source', flat=True).distinct()
+            self.assets = CurrentAsset.objects.filter(source__source__in=self.tx_sources)
+            self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(self.uid)
+        if kwargs.get('assets'):
+            self.assets = kwargs.get('assets')
+            self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(self.uid)
+        
+        if kwargs.get('source_type'):
+            self.source_type = kwargs.get('source_type')
+
+        # Single hit for any user, always used
+        self.snapshots = FinancialSnapshot.objects.for_user(self.uid)
+        
+        # Create the calculator instance
         self.fc = Calculator(self.profile)
         return
 
@@ -51,14 +89,21 @@ class Updater:
             if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
                 item['amount'] = item['amount'] * -1
             item['source'] = self.sources.get(source=item['source'])
-            item['currency'] = self.currencies.get(code=item['currency'])
+            if not item['date']:
+                item['date'] = timezone.now(self.profile.timezone).date()
+            if not item['created_on']:
+                item['created_on'] = timezone.now(self.profile.timezone).date()
+            if not item['tx_id']:
+                date_suffix = timezone.now(self.profile.timezone).date()
+                unique_id = str(uuid.uuid4())[:8].upper()
+                item['tx_id'] = f"{date_suffix}-{unique_id}"
             if item.get('tags'):
                 item['tags'] = self.tags.filter(name__in=item['tags'])
             if item.get('bill'):
                 item['bill'] = self.upcoming.get(name=item['bill'])
         return data
 
-    def fix_asset_data(self, data):
+    def fix_asset_data(self, data, src):
         for item in data:
             item['uid'] = self.profile.user_id
             # Get the PaymentSource instance based on the source name
@@ -66,8 +111,15 @@ class Updater:
             item['source'] = payment_source_instance
             # Get the Currency instance associated with the PaymentSource (via CurrentAsset)
             item['currency'] = self.assets.get_asset(payment_source_instance.source).get().currency
-        return data
+            src = self.sources.get(source=src)
+        return data, src
 
+    def fix_source_data(self, data):
+        for item in data:
+            item['uid'] = self.profile.user_id
+            item['source'] = item['source'].lower()
+            item['acc_type'] = item['acc_type'].upper()
+        return data
 
     # Transaction Handlers
     def new_transaction(self):
@@ -115,18 +167,35 @@ class Updater:
         self.rebalance(acc_type=True)
         return
 
+
+    # Source Handlers
+    def source_deleted(self):
+        self.fc.calc_asset_type(self.source_type)
+        self.rebalance()
+        return
+
+
     # Asset Handlers
-    def asset_source_updated(self):
-        asset = self.assets.get()
+    def asset_updated(self, prev_src):
         # TODO: Fix this later.  
             # Basic logic should follow transaction logic
             # Subtract the total of the asset before it's changed
             # Then add the new total to the new source
+        new = self.assets.source.acc_type
+
+        # Calc new asset values
+        old_source = self.fc.calc_asset_type(prev_src)
+        new_source = self.fc.calc_asset_type(new)
+        
+        # Set asset values to snapshot
+        prev_src = f'total_{prev_src.lower()}'
+        new_src = f'total_{new.lower()}'
+        self.snapshots.update(**{prev_src: old_source, new_src: new_source})
         return
 
 
     # Rebalance Handler
-    def rebalance(self,acc_type=False):
+    def rebalance(self,acc_type=False, total_assets=True, leaks=True, sts=True):
         """
         Rebalances the user's accounts.
         
@@ -142,9 +211,12 @@ class Updater:
         # Ordered this way due to how calculations are done
         if acc_type:
             self._recalc_asset_type()
-        self._recalc_total_assets()
-        self._recalc_leaks()
-        self._recalc_sts()
+        if total_assets:
+            self._recalc_total_assets()
+        if leaks:
+            self._recalc_leaks()
+        if sts:
+            self._recalc_sts()
         return
 
         
@@ -192,7 +264,8 @@ class Updater:
         Recalculates the leaks for a user and sets to Financial Snapshot.
         """
         logger.debug(f"Recalculating leaks for {self.uid}")
-        leaks = self.fc.calc_leaks()
+        for_month = Transaction.for_user(self.uid).get_current_month()
+        leaks = self.fc.calc_leaks(for_month)
         self.snapshots.update(total_leaks=leaks)
         return
 
@@ -206,8 +279,7 @@ class Updater:
         logger.debug(f"Affected sources: {affected_sources}")
 
         for source in affected_sources: 
-
-            # TODO: FIX BOTH OF THESE!!!  Concept is there, implementation needs fixed.
+            # TODO: Monitor for validity
             aggregate = self.fc.calc_queryset(self.transactions.filter(source=source))                
             source.amount = self.fc.calc_new_balance(self.assets.filter(source__source=source), aggregate)
         self.assets.bulk_update(affected_sources, ['amount'])

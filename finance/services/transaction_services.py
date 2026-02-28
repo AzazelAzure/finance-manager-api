@@ -29,9 +29,10 @@ def get_transactions(uid,**kwargs):
     If month is set with no year, will return transactions for current month.\n
     If year is set with no month, will function the same as by_year.\n
     If start_date is set with no end_date, will return all transactions after start_date.\n
-    If end_date is set with no start_date, will return all transactions before end_date.
+    If end_date is set with no start_date, will return all transactions before end_date.\n
+    If no kwargs are sent, will return the most recent transaction.\n
 
-
+    
     :param uid: The user id.
     :type uid: str
     :param kwargs: A dictionary of filters and ordering options.
@@ -39,11 +40,14 @@ def get_transactions(uid,**kwargs):
     :returns: {'transactions': queryset, 'amount': decimal amount}
     :rtype: dict
     """
-    
+
     logger.debug(f"Getting transactions for {uid} with filters: {kwargs}")
     queryset = Transaction.objects.for_user(uid=uid)
-    profile = AppProfile.objects.for_user(uid)
+    profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     fc = Calculator(profile)
+
+    if not kwargs:
+        queryset = queryset.get_latest()
 
     # Handle specific filters that require multiple arguments or no arguments
     if kwargs.get('current_month'):
@@ -97,10 +101,10 @@ def get_transactions(uid,**kwargs):
             'total_leaks': fc.calc_queryset(queryset.filter(tx_type__in=['XFER_OUT', 'XFER_IN'])),
             }
 
-@transaction.atomic
-@validator.TransactionValidator
 @validator.UserValidator
-def add_transaction(uid,data, rejected=None):
+@validator.TransactionValidator
+@transaction.atomic
+def add_transaction(uid, data, *args, **kwargs):
     """
     Adds a transaction to the user's account.
     
@@ -111,13 +115,15 @@ def add_transaction(uid,data, rejected=None):
     :returns: {'added': queryset}
     :rtype: dict
     """
-    upcoming = UpcomingExpense.objects.for_user(uid)
+    upcoming = kwargs.get('upcoming', UpcomingExpense.objects.for_user(uid))
+    profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     if isinstance(data, list):
         logger.debug(f"Adding bulk transactions: {data}")
-        accepted = [item for item in data if item not in rejected]
+        rejected = kwargs.get('rejected', [])
+        accepted = kwargs.get('accepted', [])
         Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
         to_update = Transaction.objects.filter(tx_id__in=[item['tx_id'] for item in accepted])
-        update = Updater(uid, transactions=to_update, upcoming=upcoming)
+        update = Updater(uid, profile=profile, transactions=to_update, upcoming=upcoming)
         update.new_transaction()
         if rejected:
             return {'accepted': accepted, 'rejected': rejected}
@@ -127,15 +133,15 @@ def add_transaction(uid,data, rejected=None):
         logger.debug(f"Adding transaction: {data}")
         tx = Transaction.objects.create(**data)
         tx = Transaction.objects.for_user(uid).get(tx_id=tx.tx_id)
-        update = Updater(uid, transactions=tx, upcoming=upcoming)
+        update = Updater(profile=profile, transactions=tx, upcoming=upcoming) 
         update.new_transaction(uid, tx)
         return {'accepted': tx}
 
-@transaction.atomic
-@validator.TransactionValidator
-@validator.TransactionIDValidator
 @validator.UserValidator
-def update_transaction(uid, tx_id: str, data: dict):
+@validator.TransactionIDValidator
+@validator.TransactionValidator
+@transaction.atomic
+def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     """
     Updates a transaction in the user's account.
     
@@ -149,18 +155,18 @@ def update_transaction(uid, tx_id: str, data: dict):
     :rtype: dict
     """
     logger.debug(f"Updating transaction: {data}")
-    tx = Transaction.objects.for_user(uid).get_tx(tx_id)
-    profile = AppProfile.objects.for_user(uid)
+    tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id)) 
+    profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     update = Updater(uid, profile=profile, transactions=tx)
     update.transaction_updated()
     tx.update(**data)
     update.new_transaction()
     return {f'updated': tx}
 
-@transaction.atomic
-@validator.TransactionIDValidator
 @validator.UserValidator
-def delete_transaction(uid, tx_id: str):
+@validator.TransactionIDValidator
+@transaction.atomic
+def delete_transaction(uid, tx_id: str, *args, **kwargs):
     """
     Deletes a transaction from the user's account.
     
@@ -172,8 +178,8 @@ def delete_transaction(uid, tx_id: str):
     :rtype: dict
     """
     logger.debug(f"Deleting transaction: {tx_id}")
-    tx = Transaction.objects.for_user(uid).get_tx(tx_id)
-    profile = AppProfile.objects.for_user(uid)
+    tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id))
+    profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     update = Updater(uid, profile=profile, transactions=tx)
     # Update balances to reverse changes
     update.transaction_updated()
@@ -183,10 +189,9 @@ def delete_transaction(uid, tx_id: str):
     tx.delete()
     return {f'deleted': tx}
 
-
-@validator.TransactionIDValidator
 @validator.UserValidator
-def get_transaction(uid, tx_id: str):
+@validator.TransactionIDValidator
+def get_transaction(uid, tx_id: str, *args, **kwargs):
     """
     Retrieves a single transaction for a user.
 
@@ -198,5 +203,5 @@ def get_transaction(uid, tx_id: str):
     :rtype: dict
     """
     logger.debug(f"Getting transaction: {tx_id} for {uid}")
-    tx = Transaction.objects.for_user(uid).get_tx(tx_id)
+    tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id))
     return {'transaction': tx}

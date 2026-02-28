@@ -104,8 +104,8 @@ class CurrentAssetManager(models.QuerySet):
         return self.filter(source__acc_type__in=args)
     
     def get_asset(self, *args):
-        """Returns a model instance for a given asset."""
-        return self.get(source__source__in=args)
+        """Returns a queryset for a given asset."""
+        return self.filter(source__source__in=args)
 
 class UpcomingExpenseManager(models.QuerySet):
     """Manager for UpcomingExpense model."""

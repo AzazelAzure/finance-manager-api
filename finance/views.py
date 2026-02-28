@@ -183,7 +183,7 @@ class TransactionView(APIView):
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
         # If no filters are provided, returns all transactions
         result = tx_svc.get_transactions(uid=uid, **filter_params)
-        serializer = TransactionGetSerializer(result)
+        serializer = TransactionGetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request, tx_id: str):
@@ -423,7 +423,7 @@ class SourceView(APIView):
         serializer = SourceSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    def patch(self, request):
+    def put(self, request):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     def get(self, request):
@@ -432,8 +432,8 @@ class SourceView(APIView):
         serializer = SourceSerializer(result['sources'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def put(self, request, src: str):
-        if src == "unknown":
+    def patch(self, request, src: str):
+        if src.lower() == "unknown":
             return Response(status=status.HTTP_403_FORBIDDEN)
         result = src_svc.update_source(
             uid=request.user.appprofile.user,

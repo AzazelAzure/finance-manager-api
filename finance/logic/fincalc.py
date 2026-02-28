@@ -13,15 +13,6 @@ Attributes:
 # TODO: Update logging
 # TODO:  Guess what?  It's docstrings again!
 
-from finance.models import (
-    CurrentAsset, 
-    UpcomingExpense,
-    FinancialSnapshot, 
-    PaymentSource,
-    Transaction,
-    AppProfile,
-    Currency
-)
 from django.db.models import Sum
 from finance.logic.convert_currency import convert_currency
 from decimal import Decimal
@@ -35,16 +26,6 @@ class Calculator:
         self.uid = self.profile.user_id
         self.base_currency = self.profile.base_currency.code
         self.spend_accounts = self.profile.get_spend_accounts()
-
-        # These should almost never be passed on initialization.
-        # The ability to pass in are for potential future features
-        # In current workflow, never pass in a kwarg to set these
-        self.assets = kwargs.get("assets") or CurrentAsset.objects.for_user(self.uid)
-        self.transactions = kwargs.get('transactions') or Transaction.objects.for_user(self.uid).get_current_month()
-        self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(self.uid)
-        self.snapshots = kwargs.get('snapshots') or FinancialSnapshot.objects.for_user(self.uid)
-        self.currencies = kwargs.get('currencies') or Currency.objects.for_user(self.uid)
-        self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(self.uid)
         return
 
     def calc_sts(self):
@@ -75,7 +56,7 @@ class Calculator:
         # Return decimal converted spendable accounts minus converted debts
         return Decimal((spend - debt)).quantize(Decimal("0.01"))
 
-    def calc_leaks(self):
+    def calc_leaks(self, tx_queryset):
         """
         Calculates leaks for transfers to monitor fees.
         
@@ -85,11 +66,11 @@ class Calculator:
         :rtype: Decimal
         """
         # Get all transactions marked as XFER_IN, Sort by currency type, get sums for each currency
-        xfers_in = self.transactions.get_by_tx_type("XFER_IN")
+        xfers_in = tx_queryset.get_by_tx_type("XFER_IN")
         xfers_in_by_currency = xfers_in.values("currency__code").annotate(total=Sum("amount"))
 
         # Repeat for XFER_OUT
-        xfers_out = self.transactions.get_by_tx_type("XFER_OUT")
+        xfers_out = tx_queryset.get_by_tx_type("XFER_OUT")
         xfers_out_by_currency = xfers_out.values("currency__code").annotate(total=Sum("amount"))
 
         # Convert both XFER_IN and XFER_OUT totals into base currency
@@ -116,7 +97,7 @@ class Calculator:
         base_currency = self.profile.base_currency.code
         total_by_currency = queryset.values("currency__code").annotate(total=Sum("amount"))
         total = sum(map(lambda x: self._calc_totals(x["currency__code"], base_currency, x["total"]), total_by_currency))
-        return Decimal(total).quantize(Decimal("0.01"))
+        return Decimal(total).quantize(Decimal("0.01")) 
 
     def calc_new_balance(self, asset_queryset, amount):
         """
@@ -180,7 +161,7 @@ class Calculator:
         logger.debug(f"Total asset total: {asset_total}")
         return Decimal(asset_total).quantize(Decimal("0.01"))
 
-    def calc_asset_type(self, acc_type):
+    def calc_asset_type(self, asset_queryset, acc_type):
         """
         Calculates the total assets for a specific account type.
 
@@ -194,7 +175,7 @@ class Calculator:
         logger.debug(f"Calculating asset type {acc_type} for {self.uid}")
 
         # Get the assets for the incoming acc_type. 
-        asset = self.assets.filter(source__acc_type=acc_type)
+        asset = asset_queryset.get_by_type(acc_type)
 
         # Sums the assets for all sources with the acc_type in acc_type
         asset_by_currency = asset.values("currency__code").annotate(total=Sum("amount"))

@@ -21,11 +21,12 @@ from finance.models import (
     Transaction,
     UpcomingExpense, 
     PaymentSource, 
-    Currency, 
     Tag
 )
 from finance.logic.updaters import Updater
 from loguru import logger
+import pycountry
+import zoneinfo
 
 
 
@@ -37,30 +38,34 @@ def TransactionValidator(func):
     Raises a ValidationError if any validation fails.
     """
     @wraps(func)
-    def _wrapped(uid, data):
+    def _wrapped(uid, data, *args, **kwargs):
         sources = PaymentSource.objects.for_user(uid)
-        currencies = Currency.objects.all()
         tags = Tag.objects.for_user(uid)
         upcoming = UpcomingExpense.objects.for_user(uid)
-        profile = AppProfile.objects.for_user(uid)
-        update = Updater(uid, sources=sources, currencies=currencies, tags=tags, upcoming=upcoming, profile=profile)
+        profile = kwargs.get('profile')
+        kwargs['sources'] = sources
+        kwargs['tags'] = tags
+        kwargs['upcoming'] = upcoming
+        update = Updater(transactions=data, sources=sources, tags=tags, upcoming=upcoming, profile=profile)
         if isinstance(data, list):
             rejected = []
             for item in data:
                 logger.debug(f"Validating transaction: {item} with uid: {uid}")
                 try:
-                    _validate_transaction(uid, item, sources, currencies, tags, upcoming)
-                    update.fix_tx_data(data)
+                    _validate_transaction(uid, item, sources, tags, upcoming)
                 except ValidationError as e:
                     logger.error(f"Transaction validation failed: {e}")
                     rejected.append(item)
-            return func(uid, data, rejected)
+            accepted = [item for item in data if item not in rejected]
+            kwargs['rejected'] = rejected
+            kwargs['accepted'] = accepted
+            update.fix_tx_data(accepted)
+            return func(uid, data,  *args, **kwargs)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
-        _validate_transaction(uid, data, sources, currencies, tags, upcoming)
+        _validate_transaction(uid, data, sources, tags, upcoming)
         update.fix_data(data)
-        return func(uid, data)
+        return func(uid, data, *args, **kwargs)
     return _wrapped
-
 
 def TransactionIDValidator(func):
     """
@@ -69,28 +74,18 @@ def TransactionIDValidator(func):
     Raises a ValidationError if the transaction does not exist.
     """
     @wraps(func)
-    def _wrapped(uid, tx_id: str):
+    def _wrapped(uid, tx_id: str, *args, **kwargs):
         logger.debug(f"Validating transaction id: {tx_id} with uid: {uid}")
-        if not Transaction.objects.for_user(uid).filter(tx_id=tx_id).exists():
+        # Check if transaction exists
+        profile = kwargs.get('profile')
+        to_check = Transaction.objects.for_user(profile.user_id).get_tx(tx_id=tx_id)
+        if not to_check:
             logger.error(f"Transaction does not exist: {tx_id}")
             raise ValidationError("Transaction does not exist")
-        return func(uid, tx_id)
+        kwargs['id_check'] = to_check
+        return func(uid, tx_id,  profile=profile, *args, **kwargs)
     return _wrapped
 
-def TransactionTypeValidator(func):
-    """
-    Decorator to validate a transaction type.
-    Checks if the transaction type exists.
-    Raises a ValidationError if the transaction type does not exist.
-    """
-    @wraps(func)
-    def _wrapped(uid, tx_type: str):
-        logger.debug(f"Validating transaction type: {tx_type} with uid: {uid}")
-        if not Transaction.objects.for_user(uid).filter(tx_type=tx_type).exists():
-            logger.error(f"Transaction type does not exist: {tx_type}")
-            raise ValidationError("Transaction type does not exist")
-        return func(uid, tx_type)
-    return _wrapped
 
 # User Validator
 def UserValidator(func):
@@ -100,13 +95,20 @@ def UserValidator(func):
     Raises a ValidationError if the user does not exist.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data:dict, *args, **kwargs):
         logger.debug(f"Validating user with uid: {uid}")
-        if not AppProfile.objects.for_user(uid).exists():
+        profile = AppProfile.objects.for_user(uid)
+        if not profile.exists():
             logger.error(f"User does not exist: {uid}")
             raise ValidationError("User does not exist")
-        return func(uid, data)
+        kwargs['profile'] = profile
+        if data.get('timezone'):
+            _validate_timezone(data['timezone'])
+        if data.get('base_currency'):
+            _validate_currency(data['base_currency'])
+        return func(uid, data, *args, **kwargs)
     return _wrapped
+
 
 # Asset Validators
 def AssetValidator(func):
@@ -117,28 +119,17 @@ def AssetValidator(func):
     Raises a ValidationError if any validation fails.
     """
     @wraps(func)
-    def _wrapped(uid, data):
-        # Currently set up to allow for updating multiple assets
-        # Bulk updates are currently not implemented, but framework exists
+    def _wrapped(uid, data, src, *args, **kwargs):
         sources = PaymentSource.objects.for_user(uid)
-        currencies = Currency.objects.all()
-        profile = AppProfile.objects.for_user(uid)
-        update = Updater(uid, sources=sources, currencies=currencies, profile=profile)
-        if isinstance(data, list):
-            rejected = []
-            for item in data:
-                logger.debug(f"Validating asset: {item} with uid: {uid}")
-                try:
-                    _validate_asset(uid, item, sources, currencies, profile)
-                    update.fix_asset_data(data)
-                except ValidationError:
-                    rejected.append(item)
-            return func(uid, data, rejected)
+        profile = kwargs.get('profile')
         logger.debug(f"Validating asset: {data} with uid: {uid}")
-        _validate_asset(uid, data, sources, currencies, profile)
-        update.fix_asset_data(data)
-        return func(uid, data)
+        _validate_asset(uid, data, sources, src)
+        update = Updater(sources=sources, profile=profile)
+        update.fix_asset_data(data, src)
+        kwargs['sources'] = sources
+        return func(uid, data, *args, **kwargs)
     return _wrapped
+
 
 # Upcoming Expense Validators
 def UpcomingExpenseValidator(func):
@@ -148,13 +139,44 @@ def UpcomingExpenseValidator(func):
     Raises a ValidationError if the expense does not exist.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data, *args, **kwargs):
         logger.debug(f"Validating expense: {data} with uid: {uid}")
-        if not UpcomingExpense.objects.for_user(uid).filter(name=data['name']).exists():
-            logger.error(f"Expense does not exist: {data['name']}")
-            raise ValidationError("Expense does not exist")
-        return func(uid, data)
+        profile = kwargs.get('profile')
+        upcoming = UpcomingExpense.objects.for_user(profile.user_id)
+        kwargs['upcoming'] = upcoming
+        # Check if it's a list, and treat it as a bulk addition
+        if isinstance(data, list):
+            rejected = []
+            accepted = []
+            for item in data:
+                try:
+                    _validate_expense(uid, item)
+                    accepted.append(item)
+                except ValidationError as e:
+                    logger.error(f"Expense validation failed: {e}")
+                    rejected.append(item)
+            kwargs['rejected'] = rejected
+            kwargs['accepted'] = accepted
+            return func(uid, data, *args, **kwargs)
+        else: 
+            _validate_expense(uid, data)
+            kwargs['upcoming'] = upcoming.filter(name=data['name'])
+        return func(uid, data, **args, **kwargs)
     return _wrapped
+
+def UpcomingExpenseGetValidator(func):
+    @wraps(func)
+    def _wrapped(uid, data, expense_name: str, *args, **kwargs):
+        logger.debug(f"Validating expense: {data} with uid: {uid}")
+        profile = kwargs.get('profile')
+        upcoming = UpcomingExpense.for_user(profile.user_id).get_by_name(expense_name)
+        if not upcoming:
+            logger.error(f"Expense does not exist: {expense_name}")
+            raise ValidationError("Expense does not exist")
+        kwargs['existing'] = upcoming
+        return func(uid, expense_name, *args, **kwargs)
+    return _wrapped
+
 
 # Tag Validators
 def TagValidator(func):
@@ -172,6 +194,8 @@ def TagValidator(func):
         return func(uid, data)
     return _wrapped
 
+
+# Source Validators
 def SourceValidator(func):
     """
     Decorator to validate a payment source.
@@ -179,26 +203,52 @@ def SourceValidator(func):
     Raises a ValidationError if the source does not exist.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data, *args, **kwargs):
+        profile = kwargs.get('profile')
+        sources = PaymentSource.objects.for_user(profile.user_id)
+        update = Updater(sources=sources, profile=profile)
+        kwargs['sources'] = sources
         logger.debug(f"Validating source: {data} with uid: {uid}")
-        if not PaymentSource.objects.for_user(uid).filter(source=data['source']).exists():
-            logger.error(f"Source does not exist: {data['source']}")
-            raise ValidationError("Source does not exist")
-        if data['acc_type'] not in PaymentSource.AccType.choices:
-            logger.error(f"Account type does not exist: {data['acc_type']}")
-            raise ValidationError("Account type does not exist")
-        return func(uid, data)
+        if isinstance(data, list):
+            rejected = []
+            accept = []
+            for item in data:
+                try:
+                    _validate_source(uid, item)
+                    update.fix_source_data(item)
+                    accept.append(item)
+                except ValidationError as e:
+                    logger.error(f"Source validation failed: {e}")
+                    rejected.append(item)
+            kwargs['rejected'] = rejected
+            kwargs['accepted'] = accept
+            return func(uid, data, *args, **kwargs)
+        else:
+            _validate_source(uid, data)
+            update.fix_source_data(data)
+            return func(uid, data, *args, **kwargs)
     return _wrapped
 
+def SourceGetValidator(func):
+    @wraps(func)
+    def _wrapped(uid, source: str, *args, **kwargs):
+        logger.debug(f"Validating source: {source} with uid: {uid}")
+        if not PaymentSource.objects.for_user(uid).filter(source=source).exists():
+            logger.error(f"Source does not exist: {source}")
+            raise ValidationError("Source does not exist")
+        checked = PaymentSource.objects.for_user(uid).get_by_source(source=source)
+        kwargs['checked'] = checked
+        return func(uid, source, *args, **kwargs)
+    return _wrapped
+
+
 # Private Functions
-def _validate_transaction(uid, data:dict, sources, currencies, tags, upcoming):
+def _validate_transaction(uid, data:dict, sources, tags, upcoming):
     logger.debug(f"Validating transaction: {data} with uid: {uid}")
     if not sources.filter(source=data['source']).exists():
         logger.error(f"Source does not exist: {data['source']}")
         raise ValidationError("Source does not exist")
-    if not currencies.filter(code=data['currency']).exists():
-        logger.error(f"Currency does not exist: {data['currency']}")
-        raise ValidationError("Currency does not exist")
+    _validate_currency(data['currency'])
     if data.get('tags'):
         for tag in data['tags']:
             if not tags.filter(name=tag).exists():
@@ -218,14 +268,52 @@ def _validate_transaction(uid, data:dict, sources, currencies, tags, upcoming):
             raise ValidationError("Expense must be an expense")
     return data
 
-def _validate_asset(uid, data:dict, sources, currencies, profile):
+def _validate_asset(uid, data:dict, sources, src):
     logger.debug(f"Validating asset: {data} with uid: {uid}")
-    if not sources.filter(source=data['source']).exists():
-        logger.error(f"Source does not exist: {data['source']}")
-        raise ValidationError("Source does not exist")
-    if not currencies.filter(code=data['currency']).exists():
-        logger.error(f"Currency does not exist: {data['currency']}")
-        raise ValidationError("Currency does not exist")
+    if data.get('source'):
+        if not sources.filter(source=data['source']).exists():
+            logger.error(f"Source does not exist: {data['source']}")
+            raise ValidationError("Source does not exist")
+    if data.get('currency'):    
+        _validate_currency(data['currency'])
+    if not sources.filter(source=src).exists():
+        logger.error(f"Reference source to change that does not exist: {src}")
+        raise ValidationError(f"Asset for {src} not found")
+    return data, src
+
+def _validate_expense(uid, data:dict):
+    logger.debug(f"Validating expense: {data} with uid: {uid}")
+    if UpcomingExpense.objects.for_user(uid).filter(name=data['name']).exists():
+        raise ValidationError("Expense already exists")
+    _validate_currency(data['currency'])
     return data
 
+def _validate_source(uid, data:dict, sources):
+    logger.debug(f"Validating sources: {sources}")
+    if data.get('source'):
+        if data['source'].lower() == "unknown":
+            raise ValidationError("Cannot add unknown source")
+        if not sources.filter(source=data['source'].lower()).exists():
+            logger.error(f"Source does not exist: {data['source']}")
+            raise ValidationError("Source does not exist")
+    if data.get('acc_type'):
+        if data['acc_type'].upper() == "UNKNOWN":
+            raise ValidationError("Cannot add unknown account type")
+        if data['acc_type'] not in PaymentSource.AccType.choices:
+            logger.error(f"Account type does not exist: {data['acc_type']}")
+            raise ValidationError("Account type does not exist")
+    return data
 
+def _validate_currency(code):
+    logger.debug(f"Validating currency: {code}")
+    if not pycountry.currencies.get(alpha_3=code):
+        logger.error(f"Currency does not exist: {code}")
+        raise ValidationError("Currency does not exist")
+    return code
+
+def _validate_timezone(tz):
+    logger.debug(f"Validating timezone: {tz}")
+    if not zoneinfo.available_timezones.__contains__(tz):
+        logger.error(f"Timezone does not exist: {tz}")
+        raise ValidationError("Timezone does not exist")
+    return tz

@@ -11,17 +11,16 @@ Attributes:
 """
 
 import finance.logic.validators as validator
-import finance.logic.updaters as update
-import finance.logic.fincalc as fc
+from finance.logic.updaters import Updater
+from finance.logic.fincalc import Calculator
 from django.db import transaction
 from loguru import logger
 from finance.models import UpcomingExpense, AppProfile
 
-
-@transaction.atomic
 @validator.UserValidator
 @validator.UpcomingExpenseValidator
-def add_expense(uid, data: dict):
+@transaction.atomic
+def add_expense(uid, data, *args, **kwargs):
     """
     Adds a planned expense to the user's account.
 
@@ -33,38 +32,28 @@ def add_expense(uid, data: dict):
     :rtype: dict
     """
     logger.debug(f"Adding expense: {data}")
-    uid = AppProfile.objects.for_user(uid).get()
-    data['uid'] = uid
-    UpcomingExpense.objects.create(**data)
-    update.rebalance(uid)
-    return {'added': UpcomingExpense.objects.for_user(uid).get_by_name(data['name'])}
+    profile = kwargs.get('profile')
+    update = Updater(profile=profile)
+    if isinstance(data,list):
+        logger.debug(f"Adding multiple expenses: {data}")
+        accepted = kwargs.get('accepted')
+        rejected = kwargs.get('rejected')
+        for item in accepted:
+            item['uid'] = profile.user_id
+        UpcomingExpense.objects.bulk_create([UpcomingExpense(**item) for item in accepted])
+        update.rebalance(total_assets=False, leaks=False)
+        return {'accepted': accepted, 'rejected': rejected}
+    else:
+        data['uid'] = profile.user_id
+        UpcomingExpense.objects.create(**data)
+        update.rebalance(total_assets=False, leaks=False)
+        return {'accepted': UpcomingExpense.objects.for_user(uid).get_by_name(data['name'])}
 
-@transaction.atomic    
+
 @validator.UserValidator
-def bulk_add_expenses(uid, data: list):
-    """
-    Adds a list of planned expenses to the user's account.
-
-    :param uid: The user id.
-    :type uid: str
-    :param data: A list of dictionaries representing the expenses to add.
-    :type data: list
-    :returns: {'added': [queryset]}
-    :rtype: dict
-    """
-    logger.debug(f"Adding bulk expenses: {data}")
-    added = []
-    for item in data:
-        logger.debug(f"Adding expense: {item}")
-        add_expense(uid, item)
-        added.append(UpcomingExpense.objects.for_user(uid).get_by_name(item['name']))
-    return {'added': added }
-
-
+@validator.UpcomingExpenseGetValidator
 @transaction.atomic
-@validator.UserValidator
-@validator.UpcomingExpenseValidator
-def delete_expense(uid, expense_name: str):
+def delete_expense(uid, expense_name: str, *args, **kwargs):
     """
     Deletes a planned expense from the user's account.
 
@@ -76,15 +65,18 @@ def delete_expense(uid, expense_name: str):
     :rtype: dict
     """
     logger.debug(f"Deleting expense: {expense_name}")
-    expense = UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)
+    update = Updater(profile=kwargs.get('profile'))
+    expense = kwargs.get('existing')
+    deleted = expense.get()
     expense.delete()
-    update.rebalance(uid)
-    return {'deleted': expense}
+    update.rebalance(total_assets=False, leaks=False)
+    return {'deleted': deleted}
 
-@transaction.atomic
 @validator.UserValidator
+@validator.UpcomingExpenseGetValidator
 @validator.UpcomingExpenseValidator
-def update_expense(uid, expense_name: str, data: dict):
+@transaction.atomic
+def update_expense(uid,  data: dict, expense_name: str, *args, **kwargs):
     """
     Updates a planned expense in the user's account.
 
@@ -98,20 +90,21 @@ def update_expense(uid, expense_name: str, data: dict):
     :rtype: dict
     """
     logger.debug(f"Updating expense: {expense_name}")
-    expense = UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)
+    expense = kwargs.get('existing')
+    update = Updater(profile=kwargs.get('profile'))
     expense.update(**data)
-    update.rebalance(uid)
+    update.rebalance(total_assets=False, leaks=False)
     return {'updated': expense}
 
 
 @validator.UserValidator
-@validator.UpcomingExpenseValidator
 def get_expenses(uid, **kwargs):
     """
-    Retrieves a list of planned expenses for a user with dynamic filtering and ordering.
-    If start is set with no end, will return all expenses after start.
-    If end is set with no start, will return all expenses before end.
-    If month is set, will return all expenses for the current month.
+    Retrieves a list of planned expenses for a user with dynamic filtering and ordering.\n
+    If start is set with no end, will return all expenses after start.\n
+    If end is set with no start, will return all expenses before end.\n
+    If month is set, will return all expenses for the current month.\n
+    If no kwargs set, will return the current month.
 
 
     :param uid: The user id.
@@ -123,6 +116,9 @@ def get_expenses(uid, **kwargs):
     """
     logger.debug(f"Getting expenses for {uid} with filters: {kwargs}")
     queryset = UpcomingExpense.objects.for_user(uid)
+
+    if not kwargs:
+        queryset = queryset.get_current_month()
 
     # Handle specific filters that require multiple arguments or no arguments
     if kwargs.get('start') and kwargs.get('end'):
@@ -150,14 +146,14 @@ def get_expenses(uid, **kwargs):
         if kwargs.get(param_name):
             method = getattr(queryset, manager_method_name)
             queryset = method(kwargs[param_name])
-    
+    fc = Calculator(profile=kwargs.get('profile'))
     queryset = queryset.order_by('-due_date')
     return {'expenses': queryset, 'amount': fc.calc_queryset(uid, queryset)}
 
 
 @validator.UserValidator
-@validator.UpcomingExpenseValidator
-def get_expense(uid, expense_name: str):
+@validator.UpcomingExpenseGetValidator
+def get_expense(uid, expense_name: str, *args, **kwargs):
     """
     Retrieves a single planned expense for a user.
     
@@ -169,4 +165,4 @@ def get_expense(uid, expense_name: str):
     :rtype: dict
     """
     logger.debug(f"Getting expense: {expense_name} for {uid}")
-    return {'expense': UpcomingExpense.objects.for_user(uid).get_by_name(expense_name)}
+    return {'expense': kwargs.get('existing')}

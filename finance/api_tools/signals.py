@@ -17,48 +17,6 @@ from finance.models import (
     UpcomingExpense
 )
 from loguru import logger
-import uuid
-
-
-# Transaction signals
-@receiver(pre_save, sender=Transaction)
-def generate_new_tx_data(sender, instance, **kwargs):
-    date_suffix = timezone.now(AppProfile.for_user(instance.uid).get_timezone()).date()
-    if not instance.tx_id:
-        # Get and set a tx_id for unique transaction identifiers
-        unique_id = str(uuid.uuid4())[:8].upper()
-        instance.tx_id = f"{date_suffix}-{unique_id}"
-    if not instance.created_on:
-        instance.created_on = date_suffix
-    return
-
-@receiver(post_save, sender=Transaction)
-def update_bill_status(sender, instance, **kwargs):
-    if instance.bill:
-        instance.bill.paid_flag = True
-        instance.bill.save()
-    return
-
-
-# Upcoming expense signals
-@receiver(pre_save, sender=UpcomingExpense)
-def update_upcoming_expense(sender, instance, created, **kwargs):
-    """
-    Signal that updates bills that are paid.
-    """
-    if created:
-        # Do nothing for new expenses
-        return
-    else:
-        # Handle bills that are paid and update
-        if instance.paid_flag:
-            user_timezone = AppProfile.for_user(instance.uid).get_timezone()
-            if instance.end_date and timezone.now(user_timezone).date() >= instance.end_date:
-                instance.is_recurring = False
-            if instance.is_recurring:
-                instance.due_date = instance.due_date + relativedelta(months=1)
-                instance.paid_flag = False
-
 
 @receiver(pre_delete, sender=PaymentSource)
 def delete_source(sender, instance, **kwargs):
