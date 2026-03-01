@@ -39,10 +39,14 @@ def TransactionValidator(func):
     """
     @wraps(func)
     def _wrapped(uid, data, *args, **kwargs):
-        sources = PaymentSource.objects.for_user(uid)
-        tags = Tag.objects.for_user(uid)
+        sources = kwargs.get('sources') or PaymentSource.objects.for_user(uid)
+        tags = set(Tag.objects.for_user(uid).values_list('name', flat=True))
         upcoming = UpcomingExpense.objects.for_user(uid)
+        upcoming_check = set(upcoming.values_list('name', flat=True))
         profile = kwargs.get('profile')
+        source_check = kwargs.get('source_check') or set(sources.values_list('source', flat=True))
+        kwargs['source_check'] = source_check
+        kwargs['upcoming_check'] = upcoming_check
         kwargs['sources'] = sources
         kwargs['tags'] = tags
         kwargs['upcoming'] = upcoming
@@ -52,7 +56,7 @@ def TransactionValidator(func):
             for item in data:
                 logger.debug(f"Validating transaction: {item} with uid: {uid}")
                 try:
-                    _validate_transaction(uid, item, sources, tags, upcoming)
+                    _validate_transaction(uid, item, source_check, tags, upcoming_check)
                 except ValidationError as e:
                     logger.error(f"Transaction validation failed: {e}")
                     rejected.append(item)
@@ -62,7 +66,7 @@ def TransactionValidator(func):
             update.fix_tx_data(accepted)
             return func(uid, data,  *args, **kwargs)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
-        _validate_transaction(uid, data, sources, tags, upcoming)
+        _validate_transaction(uid, data, source_check, tags, upcoming_check)
         update.fix_data(data)
         return func(uid, data, *args, **kwargs)
     return _wrapped
@@ -97,11 +101,20 @@ def UserValidator(func):
     @wraps(func)
     def _wrapped(uid, data:dict, *args, **kwargs):
         logger.debug(f"Validating user with uid: {uid}")
-        profile = AppProfile.objects.for_user(uid)
-        if not profile.exists():
+        profile = AppProfile.objects.for_user(uid).first()
+        if not profile:
             logger.error(f"User does not exist: {uid}")
             raise ValidationError("User does not exist")
         kwargs['profile'] = profile
+        if data.get('spend_accounts'):
+            sources = PaymentSource.objects.for_user(uid)
+            source_check = set(sources.values_list('source', flat=True))
+            for item in data['spend_accounts']:
+                if not item.lower() in source_check:
+                    logger.error(f"Source does not exist: {item}")
+                    raise ValidationError("Source does not exist")
+            kwargs['sources'] = sources
+            kwargs['source_check'] =source_check
         if data.get('timezone'):
             _validate_timezone(data['timezone'])
         if data.get('base_currency'):
@@ -179,21 +192,38 @@ def UpcomingExpenseGetValidator(func):
 
 
 # Tag Validators
-def TagValidator(func):
+def TagSetValidator(func):
     """
     Decorator to validate a tag.
     Checks if the tag exists.
     Raises a ValidationError if the tag already exists.
     """
     @wraps(func)
-    def _wrapped(uid, data:dict):
+    def _wrapped(uid, data, *args, **kwargs):
         logger.debug(f"Validating tag: {data} with uid: {uid}")
-        if Tag.objects.for_user(uid).filter(name=data['name'].lower()).exists():
-            logger.error(f"Tag already exists: {data['name']}")
-            raise ValidationError("Tag already exists.  Cannot add duplicates")
-        return func(uid, data)
+        profile = kwargs.get('profile')
+        tags = Tag.objects.for_user(profile.user_id)
+        kwargs['tags'] = tags
+        for item in data:
+            if tags.filter(name=item['name'].lower().exists()):
+                logger.error(f"Tag already exists: {data['name']}")
+                raise ValidationError("Tag already exists.  Cannot add duplicates")
+        return func(uid, data, *args, **kwargs)
     return _wrapped
 
+def TagGetValidator(func):
+    @wraps(func)
+    def _wrapped(uid, data, *args, **kwargs):
+        logger.debug(f"Validating tag: {data} with uid: {uid}")
+        profile = kwargs.get('profile')
+        tags = Tag.objects.for_user(profile.user_id)
+        kwargs['tags'] = tags
+        for item in data:
+            if not tags.filter(name=item['name'].lower()).exists():
+                logger.error(f"Tag does not exist: {data['name']}")
+                raise ValidationError("Tag does not exist")
+        return func(uid, data, *args, **kwargs)
+    return _wrapped
 
 # Source Validators
 def SourceValidator(func):

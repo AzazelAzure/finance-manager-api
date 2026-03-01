@@ -6,13 +6,8 @@ class TagSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 class SourceSerializer(serializers.Serializer):
-    source = serializers.CharField()
-    acc_type = serializers.CharField(max_length=10)
-
-class CurrencySerializer(serializers.Serializer):
-    code = serializers.CharField(max_length=3)
-    name = serializers.CharField(max_length=50)
-    symbol = serializers.CharField(max_length=10, required=False)
+    source = serializers.CharField(required=False)
+    acc_type = serializers.CharField(max_length=10, required=False)
 
 
 class ExpenseSerializer(serializers.Serializer):
@@ -38,7 +33,7 @@ class TransactionSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     source = serializers.CharField(max_length=50)
     currency = serializers.CharField(max_length=3)
-    tags = serializers.ListField(child=serializers.CharField(max_length=200))
+    tags = serializers.ListField(child=serializers.CharField(max_length=200), required=False)
     tx_type = serializers.CharField(max_length=10)
     
 
@@ -64,8 +59,8 @@ class TransactionGetReturnSerializer(serializers.Serializer):
     total_leaks = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 class AssetSerializer(serializers.Serializer):
-    source = serializers.CharField(max_length=50)
-    currency = serializers.CharField(max_length=3)
+    source = serializers.CharField(max_length=50, required=False)
+    currency = serializers.CharField(max_length=3, required=False)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
 

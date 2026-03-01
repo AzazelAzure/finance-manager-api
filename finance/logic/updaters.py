@@ -27,6 +27,8 @@ import uuid
 
 # TODO:  Docstrings... again
 
+# TODO: Finish fixing changes for new linking system and other refactors
+
 class Updater:
     """
     Class to handle data manipulation for the finance manager application.
@@ -74,6 +76,12 @@ class Updater:
         if kwargs.get('source_type'):
             self.source_type = kwargs.get('source_type')
 
+        if kwargs.get('souce_check'):
+            self.source_check = kwargs.get('source_check')
+        
+        if kwargs.get('upcoming_check'):
+            self.upcoming_check = kwargs.get('upcoming_check')
+
         # Single hit for any user, always used
         self.snapshots = FinancialSnapshot.objects.for_user(self.uid)
         
@@ -84,11 +92,10 @@ class Updater:
     # Data fixers
     def fix_tx_data(self, data):
         for item in data:
-            item['uid'] = self.profile.get().user_id
+            item['uid'] = self.profile.user_id
             item['amount'] = Decimal(Abs(item['amount']))
             if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
                 item['amount'] = item['amount'] * -1
-            item['source'] = self.sources.get(source=item['source'])
             if not item['date']:
                 item['date'] = timezone.now(self.profile.timezone).date()
             if not item['created_on']:
@@ -97,10 +104,6 @@ class Updater:
                 date_suffix = timezone.now(self.profile.timezone).date()
                 unique_id = str(uuid.uuid4())[:8].upper()
                 item['tx_id'] = f"{date_suffix}-{unique_id}"
-            if item.get('tags'):
-                item['tags'] = self.tags.filter(name__in=item['tags'])
-            if item.get('bill'):
-                item['bill'] = self.upcoming.get(name=item['bill'])
         return data
 
     def fix_asset_data(self, data, src):
@@ -110,7 +113,6 @@ class Updater:
             payment_source_instance = self.sources.get(source=item['source'])
             item['source'] = payment_source_instance
             # Get the Currency instance associated with the PaymentSource (via CurrentAsset)
-            item['currency'] = self.assets.get_asset(payment_source_instance.source).get().currency
             src = self.sources.get(source=src)
         return data, src
 

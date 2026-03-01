@@ -59,7 +59,9 @@ class TransactionManager(models.QuerySet):
     
     def get_by_tag_name(self, tag_name):
         """Returns a queryset for transactions with a given tag name."""
-        return self.filter(tags__name=tag_name)
+        if not isinstance(tag_name, list):
+            tag_name = [tag_name]
+        return self.filter(tags__contains=tag_name)
     
     def get_by_category(self, cat_name):
         """Returns a queryset for transactions with a given category."""

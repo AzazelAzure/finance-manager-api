@@ -80,12 +80,12 @@ def _generate_base_profile(app_profile):
     Seeds a new app profile with default values.
     """
     FinancialSnapshot.objects.create(uid=app_profile.user_id)
-    default_currency = Currency.objects.filter(code="USD").first()
+    default_currency = 'USD'
     app_profile.base_currency = default_currency
     # PaymentSource.save() will automatically create the CurrentAsset
-    default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=instance.appprofile)
-    PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=instance.appprofile)
+    default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=app_profile.user_id)
+    PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=app_profile.user_id)
     app_profile.spend_accounts.set([default_source])
     app_profile.save()
-    logger.debug(f"Created user: {instance}.  User: {instance.appprofile}.  Base currency: {default_currency}. Default source: {default_source}")
+    logger.debug(f"Created user: User: {app_profile.username}.  Base currency: {default_currency}. Default source: {default_source}")
     return

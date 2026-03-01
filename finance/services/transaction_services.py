@@ -121,18 +121,16 @@ def add_transaction(uid, data, *args, **kwargs):
         logger.debug(f"Adding bulk transactions: {data}")
         rejected = kwargs.get('rejected', [])
         accepted = kwargs.get('accepted', [])
-        Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
-        to_update = Transaction.objects.filter(tx_id__in=[item['tx_id'] for item in accepted])
+        to_update = Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
         update = Updater(uid, profile=profile, transactions=to_update, upcoming=upcoming)
         update.new_transaction()
         if rejected:
-            return {'accepted': accepted, 'rejected': rejected}
+            return {'accepted': to_update, 'rejected': rejected}
         else:
-            return {'accepted': accepted}
+            return {'accepted': to_update}
     else:
         logger.debug(f"Adding transaction: {data}")
         tx = Transaction.objects.create(**data)
-        tx = Transaction.objects.for_user(uid).get(tx_id=tx.tx_id)
         update = Updater(profile=profile, transactions=tx, upcoming=upcoming) 
         update.new_transaction(uid, tx)
         return {'accepted': tx}
@@ -155,7 +153,7 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating transaction: {data}")
-    tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id)) 
+    tx = kwargs.get('id_check') 
     profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     update = Updater(uid, profile=profile, transactions=tx)
     update.transaction_updated()
@@ -178,7 +176,7 @@ def delete_transaction(uid, tx_id: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting transaction: {tx_id}")
-    tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id))
+    tx = kwargs.get('id_check')
     profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     update = Updater(uid, profile=profile, transactions=tx)
     # Update balances to reverse changes
