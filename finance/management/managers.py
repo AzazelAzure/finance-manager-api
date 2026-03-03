@@ -95,20 +95,11 @@ class TransactionManager(models.QuerySet):
         """Returns a queryset for transactions with an amount less than or equal to a given amount."""
         return self.filter(amount__lte=amount)
     
-class CurrentAssetManager(models.QuerySet):
-    """Manager for CurrentAsset model."""
+class CategoryManager(models.QuerySet):
+    """Manager for Category model."""
     def for_user(self, uid):
-        """Returns a queryset for a user."""
         return self.filter(uid=uid)
     
-    def get_by_type(self, *args):
-        """Returns a queryset for assets of a given type."""
-        return self.filter(source__acc_type__in=args)
-    
-    def get_asset(self, *args):
-        """Returns a queryset for a given asset."""
-        return self.filter(source__source__in=args)
-
 class UpcomingExpenseManager(models.QuerySet):
     """Manager for UpcomingExpense model."""
     def for_user(self, uid):
@@ -187,10 +178,6 @@ class TagManager(models.QuerySet):
         """Returns a queryset for a user."""
         return self.filter(uid=uid)
     
-    def get_by_name(self, name):
-        """Returns a queryset for a given tag name."""
-        return self.filter(name=name)
-
 class PaymentSourceManager(models.QuerySet):
     """Manager for PaymentSource model."""
     def for_user(self, uid):
@@ -217,7 +204,7 @@ class AppProfileManager(models.QuerySet):
     
     def get_spend_accounts(self):
         """Returns a tuple of spend accounts for a user."""
-        return self.get().values_list("spend_accounts__source")
+        return self.get().values_list("spend_accounts")
     
     def get_timezone(self):
         """Returns the timezone for a user."""

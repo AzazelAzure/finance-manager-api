@@ -24,7 +24,7 @@ class Calculator:
     def __init__(self, profile, **kwargs):
         self.profile = profile
         self.uid = self.profile.user_id
-        self.base_currency = self.profile.base_currency.code
+        self.base_currency = self.profile.base_currency
         self.spend_accounts = self.profile.get_spend_accounts()
         return
 
@@ -99,12 +99,11 @@ class Calculator:
         total = sum(map(lambda x: self._calc_totals(x["currency__code"], base_currency, x["total"]), total_by_currency))
         return Decimal(total).quantize(Decimal("0.01")) 
 
-    def calc_new_balance(self, asset_queryset, amount):
+    def calc_new_balance(self, source_queryset, amount):
         """
         Calculates the new balance for a source.\n
         Amount should always be in one currency.  If not, this will cause problems.\n
-        If you're unsure, run the asset_queryset through calc_queryset first.\n
-        It's better to convert it all to the base currency then back than to have a mix of currencies.\n
+        Realistically, you should make sure the amount is in the base currency first.
 
         :param uid: Required to linking accounts to user profile.
         :type uid: str
@@ -116,20 +115,20 @@ class Calculator:
         :rtype: Decimal
         """
     
-        logger.debug(f"Calculating new balance for {asset_queryset} with amount {amount}")
+        logger.debug(f"Calculating new balance for {source_queryset} with amount {amount}")
 
         # Get the current balance
-        old_balance = asset_queryset.values_list("amount", flat=True).first()
+        old_balance = source_queryset.values_list("amount", flat=True).first()
         logger.debug(f"Old balance: {old_balance}")
 
         # Check the actual currency vs the base currency
-        asset_currency = asset_queryset.currency
-        currency = self.profile.base_currency.code
+        asset_currency = source_queryset.currency
+        currency = self.base_currency
 
         # This checks if the currency is in the base currency
         # If not, converts the amount passed in to the asset currency
         if currency != asset_currency.code:
-            amount = convert_currency(amount, currency, asset_currency.code)
+            amount = convert_currency(amount, currency, asset_currency)
 
         # Calculate the new balance and return it in Decimal
         new_balance = old_balance + amount

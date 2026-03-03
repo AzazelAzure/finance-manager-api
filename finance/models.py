@@ -32,23 +32,15 @@ import uuid
 
 # TODO: Finish all other foreignkey decoupling
     # App Profile spend accounts
-    # Current Assets sources
+    # Current Assets rolled into PaymentSource
     # Transactions
         # Source
         # Tags
         # Bill
     
-# Consider again merging CurrentAssets into PaymentSources
-    # TODO: Fill this out
-    # Pros:
-        # One less database hit
-        # Actually would simplify hit to one thing.
-        # Since name MUST be unique, amount would be tied to line for name
-        # Since I've decoupled CurrentAssets to PaymentSources I'd either need to:
-            # A: Always reference the PaymentSources for the AccType
-            # B: Essentially copy Sources to Assets
-    # Cons:
-        # More complicated hits for Fian
+# TODO: Remove "unknown" source from auto creation in Payment Source
+    # Removal of direct links removes orphaned transactions
+    # This may still be useful actually, since not having the source anymore makes it easier to find
 
 
 class AppProfile(models.Model):
@@ -88,8 +80,8 @@ class Tag(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['name', 'uid'], name='unique_tag_per_user')
         ]
-    name = models.CharField(max_length=200, )
-    uid = models.CharField(max_length=200)
+    tags = models.JSONField(default=list, null=True, blank=True)
+    uid = models.CharField(max_length=200, db_index=True)
     objects = TagManager()
     def __str__(self):
         return self.name
@@ -121,13 +113,13 @@ class PaymentSource(models.Model):
         UNKNOWN = "UNKNOWN", "Unknown"
 
     source = models.CharField(max_length=50, unique=True)
-    acc_type = models.CharField(max_length=10, choices=AccType.choices)
+    acc_type = models.CharField(max_length=10, choices=AccType.choices, default=AccType.UKNOWN)
     currency = models.CharField(max_length=3, default="USD")
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
 
     # User dependancy
-    uid = models.CharField(max_length=200)
+    uid = models.CharField(max_length=200, db_index=True)
 
     def __str__(self):
         return f"{self.source} ({self.AccType})"
@@ -169,13 +161,31 @@ class UpcomingExpense(models.Model):
     currency = models.CharField(max_length=3, default="USD")
 
     # User dependancy
-    uid = models.CharField(max_length=200)
+    uid = models.CharField(max_length=200, db_index=True)
 
     # Boolean for recurring logic
     is_recurring = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
+
+
+class Category(models.Model):
+    """
+    Model for categories. Allows users to add custom categories to transactions.
+    """
+
+    class Meta:
+        verbose_name_plural = "Categories",
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'uid'], name='unique_category_per_user')
+        ]
+
+    name = models.CharField(max_length=200)
+    uid = models.CharField(max_length=200, db_index=True)
+    objects = CategoryManager()
+    def __str__(self):
+        return self.name
 
 
 class Transaction(models.Model):
@@ -217,7 +227,7 @@ class Transaction(models.Model):
     bill = models.CharField(max_length=200, null=True, blank=True)
 
     # User dependancy
-    uid = models.CharField(max_length=200)
+    uid = models.CharField(max_length=200, db_index=True)
 
     class TxType(models.TextChoices):
         EXPENSE = (
@@ -242,36 +252,6 @@ class Transaction(models.Model):
 
     def __str__(self):
         return self.tx_id
-
-
-class CurrentAsset(models.Model):
-    """
-    Model for current assets. Allows users view assets in thier accounts.
-    Automatically generated when a PaymentSource is created.
-    Since this is a one-to-one relationship to PaymentSource, no methods exist to create new CurrentAssets.
-    This ensures that there is only one CurrentAsset per PaymentSource, and no floating assets to sources that don't exist.
-
-    Attributes:
-        source (OneToOneField): One-to-one relationship with the PaymentSource model.
-        amount (DecimalField): Amount of the asset.
-        currency (ForeignKey): Foreign key to the Currency model.
-        uid (ForeignKey): Foreign key to the AppProfile model.
-    """
-    objects = CurrentAssetManager.as_manager()
-
-    class Meta:
-        verbose_name_plural = "Current Assets"
-
-    source = models.CharField(max_length=50)
-    amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    currency = models.CharField(max_length=3, default="USD")
-
-
-    # User dependancy
-    uid = models.CharField(max_length=200)
-
-    def __str__(self):
-        return f"{self.source.source} ({self.amount})"
 
 
 class FinancialSnapshot(models.Model):
@@ -305,7 +285,7 @@ class FinancialSnapshot(models.Model):
     total_monthly_spending = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_remaining_expenses = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_leaks = models.DecimalField(max_digits=15, decimal_places=2, default=0)  
-    uid = models.CharField(max_length=200)
+    uid = models.CharField(max_length=200, db_index=True)
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"

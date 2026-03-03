@@ -18,7 +18,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 import finance.services.transaction_services as tx_svc
 import finance.services.source_services as src_svc
 import finance.services.expense_services as exp_svc
-import finance.services.asset_services as asset_svc
+import finance.services.category_services as asset_svc
 import finance.services.tag_services as tag_svc
 import finance.services.user_services as user_svc
 from .api_tools.serializers import (
@@ -45,6 +45,7 @@ from .api_tools.serializers import (
 
 # TODO: Add views for each URL to fix routing issues
 # TODO: Fix get AppProfile to not require different URLS based on what they are updating
+# TODO: Delete CurrentAsset view and roll into PaymentSource view
 
 
 @extend_schema_view(

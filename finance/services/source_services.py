@@ -12,11 +12,12 @@ Attributes:
 import finance.logic.validators as validator
 from finance.logic.updaters import Updater 
 from django.db import transaction
-from django.core.exceptions import ValidationError
 from loguru import logger
-from finance.models import PaymentSource, CurrentAsset
+from finance.models import PaymentSource
 
 # TODO:  GUESS WHAT?!?!?!  Fix the docstrings, commments, and logger
+# TODO: Refactor this for the rollin of assets to here
+
 
 # Payment Source Functions
 @validator.UserValidator
@@ -34,26 +35,27 @@ def add_source(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Adding asset: {data}")
-    update = Updater(profile=kwargs.get('profile'))
     sources = kwargs.get('sources')
     if isinstance(data, list):
         rejected = kwargs.get('rejected')
         accepted = kwargs.get('accepted')
-        sources.bulk_create([PaymentSource(**item) for item in accepted])
-        update.new_source(accepted)
-        CurrentAsset.objects.bulk_create([CurrentAsset(**item['source']) for item in accepted])
+        created = sources.bulk_create([PaymentSource(**item) for item in accepted])
+        to_update = created.exclude(amount=0)
+        update = Updater(profile=kwargs.get('profile'), sources=to_update)
+        update.source_added()
         return {'added': accepted, 'rejected': rejected}
 
     else:
-        sources.create(**data)
-        update.new_source(data)
-        CurrentAsset.objects.create(**data['source'])
+        new_source = sources.create(**data)
+        update = Updater(profile=kwargs.get('profile'), sources=new_source)
+        update.source_added()
     return {'added': data}
 
 
-@transaction.atomic
+
 @validator.UserValidator
 @validator.SourceValidator
+@transaction.atomic
 def delete_source(uid, source: str, *args, **kwargs):
     """
     Deletes a payment source from the user's account.
@@ -66,16 +68,17 @@ def delete_source(uid, source: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting source: {source}")
-    sources = kwargs.get('checked').get()
+    sources = kwargs.get('checked')
     source.delete()
     update = Updater(profile=kwargs.get('profile'), source_type=sources.acc_type)
     update.source_deleted()
     return {'deleted': source}
 
-@transaction.atomic
+
 @validator.UserValidator
 @validator.SourceGetValidator
 @validator.SourceValidator
+@transaction.atomic
 def update_source(uid, source: str, data: dict, *args, **kwargs):
     """
     Updates a payment source in the user's account.
