@@ -16,6 +16,7 @@ from finance.logic.fincalc import Calculator
 from django.db import transaction
 from loguru import logger
 from finance.models import Transaction, UpcomingExpense, AppProfile
+import copy
 
 # TODO: Update Docstrings here too.  Again...
 
@@ -130,7 +131,7 @@ def add_transaction(uid, data, *args, **kwargs):
             return {'accepted': to_update}
     else:
         logger.debug(f"Adding transaction: {data}")
-        tx = Transaction.objects.create(**data)
+        tx = [Transaction.objects.create(**data)]
         update = Updater(profile=profile, transactions=tx, upcoming=upcoming) 
         update.new_transaction(uid, tx)
         return {'accepted': tx}
@@ -155,10 +156,12 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     logger.debug(f"Updating transaction: {data}")
     tx = kwargs.get('id_check') 
     profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
-    update = Updater(uid, profile=profile, transactions=tx)
-    update.transaction_updated()
-    tx.update(**data)
-    update.new_transaction()
+    tx.save(update_fields=data)
+    new_tx = copy.copy(tx)
+    for field , value in data.items():
+        setattr(new_tx, field, value)
+    update = Updater(uid, profile=profile, transactions=[new_tx])
+    update.transaction_handler(update=tx)
     return {f'updated': tx}
 
 @validator.UserValidator

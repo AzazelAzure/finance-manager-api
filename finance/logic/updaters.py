@@ -75,11 +75,12 @@ class Updater:
         # Situational settings
         if kwargs.get('transactions'):
             self.transactions = kwargs.get('transactions')
-            self.tags = kwargs.get("tags") or Tag.objects.for_user(self.uid)
             self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(self.uid)
-            self.tx_sources = self.transactions.values_list('source', flat=True).distinct()
-            self.sources = kwargs.get('sources') or PaymentSource.objects.for_user(self.uid)
-        
+            self.sources = list(PaymentSource.objects.for_user(self.uid))
+            self.paid_bills = set(tx.bill for tx in self.transactions if tx.bill)
+            self.unpaid = list(self.upcoming.filter(paid_flag=False))
+            self.spend_accounts = set(source for source in self.sources if source.source in self.spend_accounts)
+            
         if kwargs.get('sources'):
             self.sources = kwargs.get('sources')
 
@@ -94,7 +95,7 @@ class Updater:
 
         # Single hit for any user, always used
         # TODO: Move this to a conditional grab
-        self.snapshots = FinancialSnapshot.objects.for_user(self.uid)
+        self.snapshots = FinancialSnapshot.objects.for_user(self.uid).first()
         
         # Create the calculator instance
         self.fc = Calculator(self.profile)
@@ -182,6 +183,49 @@ class Updater:
         return
 
 
+    def transaction_handler(self, update=None):
+        # 1.  Check if transfer was passed in
+            # If passed handle undoing the transaction
+            # Since this no longer hits two models, should just be checking bill status
+            # And reversing the amount in that account
+        # 2. Check if self.transactions has bill
+            # If it does, handle that
+        # 3. Handle affected sources and recalc them
+        # 4 Update snapshot
+        updated_bill = False
+        if update:
+            updated_bill = self._handle_tx_update(update)
+        if self.paid_bills:
+            self._handle_upcoming(updated_bill)
+        src_amounts = self.fc.calc_tx_sources(self.transactions, self.sources)
+        for source in self.sources:
+            if source.source in src_amounts:
+                source.amount = src_amounts[source.source]
+        PaymentSource.objects.for_user(self.uid).bulk_update(self.sources, ['amount'])
+        snapshot = self.snapshot_handler()
+        return snapshot
+
+    def snapshot_handler(self):
+        debt_list = {
+            bill.name: bill 
+            for bill in self.unpaid 
+            if bill.is_recurring==True and self._in_current_month(bill.due_date)
+            }
+        transfers = [item for item in self.transactions if item.tx_type in ['XFER_IN', 'XFER_OUT']]
+        type_totals = self.fc.calc_acc_types(self.sources)
+        self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
+        self.snapshots.safe_to_spend = self.fc.calc_sts(self.spend_accounts, debt_list)
+        if transfers:
+            self.snapshots.leaks = self.fc.calc_leaks(transfers)
+        for total in self.snapshots:
+            if total in type_totals:
+                self.snapshots[total] = type_totals[total]
+        self.snapshots.save()
+        return self.snapshots
+
+        
+
+
     # Category Handlers
     def category_changed(self, cat_name, new_name):
         affected = Transaction.for_user(self.uid).filter(category=cat_name)
@@ -220,6 +264,8 @@ class Updater:
         # else, move them all to "unknown"
         return
 
+
+    # Slated for deletion
     # Rebalance Handler
     def rebalance(self,acc_type=False, total_assets=True, leaks=True, sts=True):
         """
@@ -260,6 +306,8 @@ class Updater:
         
 
     # Private Functions
+
+    # Functions slated for deletion
     def _recalc_sts(self):
         """
         Recalculates the safe to spend for a user and sets to Financial Snapshot.
@@ -283,30 +331,6 @@ class Updater:
         logger.warning(f"Changed total assets to: {total_assets}")
         return
 
-    def _recalc_asset_type(self):
-        """
-        Recalculates the total assets for a specific account type and sets to Financial Snapshot.
-        """
-        to_update = {}
-        logger.debug(f"Recalculating asset type for {self.uid}")
-        affected_accs = self.transactions.values_list('source__acc_type', flat=True).distinct()
-        logger.debug(f"Affected accounts: {affected_accs}")
-        for item in affected_accs:
-            to_update[f'total_{item.lower()}'] = self.fc.calc_asset_type(self.uid, item) 
-        logger.debug(f"To update: {to_update}") 
-        self.snapshots.update(**to_update)
-        return
-
-    def _recalc_leaks(self):
-        """
-        Recalculates the leaks for a user and sets to Financial Snapshot.
-        """
-        logger.debug(f"Recalculating leaks for {self.uid}")
-        for_month = Transaction.for_user(self.uid).get_current_month()
-        leaks = self.fc.calc_leaks(for_month)
-        self.snapshots.update(total_leaks=leaks)
-        return
-
     def _recalc_source_amount(self):
         """
         Recalculates the asset amount for a source.
@@ -323,23 +347,34 @@ class Updater:
         self.sources.bulk_update(affected_sources, ['amount'])
         return
 
-    def _handle_upcoming(self):
-        
+    def _updated_affected_upcomings(self, tx):
 
-        unpaid = list(self.upcoming.filter(paid_flag=False))
-        paid_bills = set(self.transactions.values_list('bill', flat=True))
-
-        # If none, just return
-        if not paid_bills:
+            # Check if paid flag should be changed
+            if tx.date >= tx.bill.due_date - relativedelta(months=1):
+                tx.bill.paid_flag = False
+                tx.bill.due_date = tx.bill.due_date - relativedelta(months=1)
+            
+            # Check if current due date is before the end date
+            # If it is, fix the is recurring
+            if tx.bill.end_date and tx.bill.due_date <= tx.bill.end_date:
+                tx.bill.is_recurring = True
+            
+            tx.bill.save()
             return
+
+    # Used functions
+    def _handle_upcoming(self,updated_bill=False):
         
+
         to_update = []
-        # Otherwise, handle the bill logic
-        for bill in unpaid:
-            if bill.name in paid_bills:
+        if updated_bill:
+            to_update.append(updated_bill)
+
+        for bill in self.unpaid:
+            if bill.name in self.paid_bills:
                 to_update.append(bill)
 
-                # Flip the is recurring if the end date has passed
+                # Flip the 'is recurring' if the end date has passed
                 if bill.end_date and timezone.now(self.profile.timezone).date() >= bill.end_date:
                     bill.is_recurring = False
                     bill.paid_flag = True
@@ -352,17 +387,24 @@ class Updater:
         self.upcoming.bulk_update(to_update, ['paid_flag', 'due_date', 'is_recurring'])
         return
     
-    def _updated_affected_upcomings(self, tx):
-
-        # Check if paid flag should be changed
-        if tx.date >= tx.bill.due_date - relativedelta(months=1):
-            tx.bill.paid_flag = False
-            tx.bill.due_date = tx.bill.due_date - relativedelta(months=1)
-        
-        # Check if current due date is before the end date
-        # If it is, fix the is recurring
-        if tx.bill.end_date and tx.bill.due_date <= tx.bill.end_date:
-            tx.bill.is_recurring = True
-        
-        tx.bill.save()
-        return
+    def _in_current_month(self, date):
+        return date.month == timezone.now(self.profile.timezone).date().month and date.year == timezone.now(self.profile.timezone).date().year
+    
+    def _handle_tx_update(self, tx):
+        append_change = False
+        affected_bill = next((bill for bill in self.unpaid if bill.name == tx.bill), None)
+        if affected_bill:
+            if affected_bill.due_date - relativedelta(months=1) <= tx.date:
+                affected_bill.paid_flag = False
+                affected_bill.due_date = affected_bill.due_date - relativedelta(months=1)
+            if affected_bill.end_date and affected_bill.due_date <= affected_bill.end_date:
+                affected_bill.is_recurring = True
+            if not self.paid_bills:
+                affected_bill.save()
+            else:
+                append_change = affected_bill
+        affected_source = next((source for source in self.sources if source.source == tx.source), None)
+        if affected_source:
+            tx.amount = tx.amount * -1
+            affected_source.amount += tx.amount
+        return append_change

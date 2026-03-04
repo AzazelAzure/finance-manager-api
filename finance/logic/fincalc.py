@@ -25,10 +25,10 @@ class Calculator:
         self.profile = profile
         self.uid = self.profile.user_id
         self.base_currency = self.profile.base_currency
-        self.spend_accounts = self.profile.get_spend_accounts()
+        self.spend_accounts = self.profile.spend_accounts
         return
 
-    def calc_sts(self):
+    def calc_sts(self, source_list, debt_list):
         """
         Calculates 'safe to spend' totals by aggregating specific source types.
 
@@ -160,29 +160,35 @@ class Calculator:
         logger.debug(f"Total asset total: {asset_total}")
         return Decimal(asset_total).quantize(Decimal("0.01"))
 
-    def calc_asset_type(self, asset_queryset, acc_type):
-        """
-        Calculates the total assets for a specific account type.
+    def calc_acc_types(self, source_list):
+        acctype_totals ={}
+        for source in source_list:
+            if source.acc_type == "UNKNOWN":
+                continue
+            if source.currency != self.base_currency:
+                source.amount = convert_currency(source.amount, source.currency, self.base_currency)
+            if f'total_{source.acc_type.lower()}' in acctype_totals:
+                acctype_totals[f'total_{source.acc_type.lower()}'] += Decimal(source.amount).quantize(Decimal("0.01"))
+            else:
+                acctype_totals[f'total_{source.acc_type.lower()}'] = Decimal(source.amount).quantize(Decimal("0.01"))
+        logger.debug(f"Acc type totals: {acctype_totals}")
+        return acctype_totals
 
-        :param uid: Required to linking accounts to user profile.
-        :type uid: str
-        :param acc_type: The account type to calculate the total for.
-        :type acc_type: str
-        :returns: The total assets for the account type.
-        :rtype: Decimal
-        """
-        logger.debug(f"Calculating asset type {acc_type} for {self.uid}")
 
-        # Get the assets for the incoming acc_type. 
-        asset = asset_queryset.get_by_type(acc_type)
+    def calc_tx_sources(self, tx_list, source_list):
+        source_aggregate ={}
+        source_map = {source.source: source for source in source_list}
+        logger.debug(f"Source map: {source_map}")
+        for source in source_list: 
+            source_aggregate[source.source] = Decimal(source.amount).quantize(Decimal("0.01"))
+        logger.debug(f"Initialized source aggregate: {source_aggregate}")
+        for tx in tx_list:
+            if tx.currency != source_map[tx.source].currency:
+                tx.amount = convert_currency(tx.amount, tx.currency, source_map[tx.source].currency)
+            source_aggregate[tx.source] += Decimal(tx.amount).quantize(Decimal("0.01"))
+        logger.debug(f"Source aggregate: {source_aggregate}")
+        return source_aggregate
 
-        # Sums the assets for all sources with the acc_type in acc_type
-        asset_by_currency = asset.values("currency__code").annotate(total=Sum("amount"))
-        logger.debug(f"Asset by currency: {asset_by_currency}")
-
-        # Converts the assets by currency to base_currency then returns Decimal total
-        asset_total = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), asset_by_currency))
-        return Decimal(asset_total).quantize(Decimal("0.01"))
 
     def _calc_totals(item_currency, base_currency, amount):
         logger.debug(f"Calculating totals for {item_currency} with base currency {base_currency} from {amount}")
