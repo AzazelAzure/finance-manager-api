@@ -41,22 +41,35 @@ class Calculator:
         """
         logger.debug(f"Calculating sts for {self.uid}")
         # Set spendable and get current month debts
-        spendable = self.assets.get_by_type(*self.spend_accounts)
-        debts = self.upcoming.get_current_month()
+        spendable = source_list
+        debts = debt_list
 
         # Organize spendable accounts/debts by currency and get sums
-        spend_by_currency = spendable.values("currency__code").annotate(total=Sum("amount"))
-        debt_by_currency = debts.values("currency__code").annotate(total=Sum("estimated_cost"))
+        spend_by_currency = {}
+        for item in spendable:
+            if item.currency not in spend_by_currency:
+                spend_by_currency[item.currency] = item.amount
+            else:
+                spend_by_currency[item.currency] += item.amount
+        logger.debug(f"Spend by currency: {spend_by_currency}")
+
+        debt_by_currency = {}
+        for item in debts:
+            if item.currency not in debt_by_currency:
+                debt_by_currency[item.currency] = item.amount
+            else:
+                debt_by_currency[item.currency] += item.amount
+        logger.debug(f"Debt by currency: {debt_by_currency}")
 
         # Convert spendable accounts/debts into base currency if necessary
-        spend = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), spend_by_currency))
-        debt = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), debt_by_currency))
+        spend = sum(self._calc_totals(currency, self.base_currency, amount) for currency, amount in spend_by_currency.items())
+        debt = sum(self._calc_totals(currency, self.base_currency, amount) for currency, amount in debt_by_currency.items())
         logger.debug(f"Spend: {spend}, Debt: {debt}, Total: {(spend - debt)}")
 
         # Return decimal converted spendable accounts minus converted debts
         return Decimal((spend - debt)).quantize(Decimal("0.01"))
 
-    def calc_leaks(self, tx_queryset):
+    def calc_leaks(self, tx_list):
         """
         Calculates leaks for transfers to monitor fees.
         
@@ -66,16 +79,28 @@ class Calculator:
         :rtype: Decimal
         """
         # Get all transactions marked as XFER_IN, Sort by currency type, get sums for each currency
-        xfers_in = tx_queryset.get_by_tx_type("XFER_IN")
-        xfers_in_by_currency = xfers_in.values("currency__code").annotate(total=Sum("amount"))
+        xfers_in = [tx for tx in tx_list if tx.tx_type == "XFER_IN"]
+        xfers_in_by_currency = {}
+        for item in xfers_in:
+            if item.currency not in xfers_in_by_currency:
+                xfers_in_by_currency[item.currency] = item.amount
+            else:
+                xfers_in_by_currency[item.currency] += item.amount
+        logger.debug(f"Xfers in by currency: {xfers_in_by_currency}")
 
         # Repeat for XFER_OUT
-        xfers_out = tx_queryset.get_by_tx_type("XFER_OUT")
-        xfers_out_by_currency = xfers_out.values("currency__code").annotate(total=Sum("amount"))
+        xfers_out = [tx for tx in tx_list if tx.tx_type == "XFER_OUT"]
+        xfers_out_by_currency = {}
+        for item in xfers_out:
+            if item.currency not in xfers_out_by_currency:
+                xfers_out_by_currency[item.currency] = item.amount
+            else:
+                xfers_out_by_currency[item.currency] += item.amount
+        logger.debug(f"Xfers out by currency: {xfers_out_by_currency}")
 
         # Convert both XFER_IN and XFER_OUT totals into base currency
-        xfer_in_total = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), xfers_in_by_currency))
-        xfer_out_total = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), xfers_out_by_currency))
+        xfer_in_total = sum(self._calc_totals(currency, self.base_currency, amount) for currency, amount in xfers_in_by_currency.items())
+        xfer_out_total = sum(self._calc_totals(currency, self.base_currency, amount) for currency, amount in xfers_out_by_currency.items())
         xfer_total = xfer_in_total - xfer_out_total
 
         # Return total of XFER_IN - XFER_OUT
@@ -135,7 +160,7 @@ class Calculator:
         logger.debug(f"New balance: {new_balance}")
         return Decimal(new_balance).quantize(Decimal("0.01"))
 
-    def calc_total_assets(self):
+    def calc_total_assets(self, source_list):
         """
         Calculates the total assets for a user.
 
@@ -144,19 +169,27 @@ class Calculator:
         :returns: The total assets for the user.
         :rtype: Decimal
         """
+        # TODO: Fix this for sources
 
         logger.debug(f"Calculating total assets for {self.uid} with base currency {self.base_currency}")
 
         # Remove 'unknown' from assets so they aren't included in calculations
-        assets = self.assets.exclude(source__acc_type="UNKNOWN")
+        assets = [source for source in source_list if source.acc_type != "UNKNOWN"]
 
         # Get all assets, and sort them by currency, and sum them by that currency
-        asset_by_currency = assets.values("currency__code").annotate(total=Sum("amount"))
+        asset_by_currency = {}
+        for item in assets:
+            if item.currency not in asset_by_currency:
+                asset_by_currency[item.currency] = item.amount
+            else:
+                asset_by_currency[item.currency] += item.amount
         logger.debug(f"Asset by currency: {asset_by_currency}")
 
         # Convert all assets not already in base_currency to the base_currency
         # Then sum them, and return the total in Decimal
-        asset_total = sum(map(lambda x: self._calc_totals(x["currency__code"], self.base_currency, x["total"]), asset_by_currency))
+        asset_total = sum(self._calc_totals(currency, self.base_currency, amount) 
+                          for currency, amount in asset_by_currency.items())
+        
         logger.debug(f"Total asset total: {asset_total}")
         return Decimal(asset_total).quantize(Decimal("0.01"))
 
@@ -174,7 +207,6 @@ class Calculator:
         logger.debug(f"Acc type totals: {acctype_totals}")
         return acctype_totals
 
-
     def calc_tx_sources(self, tx_list, source_list):
         source_aggregate ={}
         source_map = {source.source: source for source in source_list}
@@ -189,7 +221,8 @@ class Calculator:
         logger.debug(f"Source aggregate: {source_aggregate}")
         return source_aggregate
 
-
+    
+    @staticmethod
     def _calc_totals(item_currency, base_currency, amount):
         logger.debug(f"Calculating totals for {item_currency} with base currency {base_currency} from {amount}")
         total = 0

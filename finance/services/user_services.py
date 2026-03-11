@@ -12,22 +12,20 @@ Attributes:
 
 
 import finance.logic.validators as validator
-import finance.logic.fincalc as fc
+from finance.logic.updaters import Updater
+from finance.logic.fincalc import Calculator
 from django.db import transaction
-from django.core.exceptions import ValidationError
 from loguru import logger
 from finance.models import (
-    CurrentAsset,
     Transaction,
     AppProfile,
     FinancialSnapshot,
     PaymentSource,
-    Currency
 )
 
 @transaction.atomic
 @validator.UserValidator
-def user_update_spend_accounts(uid: str, data: list):
+def user_update(uid: str, data: dict, *args, **kwargs):
     """
     Updates the spend accounts for a user.
     Raises a ValidationError if any of the sources do not exist.
@@ -39,22 +37,27 @@ def user_update_spend_accounts(uid: str, data: list):
     :returns: {'spend_accounts': [list], 'message': "Spend accounts updated successfully"}
     :rtype: dict
     """
-    logger.debug(f"Updating spend accounts for {uid}")
-    user = AppProfile.objects.for_user(uid).get()
-    # Set all params to uppercase
-    data = {item.lower() for item in data}
-    # Check if sources exists
-    for item in data:
-        if not PaymentSource.objects.for_user(uid).filter(source=item).exists():
-            logger.error(f"Source does not exist: {item}")
-            raise ValidationError("Source does not exist")
-        item = PaymentSource.objects.for_user(uid).get_by_source(source=item)
-    # Update spend accounts    
-    user.spend_accounts.set(data)
-    return {'spend_accounts': user.spend_accounts, 'message': "Spend accounts updated successfully"}
+    logger.debug(f'Updating {uid}')
+    profile = kwargs.get('profile')
+    sources = kwargs.get('sources') or [PaymentSource.objects.for_user(uid)]
+    if data.get('spend_accounts'):
+        if isinstance(data['spend_accounts'], list):
+            data['spend_accounts'] = [item.lower() for item in data['spend_accounts']]
+            profile.spend_accounts = data['spend_accounts']
+        else:
+            profile.spend_accounts = [data['spend_accounts']]
+    if data.get('base_currency'):
+        profile.base_currency = data['base_currency'].upper()
+    if data.get('timezone'):
+        profile.timezone = data['timezone'].upper()
+    profile.save()
+    update = Updater(profile=profile, sources=sources)
+    snapshot = update.user_handler()
+    return {'message': "User updated successfully", 'snapshot': snapshot}
+
         
 @validator.UserValidator
-def user_get_info(uid: str):
+def user_get_info(uid: str, *args, **kwargs):
     """
     Retrieves the spend accounts and base currency for a user.
     
@@ -68,35 +71,10 @@ def user_get_info(uid: str):
     base_currency = AppProfile.objects.for_user(uid).get_base_currency()
     return {'spend_accounts': spend_accounts, 'base_currency': base_currency}
 
-@transaction.atomic
-@validator.UserValidator
-def user_update_base_currency(uid: str, data: dict):
-    """
-    Updates the base currency for a user.
-    
-    :param uid: The user id.
-    :type uid: str
-    :param data: The data for the base currency.
-    :type data: dict
-    :returns: {'base_currency': model_instance, 'message': "Base currency updated successfully"}
-    :rtype: dict
-    """
-    logger.debug(f"Updating base currency for {uid}")
-    user = AppProfile.objects.for_user(uid).get()
-    # Set all params to uppercase
-    data = {k.upper(): v for k, v in data.items()}
-    # Check if currency exists
-    if not Currency.objects.filter(code=data['code']).exists():
-        logger.error(f"Currency does not exist: {data['code']}")
-        raise ValidationError("Currency does not exist")
-    # Update base currency
-    user.base_currency = Currency.objects.filter(code=data['code']).first()
-    user.save()
-    return {'base_currency': user.base_currency, 'message': "Base currency updated successfully"}
 
 # Data Getterss
 @validator.UserValidator
-def user_get_totals(uid):
+def user_get_totals(uid, *args, **kwargs):
     """
     Retrieves the totals for a user.  Acts as a basic dashboard retrieval for relevant data.
     
@@ -107,6 +85,7 @@ def user_get_totals(uid):
     """
     logger.debug(f"Getting all totals for {uid}")
     queryset = Transaction.objects.for_user(uid).get_current_month()
+    fc = Calculator(profile=kwargs.get('profile'))
     return {
         'snapshot': FinancialSnapshot.objects.for_user(uid), 
         'transactions_for_month': queryset,

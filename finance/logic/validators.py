@@ -72,7 +72,7 @@ def TransactionValidator(func):
             return func(uid, data,  *args, **kwargs)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
         _validate_transaction(uid, data, source_check, tags, upcoming_check, cat_check, profile)
-        update.fix_data(data)
+        update.fix_data([data])
         kwargs['tags'] = tags
         return func(uid, data, *args, **kwargs)
     return _wrapped
@@ -88,7 +88,7 @@ def TransactionIDValidator(func):
         logger.debug(f"Validating transaction id: {tx_id} with uid: {uid}")
         # Check if transaction exists
         profile = kwargs.get('profile')
-        to_check = Transaction.objects.for_user(profile.user_id).get_tx(tx_id=tx_id)
+        to_check = Transaction.objects.for_user(profile.user_id).get_tx(tx_id=tx_id).first()
         if not to_check:
             logger.error(f"Transaction does not exist: {tx_id}")
             raise ValidationError("Transaction does not exist")
@@ -166,7 +166,7 @@ def UserValidator(func):
                 if not item.lower() in source_check:
                     logger.error(f"Source does not exist: {item}")
                     raise ValidationError("Source does not exist")
-            kwargs['sources'] = sources
+            kwargs['sources'] = [sources]
             kwargs['source_check'] =source_check
         if data.get('timezone'):
             _validate_timezone(data['timezone'])
@@ -177,7 +177,7 @@ def UserValidator(func):
 
 
 # Upcoming Expense Validators
-def UpcomingExpenseValidator(func):
+def UpcomingExpenseSetValidator(func):
     """
     Decorator to validate an upcoming expense.
     Checks if the expense exists.
@@ -188,10 +188,10 @@ def UpcomingExpenseValidator(func):
         logger.debug(f"Validating expense: {data} with uid: {uid}")
         profile = kwargs.get('profile')
         upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(profile.user_id)
-        upcoming_check = kwargs.get('upcoming_check') or set(upcoming.values_list('name', flat=True))
+        upcoming_check = kwargs.get('checked') or set(upcoming.values_list('name', flat=True))
         patch = kwargs.get('patch') or False
-        kwargs['upcoming_check'] = upcoming_check
         kwargs['upcoming'] = upcoming
+        update = Updater(profile=profile)
         # Check if it's a list, and treat it as a bulk addition
         if isinstance(data, list):
             rejected = []
@@ -205,10 +205,12 @@ def UpcomingExpenseValidator(func):
                     rejected.append(item)
             kwargs['rejected'] = rejected
             kwargs['accepted'] = accepted
+            update.fix_expense_data(accepted)
             return func(uid, data, *args, **kwargs)
         else: 
             _validate_expense(uid, data,profile,  upcoming_check, patch)
             kwargs['upcoming'] = upcoming.filter(name=data['name'])
+            update.fix_expense_data([data])
         return func(uid, data, **args, **kwargs)
     return _wrapped
 
@@ -218,14 +220,13 @@ def UpcomingExpenseGetValidator(func):
         logger.debug(f"Validating expense: {data} with uid: {uid}")
         profile = kwargs.get('profile')
         upcoming = UpcomingExpense.for_user(profile.user_id)
-        upcoming_check = set(upcoming.values_list('name', flat=True))
-        kwargs['upcoming_check'] = upcoming_check
-        if not expense_name in upcoming_check:
+        upcoming_check = upcoming.filter(name=expense_name).first()
+        if not upcoming_check:
             logger.error(f"Expense does not exist: {expense_name}")
             raise ValidationError("Expense does not exist")
         kwargs['patch'] = True
         kwargs['upcoming'] = upcoming
-        kwargs['existing'] = upcoming.get_by_name(expense_name)
+        kwargs['checked'] = upcoming_check
         return func(uid, expense_name, *args, **kwargs)
     return _wrapped
 
@@ -315,7 +316,7 @@ def SourceSetValidator(func):
             return func(uid, data, *args, **kwargs)
         else:
             _validate_source(uid, data, source_check, patch)
-            update.fix_source_data(data)
+            update.fix_source_data([data])
             return func(uid, data, *args, **kwargs)
     return _wrapped
 
@@ -324,14 +325,12 @@ def SourceGetValidator(func):
     def _wrapped(uid, source: str, *args, **kwargs):
         logger.debug(f"Validating source: {source} with uid: {uid}")
         sources = PaymentSource.objects.for_user(uid)
-        source_check = set(sources.values_list('source', flat=True))
+        source_check = source.get_by_source(source=source).first()
         if not source in source_check:
             logger.error(f"Source does not exist: {source}")
             raise ValidationError("Source does not exist")
-        checked = PaymentSource.objects.for_user(uid).get_by_source(source=source)
         kwargs['sources'] = sources
         kwargs['source_check'] = source_check
-        kwargs['checked'] = checked
         kwargs['patch'] = True
         return func(uid, source, *args, **kwargs)
     return _wrapped

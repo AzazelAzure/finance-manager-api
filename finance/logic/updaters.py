@@ -13,7 +13,6 @@ from decimal import Decimal
 from django.db.models.functions import Abs
 from django.utils import timezone
 from finance.models import (
-    Tag,
     Transaction, 
     PaymentSource,
     FinancialSnapshot,
@@ -22,22 +21,7 @@ from finance.models import (
 from loguru import logger
 import uuid
 
-# TODO: In order:
-    # Fix Transaction Handling
-    # Fix Source handling
-    # Fix Snapshot handling
-    # Docstrings absolutely last
-
-
-
 # TODO:  Docstrings... again
-
-# TODO: Finish fixing changes for new linking system and other refactors
-
-# TODO: Fix transaction updates to account for affecting sources
-    # TODO: This will require some changes in fincalc
-
-# TODO: Refactor snapshot calculations to reduce separate calls to one
 
 class Updater:
     """
@@ -68,7 +52,7 @@ class Updater:
 
         # Ease for profile to set applicable info
         self.uid = self.profile.user_id
-        self.base_currency = self.profile.base_currency.code
+        self.base_currency = self.profile.base_currency
         self.spend_accounts = self.profile.spend_accounts
         
         
@@ -79,27 +63,22 @@ class Updater:
             self.sources = list(PaymentSource.objects.for_user(self.uid))
             self.paid_bills = set(tx.bill for tx in self.transactions if tx.bill)
             self.unpaid = list(self.upcoming.filter(paid_flag=False))
-            self.spend_accounts = set(source for source in self.sources if source.source in self.spend_accounts)
+            self.spend_accounts = list(source for source in self.sources if source.source in self.spend_accounts)
             
         if kwargs.get('sources'):
             self.sources = kwargs.get('sources')
 
-        if kwargs.get('source_type'):
-            self.source_type = kwargs.get('source_type')
-
-        if kwargs.get('souce_check'):
-            self.source_check = kwargs.get('source_check')
-        
-        if kwargs.get('upcoming_check'):
-            self.upcoming_check = kwargs.get('upcoming_check')
+        if kwargs.get('upcoming'):
+            self.sources = kwargs.get('sources') or [PaymentSource.objects.for_user(self.uid)]
+            self.upcoming = kwargs.get('upcoming')
 
         # Single hit for any user, always used
-        # TODO: Move this to a conditional grab
         self.snapshots = FinancialSnapshot.objects.for_user(self.uid).first()
         
         # Create the calculator instance
         self.fc = Calculator(self.profile)
         return
+
 
     # Data fixers
     def fix_tx_data(self, data):
@@ -135,63 +114,17 @@ class Updater:
             if item.get('amount'):
                 item['amount'] = Decimal(item['amount'])
         return data
-
-    # Transaction Handlers
-    def new_transaction(self):
-        """
-        Function to handle new transactions.
-        
-        :param uid: The user id.
-        :type uid: str
-        :param transaction_queryset: A queryset of a transaction
-        :type transaction_queryset: queryset
-        :returns: None
-        """
-        self._recalc_source_amount()
-        self._handle_upcoming()
-        self.rebalance(acc_type=True)
-        return
-
-    def transaction_updated(self):
-        """
-        Function to handle transaction updates.
-        Reverses the transaction effect to user account.
-        If bill was changed, checks if the transaction is past due and updates the bill.
-        
-        :param uid: The user id.
-        :type uid: str
-        :param tx_id: The transaction id.
-        :type tx_id: str
-        :returns: None
-        """
-
-        tx = self.transactions.get()
-        # If bill was changed, check if transaction is past the adjusted due date
-        if tx.bill: 
-            # This decides if anything SHOULD be changed.
-            # Since on payment, it pushes the duedate up one month automatically
-            # We check if we undid that change would this tx have paid it.
-            # This makes sure if this tx is older than the current billing cycle
-            # Nothing is changed
-            self._updated_affected_upcomings(tx)
-
-        # Invert transaction amount and recalculate
-        tx.amount = tx.amount * -1
-        tx.save()
-        self._recalc_asset_amount()
-        self.rebalance(acc_type=True)
-        return
+    
+    def fix_expense_data(self, data):
+        for item in data:
+            item['uid'] = self.profile.user_id
+            item['name'] = item['name'].lower()
+            item['currency'] = item['currency'].upper()
 
 
+    # Transaction Handler
     def transaction_handler(self, update=None):
-        # 1.  Check if transfer was passed in
-            # If passed handle undoing the transaction
-            # Since this no longer hits two models, should just be checking bill status
-            # And reversing the amount in that account
-        # 2. Check if self.transactions has bill
-            # If it does, handle that
-        # 3. Handle affected sources and recalc them
-        # 4 Update snapshot
+     
         updated_bill = False
         if update:
             updated_bill = self._handle_tx_update(update)
@@ -202,28 +135,23 @@ class Updater:
             if source.source in src_amounts:
                 source.amount = src_amounts[source.source]
         PaymentSource.objects.for_user(self.uid).bulk_update(self.sources, ['amount'])
-        snapshot = self.snapshot_handler()
+        snapshot = self._tx_snapshot_handler()
         return snapshot
 
-    def snapshot_handler(self):
-        debt_list = {
-            bill.name: bill 
-            for bill in self.unpaid 
-            if bill.is_recurring==True and self._in_current_month(bill.due_date)
-            }
-        transfers = [item for item in self.transactions if item.tx_type in ['XFER_IN', 'XFER_OUT']]
-        type_totals = self.fc.calc_acc_types(self.sources)
-        self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
-        self.snapshots.safe_to_spend = self.fc.calc_sts(self.spend_accounts, debt_list)
-        if transfers:
-            self.snapshots.leaks = self.fc.calc_leaks(transfers)
-        for total in self.snapshots:
-            if total in type_totals:
-                self.snapshots[total] = type_totals[total]
+
+    # Expense Handlers
+    def expense_handler(self, old_name=None, new_name=None):
+        if old_name:
+            txs = Transaction.objects.for_user(self.uid).filter(bill=old_name)
+            if new_name:
+                txs.update(bill=new_name)
+            else:
+                txs.update(bill='unknown')
+        accounts = [source for source in self.sources if source.source in self.spend_accounts]
+        debts = list(self.upcoming.get_current_month().filter(paid_flag=False))
+        self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.save()
         return self.snapshots
-
-        
 
 
     # Category Handlers
@@ -239,130 +167,36 @@ class Updater:
         affected.bulk_update(affected, ['category'])
         return
 
+
     # Source Handlers
-    def source_added(self):
-        # This will take the sources passed in when initialized
-        # Iterate over the sources, and update calculation based on acc type
-        # I may make a special calculator for this, or just the queryset calc
-        # It really depends on how my calculator refactor goes
-        # I need to make calculations and updates more efficient
-        return
+    def source_handler(self):
+        logger.debug(f"Source added for {self.uid}")
+        acc_totals = self.fc.calc_acc_types(self.sources)
+        for total in self.snapshots:
+            logger.debug(f'Source added updating snapshot for total: {total}')
+            if total in acc_totals:
+                logger.debug(f'Succesfully updated snapshot for total: {total}')
+                self.snapshots[total] = acc_totals[total]
 
-    def source_deleted(self):
-        # This is turbo fucked, fix this
-        # Will need separate for if it's updated.
-            # Will require thoughts on how to handle this
-            # If user wants all transactions to follow it
-            # Or for them to remain there.
-            # New function, with a passed "transfer" bool
-                # If not passed, assume to move to "unknown"
-        return
+        accounts = list(source for source in self.sources if source.source in self.spend_accounts)
+        debts = [UpcomingExpense.objects.for_user(self.uid).get_current_month().filter(paid_flag=False)]
+        self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
+        self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
+        self.snapshots.save()
+        return self.snapshots
+
     
-    def source_updated(self, transfer=False):
-        # This will require a top down refactor for this particular bool
-        # Basically a if transfer isn't false, set to transfer
-        # else, move them all to "unknown"
-        return
+    # User Handler
+    def user_handler(self):
+        logger.debug(f'User updated for {self.uid}')
+        debts = list(UpcomingExpense.objects.for_user(self.uid).get_current_month().filter(paid_flag=False))
+        self.snapshots.safe_to_spend = self.fc.calc_sts(self.sources, debts)
+        self.total_assets = self.fc.calc_total_assets(self.sources)
+        self.snapshots.save()
+        return self.snapshots
 
 
-    # Slated for deletion
-    # Rebalance Handler
-    def rebalance(self,acc_type=False, total_assets=True, leaks=True, sts=True):
-        """
-        Rebalances the user's accounts.
-        
-        :param uid: The user id.
-        :type uid: str
-        :param acc_type: The account type to rebalance.
-        :type acc_type: str
-        :returns: None
-        """
-        logger.debug(f"Rebalancing.  Acc_type is {acc_type}")
-
-        # Recalculate asset type if provided
-        # Ordered this way due to how calculations are done
-        # TODO: This is getting gutted to handle specific cases
-            # Case 1: Transaction cases
-                # Added new transactions
-                # Updated transaction
-            # Case 2: Source cases
-                # Added new sources
-                # Deleted sources
-                # Updated sources
-            # Has to be handled this way to reduce/remove N+1 calculations
-            # Also fix snapshot calculations to handle all necessary updates in ONE update
-            # Reduced hits from 4+ to 2 maximum.
-                # Once to get the snapshot, the second to save the new values
-        if acc_type:
-            self._recalc_asset_type()
-        if total_assets:
-            self._recalc_total_assets()
-        if leaks:
-            self._recalc_leaks()
-        if sts:
-            self._recalc_sts()
-        return
-
-        
-
-    # Private Functions
-
-    # Functions slated for deletion
-    def _recalc_sts(self):
-        """
-        Recalculates the safe to spend for a user and sets to Financial Snapshot.
-        """
-        logger.debug(f"Recalculating safe to spend for {self.uid}")
-        # Calc the new safe to spend total
-        sts = self.fc.calc_sts() 
-
-        # Update FinancialSnapshot
-        self.snapshots.update(safe_to_spend=sts)
-        logger.warning(f"Changed safe to spend to: {sts}")
-        return
-
-    def _recalc_total_assets(self):
-        """
-        Recalculates the total assets for a user and sets to Financial Snapshot.
-        """
-        logger.debug(f"Recalculating total assets for {self.uid}")
-        total_assets = self.fc.calc_total_assets() 
-        self.snapshots.update(total_assets=total_assets)
-        logger.warning(f"Changed total assets to: {total_assets}")
-        return
-
-    def _recalc_source_amount(self):
-        """
-        Recalculates the asset amount for a source.
-        """
-        logger.debug(f"Recalculating asset amount with source {source} ")
-        
-        affected_sources = self.transactions.values_list('source', flat=True).distinct()
-        logger.debug(f"Affected sources: {affected_sources}")
-
-        for source in affected_sources: 
-            # TODO: Monitor for validity
-            aggregate = self.fc.calc_queryset(self.transactions.filter(source=source))                
-            source.amount = self.fc.calc_new_balance(self.sources.filter(source=source), aggregate)
-        self.sources.bulk_update(affected_sources, ['amount'])
-        return
-
-    def _updated_affected_upcomings(self, tx):
-
-            # Check if paid flag should be changed
-            if tx.date >= tx.bill.due_date - relativedelta(months=1):
-                tx.bill.paid_flag = False
-                tx.bill.due_date = tx.bill.due_date - relativedelta(months=1)
-            
-            # Check if current due date is before the end date
-            # If it is, fix the is recurring
-            if tx.bill.end_date and tx.bill.due_date <= tx.bill.end_date:
-                tx.bill.is_recurring = True
-            
-            tx.bill.save()
-            return
-
-    # Used functions
+    # Helper functions
     def _handle_upcoming(self,updated_bill=False):
         
 
@@ -408,3 +242,21 @@ class Updater:
             tx.amount = tx.amount * -1
             affected_source.amount += tx.amount
         return append_change
+    
+    def _tx_snapshot_handler(self):
+        debt_list = {
+            bill.name: bill 
+            for bill in self.unpaid 
+            if bill.is_recurring==True and self._in_current_month(bill.due_date)
+            }
+        transfers = [item for item in self.transactions if item.tx_type in ['XFER_IN', 'XFER_OUT']]
+        type_totals = self.fc.calc_acc_types(self.sources)
+        self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
+        self.snapshots.safe_to_spend = self.fc.calc_sts(self.spend_accounts, debt_list)
+        if transfers:
+            self.snapshots.leaks = self.fc.calc_leaks(transfers)
+        for total in self.snapshots:
+            if total in type_totals:
+                self.snapshots[total] = type_totals[total]
+        self.snapshots.save()
+        return self.snapshots

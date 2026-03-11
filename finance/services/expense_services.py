@@ -33,21 +33,20 @@ def add_expense(uid, data, *args, **kwargs):
     """
     logger.debug(f"Adding expense: {data}")
     profile = kwargs.get('profile')
-    update = Updater(profile=profile)
+    upcoming = kwargs.get('upcoming')
     if isinstance(data,list):
         logger.debug(f"Adding multiple expenses: {data}")
-        accepted = kwargs.get('accepted')
-        rejected = kwargs.get('rejected')
-        for item in accepted:
-            item['uid'] = profile.user_id
-        UpcomingExpense.objects.bulk_create([UpcomingExpense(**item) for item in accepted])
-        update.rebalance(total_assets=False, leaks=False)
-        return {'accepted': accepted, 'rejected': rejected}
+        accepted = kwargs.get('accepted', [])
+        rejected = kwargs.get('rejected', [])
+        created = UpcomingExpense.objects.bulk_create([UpcomingExpense(**item) for item in accepted])
+        update = Updater(profile=profile, upcoming=upcoming)
+        snapshot = update.expense_handler()
+        return {'accepted': accepted, 'rejected': rejected, 'snapshot': snapshot}
     else:
-        data['uid'] = profile.user_id
-        UpcomingExpense.objects.create(**data)
-        update.rebalance(total_assets=False, leaks=False)
-        return {'accepted': UpcomingExpense.objects.for_user(uid).get_by_name(data['name'])}
+        created = UpcomingExpense.objects.create(**data)
+        update = Updater(profile=profile, upcoming=upcoming)
+        snapshot = update.expense_handler([created])
+        return {'accepted': created, 'snapshot': snapshot}
 
 
 @validator.UserValidator
@@ -65,12 +64,12 @@ def delete_expense(uid, expense_name: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting expense: {expense_name}")
-    update = Updater(profile=kwargs.get('profile'))
-    expense = kwargs.get('existing')
-    deleted = expense.get()
+    expense = kwargs.get('checked')
+    upcoming = kwargs.get('upcoming')
+    update = Updater(profile=kwargs.get('profile'), upcoming=upcoming)
     expense.delete()
-    update.rebalance(total_assets=False, leaks=False)
-    return {'deleted': deleted}
+    snapshot = update.expense_handler(old_name=expense.name)
+    return {'deleted': expense, 'snapshot': snapshot}
 
 @validator.UserValidator
 @validator.UpcomingExpenseGetValidator
@@ -90,11 +89,15 @@ def update_expense(uid,  data: dict, expense_name: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating expense: {expense_name}")
-    expense = kwargs.get('existing')
-    update = Updater(profile=kwargs.get('profile'))
+    expense = kwargs.get('checked')
+    upcoming = kwargs.get('upcoming')
+    update = Updater(profile=kwargs.get('profile'), upcoming=upcoming)
     expense.update(**data)
-    update.rebalance(total_assets=False, leaks=False)
-    return {'updated': expense}
+    if expense.name != data['name']:
+        snapshot = update.expense_handler(old_name=expense.name, new_name=data['name'])
+    else:
+        snapshot = update.expense_handler()
+    return {'updated': expense, 'snapshot': snapshot}
 
 
 @validator.UserValidator

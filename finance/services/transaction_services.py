@@ -19,6 +19,7 @@ from finance.models import Transaction, UpcomingExpense, AppProfile
 import copy
 
 # TODO: Update Docstrings here too.  Again...
+# TODO: Fix for updaters fix
 
 # Public Functions
 
@@ -124,17 +125,14 @@ def add_transaction(uid, data, *args, **kwargs):
         accepted = kwargs.get('accepted', [])
         to_update = Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
         update = Updater(uid, profile=profile, transactions=to_update, upcoming=upcoming)
-        update.new_transaction()
-        if rejected:
-            return {'accepted': to_update, 'rejected': rejected}
-        else:
-            return {'accepted': to_update}
+        snapshot = update.transaction_handler()
+        return {'accepted': to_update, 'rejected': rejected, 'snapshot': snapshot}
     else:
         logger.debug(f"Adding transaction: {data}")
         tx = [Transaction.objects.create(**data)]
         update = Updater(profile=profile, transactions=tx, upcoming=upcoming) 
-        update.new_transaction(uid, tx)
-        return {'accepted': tx}
+        snapshot = update.transaction_handler()
+        return {'accepted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
 @validator.TransactionIDValidator
@@ -161,8 +159,8 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     for field , value in data.items():
         setattr(new_tx, field, value)
     update = Updater(uid, profile=profile, transactions=[new_tx])
-    update.transaction_handler(update=tx)
-    return {f'updated': tx}
+    snapshot = update.transaction_handler(update=tx)
+    return {f'updated': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
 @validator.TransactionIDValidator
@@ -180,15 +178,18 @@ def delete_transaction(uid, tx_id: str, *args, **kwargs):
     """
     logger.debug(f"Deleting transaction: {tx_id}")
     tx = kwargs.get('id_check')
+    to_delete = copy.copy(tx)
+    to_delete.amount = 0
+    if to_delete.bill:
+        to_delete.bill = None
     profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
-    update = Updater(uid, profile=profile, transactions=tx)
+    update = Updater(profile=profile, transactions=[to_delete])
     # Update balances to reverse changes
-    update.transaction_updated()
+    snapshot = update.transaction_handler(update=tx)
 
     # Delete transaction
-    tx = list(tx)
     tx.delete()
-    return {f'deleted': tx}
+    return {f'deleted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
 @validator.TransactionIDValidator

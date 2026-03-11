@@ -21,7 +21,7 @@ from finance.models import PaymentSource
 
 # Payment Source Functions
 @validator.UserValidator
-@validator.SourceValidator
+@validator.SourceSetValidator
 @transaction.atomic
 def add_source(uid, data, *args, **kwargs):
     """
@@ -37,24 +37,24 @@ def add_source(uid, data, *args, **kwargs):
     logger.debug(f"Adding asset: {data}")
     sources = kwargs.get('sources')
     if isinstance(data, list):
-        rejected = kwargs.get('rejected')
-        accepted = kwargs.get('accepted')
-        created = sources.bulk_create([PaymentSource(**item) for item in accepted])
-        to_update = created.exclude(amount=0)
-        update = Updater(profile=kwargs.get('profile'), sources=to_update)
-        update.source_added()
-        return {'added': accepted, 'rejected': rejected}
+        rejected = kwargs.get('rejected',[])
+        accepted = kwargs.get('accepted',[])
+        sources.bulk_create([PaymentSource(**item) for item in accepted])
+        update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+        snapshot = update.source_handler()
+        return {'added': accepted, 'rejected': rejected, 'snapshot': snapshot}
 
     else:
         new_source = sources.create(**data)
-        update = Updater(profile=kwargs.get('profile'), sources=new_source)
-        update.source_added()
-    return {'added': data}
+        if new_source.amount != 0:
+            update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+            snapshot = update.source_handler()
+    return {'added': new_source, 'snapshot': snapshot}
 
 
 
 @validator.UserValidator
-@validator.SourceValidator
+@validator.SourceGetValidator
 @transaction.atomic
 def delete_source(uid, source: str, *args, **kwargs):
     """
@@ -68,11 +68,11 @@ def delete_source(uid, source: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting source: {source}")
-    sources = kwargs.get('checked')
+    source = kwargs.get('source_check')
     source.delete()
-    update = Updater(profile=kwargs.get('profile'), source_type=sources.acc_type)
-    update.source_deleted()
-    return {'deleted': source}
+    update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+    snapshot = update.source_handler()
+    return {'deleted': source, 'snapshot': snapshot}
 
 
 @validator.UserValidator
@@ -93,11 +93,13 @@ def update_source(uid, source: str, data: dict, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating source: {source}")
-    source_obj = kwargs.get('checked').get()
-    update = Updater(profile=kwargs.get('profile'))
-    source_obj.update(**data)
-    update.rebalance(uid=uid, acc_type=source_obj.acc_type)
-    return {'updated': source_obj}
+    source_obj = kwargs.get('checked')
+    for field, value in data.items():
+        setattr(source_obj, field, value)
+    source_obj.save()
+    update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+    snapshot = update.source_handler()
+    return {'updated': source_obj, 'snapshot': snapshot}
 
 @validator.UserValidator
 @validator.SourceValidator
