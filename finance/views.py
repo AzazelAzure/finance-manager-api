@@ -3,40 +3,63 @@ This module defines all views for the finance manager application.
 
 Attributes:
     TransactionView: View for transactions.
-    AssetView: View for assets.
     SourceView: View for sources.
     UpcomingExpenseView: View for upcoming expenses.
     TagView: View for tags.
     AppProfileView: View for app profiles.
     UserView: View for users.
 """
+# Django imports
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
+
+# Service Imports
 import finance.services.transaction_services as tx_svc
 import finance.services.source_services as src_svc
 import finance.services.expense_services as exp_svc
-import finance.services.category_services as asset_svc
 import finance.services.tag_services as tag_svc
 import finance.services.user_services as user_svc
-from .api_tools.serializers import (
-    ExpenseSerializer,
-    SourceSerializer,
-    AssetSerializer,
+import finance.services.category_services as cat_svc
+
+# Serializer Imports
+from .api_tools.serializers.base_serializers import UserSerializer
+from .api_tools.serializers.tx_serializers import(
     TransactionSerializer,
     TransactionSetSerializer,
-    TransactionGetSerializer,
     TransactionSetReturnSerializer,
-    TransactionGetReturnSerializer,
+    TransactionGetSerializer,
+    TransactionGetReturnSerializer
+) 
+from .api_tools.serializers.src_serializers import(
+    SourceSerializer,
+    SourcePostSerializer,
+    SourceSetReturnSerializer
+)
+from api_tools.serializers.exp_serializers import(
+    ExpenseSerializer,
+    ExpenseSetSerializer,
+    ExpenseSetReturnSerializer,
+    ExpenseGetReturnSerializer
+)
+from api_tools.serializers.tag_serializers import(
     TagSerializer,
+    TagSetSerializer,
+    TagSetReturnSerializer
+)
+from api_tools.serializers.profile_serializers import(
     AppProfileSerializer,
-    UserSerializer,
-    SnapshotSerializer,
+    AppProfileGetSerializer,
+    AppProfileUpdateSerializer,
+    SnapshotSerializer
+)
+from api_tools.serializers.spectactular_serializers import(
     SpectacularTxSerializer,
     SpectacularExpenseSerializer
 )
+
 
 # TODO: Add documentation
 # TODO: Add logging
@@ -156,7 +179,7 @@ class TransactionView(APIView):
         
         if tx_id: # If tx_id is provided in the URL path, get a single transaction
             result = tx_svc.get_transaction(uid=uid, tx_id=tx_id)
-            serializer = TransactionSerializer(result['transaction'])
+            serializer = TransactionGetSerializer(result['transaction'])
             return Response({'transaction': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
         
         # Otherwise, handle dynamic filtering for a list of transactions
@@ -182,7 +205,8 @@ class TransactionView(APIView):
         
         # Remove None values to avoid passing none to the service function if not provided
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
-        # If no filters are provided, returns all transactions
+        
+        # If no filters are provided, returns most recent transaction
         result = tx_svc.get_transactions(uid=uid, **filter_params)
         serializer = TransactionGetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -193,7 +217,7 @@ class TransactionView(APIView):
         if isinstance(check, Response):
             return check
         
-        # Ensure date is provided
+
         if not request.data.get('date'):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -213,14 +237,15 @@ class TransactionView(APIView):
 
     def delete(self, request, tx_id: str):
         # Delete transaction
-        result = tx_svc.user_delete_transaction(
+        result = tx_svc.delete_transaction(
             uid=request.user.appprofile.user_id,
             tx_id=tx_id)
         
         # Serialize and return
-        serializer = TransactionSerializer(data=result['deleted'], many=True)
+        serializer = TransactionGetSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @staticmethod
     def _txset_check(data):
         if isinstance(data, list):
             for item in data:
@@ -238,106 +263,9 @@ class TransactionView(APIView):
         return data
 
 
-# Asset View
-@extend_schema_view(
-    post=extend_schema(
-        summary="Not allowed.",
-        description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_403_FORBIDDEN: None},
-        tags=["Assets"]
-    ),
-    get=extend_schema(
-        summary="Retrieve all assets",
-        description="Retrieves either a single asset by source or a list of all assets.",
-        responses={status.HTTP_200_OK: AssetSerializer(many=True)},
-        tags=["Assets"]
-    ),
-    patch=extend_schema(
-        summary='Update and asset source',
-        description="Updates an existing asset identified by its source. Source passed in must exist in PaymentSources, or will raise Validation error.\n"
-                    "Forbidden for 'amount' as it is auto calculated based on other fields."
-                    "Forbidden to set source to 'unknown' as that is a default empty source.",
-        responses = {
-            status.HTTP_200_OK: AssetSerializer(many=True),
-            status.HTTP_403_FORBIDDEN: None
-        },
-        tags=["Assets"]
-    ),
-    put=extend_schema(
-        summary="Not allowed.",
-        description="For financial fidelity, this endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
-        tags=["Assets"]
-    ),
-    delete=extend_schema(
-        summary="Not allowed.",
-        description="All assets are generated automatically.  This endpoint is not allowed.",
-        responses={status.HTTP_403_FORBIDDEN: None},
-        tags=["Assets"]
-    )
-)
-class AssetView(APIView):
-    """
-    View for assets. Directly linked to PaymentSources.\n
-    Disallows put methods for financial fidelity.\n
-    Disallows post methods due to automatic asset generation.\n
-    Disallows delete methods due to automatic asset generation.\n
-
-    Attributes:
-        post: Not allowed.
-        get: Retrieve either a single asset by source or all assets for user.
-        put: Not allowed.
-        patch: Update an asset.
-        delete: Not allowed.
-    """
-    def post(self, request):
-        """Not allowed."""
-        return Response(status=status.HTTP_403_FORBIDDEN)
-    
-    def get(self, request, source=None):
-        """
-        Retrieve either a single asset by source or all assets for user.
-        If source is provided, return a single asset.
-        If no source is provided, return all assets for user.
-
-        :param request: HTTP request.
-        :param source: Optional source to filter by.
-        :return: Serialized asset or serialized set of all assets.
-        """
-        # Check if source provided, otherwise return all assets
-        if not source:
-            result = asset_svc.get_all_assets(uid=request.user.appprofile.user_id)
-            serializer = AssetSerializer(result['asset'], many=True)
-        else:
-            result = asset_svc.get_asset(uid=request.user.appprofile.user_id, source=source)
-            serializer = AssetSerializer(result['assets'], many=True)
-        
-        # Return serialized asset or all assets
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def patch(self, request, source: str):
-        # Catch if source is 'unknown' and return error
-        source = source.lower()
-        if source == "unknown":
-            return Response(status=status.HTTP_403_FORBIDDEN)
-        
-        # Reject attempts to modify amount
-        if request.data.get('amount'):
-            return Response(status=status.HTTP_403_FORBIDDEN)
-        
-        result = asset_svc.update_asset_source(
-            uid=request.user.appprofile.user_id,
-            data=request.data,
-            source=source
-        )
-        serializer = AssetSerializer(result['updated'])
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, source: str):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-    
-    def delete(self, request):
-        return Response(status=status.HTTP_403_FORBIDDEN)
+# Category View
+class CategoryView(APIView):
+    pass
 
 
 # Source View
@@ -405,7 +333,7 @@ class SourceView(APIView):
     def post(self, request):
         # Check if single or list of sources and serialize
         is_many = isinstance(request.data, list)
-        serializer = SourceSerializer(request.data, many=is_many)
+        serializer = SourcePostSerializer(request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
 
         # Handle Sources based of list or single
@@ -421,7 +349,7 @@ class SourceView(APIView):
             )
         
         # Serialize and return
-        serializer = SourceSerializer(result['added'], many=True)
+        serializer = SourceSetReturnSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def put(self, request):
@@ -437,11 +365,11 @@ class SourceView(APIView):
         if src.lower() == "unknown":
             return Response(status=status.HTTP_403_FORBIDDEN)
         result = src_svc.update_source(
-            uid=request.user.appprofile.user,
+            uid=request.user.appprofile.user_id,
             source=src,
             data=request.data
         )
-        serializer = SourceSerializer(result['updated'], many=True)
+        serializer = SourceSetReturnSerializer(result['updated'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def delete(self, request):
@@ -451,7 +379,7 @@ class SourceView(APIView):
             uid=request.user.appprofile.user,
             source=request.data['source']
         )
-        serializer = SourceSerializer(result['deleted'], many=True)
+        serializer = SourceSetReturnSerializer(result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 
@@ -509,7 +437,7 @@ class SourceView(APIView):
 class UpcomingExpenseView(APIView):
     def post(self, request):
         is_many = isinstance(request.data, list)
-        serializer = ExpenseSerializer(data=request.data, many=is_many)
+        serializer = ExpenseSetSerializer(data=request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
         if is_many:
             result = exp_svc.bulk_add_expenses(
@@ -521,7 +449,7 @@ class UpcomingExpenseView(APIView):
                 uid=request.user.appprofile.user,
                 data=serializer.data
             )
-        serializer = ExpenseSerializer(result['added'], many=True)
+        serializer = ExpenseSetReturnSerializer(result['added'], many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request, name: str = None):
@@ -544,19 +472,19 @@ class UpcomingExpenseView(APIView):
         }
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
         result = exp_svc.get_expenses(uid=uid, **filter_params)
-        serializer = ExpenseSerializer(result['expenses'], many=True)
+        serializer = ExpenseGetReturnSerializer(result['expenses'], many=True)
         return Response({'expenses': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
 
-    def patch(self, request):
+    def put(self, request):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
-    def put(self, request):
+    def patch(self, request):
         result = exp_svc.update_expense(
             uid=request.user.appprofile.user,
             expense_name=request.data['name'],
             data=request.data
         )
-        serializer = ExpenseSerializer(result, many=True)
+        serializer = ExpenseSetReturnSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def delete(self, request):
@@ -564,7 +492,7 @@ class UpcomingExpenseView(APIView):
             uid=request.user.appprofile.user,
             expense_name=request.data['name']
         )
-        serializer = ExpenseSerializer(result, many=True)
+        serializer = ExpenseSetReturnSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -618,23 +546,18 @@ class TagView(APIView):
         delete: Delete a tag.
     """
     def post(self, request):
-        # Check if single or list of tags and serialize
-        is_many = isinstance(request.data, list)
-        serializer = TagSerializer(data=request.data, many=is_many)
+        # Check if single and make a list
+        if not isinstance(request.data['tags'], list):
+            request.data['tags'] = [request.data['tags']] # May need to fix this
+        serializer = TagSerializer(data=request.data, many=True)
         serializer.is_valid(raise_exception=True)
 
-        # Handle Tags based of list or single
-        if is_many:
-            result = tag_svc.bulk_add_tags(
-                uid=request.user.appprofile.user,
-                data=serializer.data
-            )
-        else:
-            result = tag_svc.add_tag(
-                uid=request.user.appprofile.user,
-                data=serializer.data
-            )
-
+        # Add tags
+        result = tag_svc.add_tags(
+            uid=request.user.appprofile.user,
+            data=serializer.data
+        )
+        
         # Serialize and return
         serializer = TagSerializer(result['added'],many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -642,30 +565,33 @@ class TagView(APIView):
     def get(self, request):
         # Get tags, serialize, return
         result = tag_svc.get_tags(uid=request.user.appprofile.user)
-        serializer = TagSerializer(result, many=True)
+        serializer = TagSerializer(result['tags'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    def put(self, request, name: str):
+    def put(self, request):
         # Change name of tag, serialize, return
+        serializer = TagSetSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
         result = tag_svc.update_tag(
             uid=request.user.appprofile.user,
-            name=name,
-            data=request.data
+            data=serializer.data
         )
-        serializer = TagSerializer(result, many=True)
+        serializer = TagSetReturnSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
     
     def delete(self, request):
         # Delete tag, serialize, return
+        serializer = TagSetSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
         result = tag_svc.delete_tag(
             uid=request.user.appprofile.user,
-            tag_name=request.data['name']
+            data=serializer.data
         )
-        serializer = TagSerializer(result, many=True)
+        serializer = TagSetReturnSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -730,23 +656,18 @@ class AppProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Return the app profile.  Only returns spend account and base currency.
         result = user_svc.user_get_info(uid=uid)
-        serializer = AppProfileSerializer(result, many=True)
+        serializer = AppProfileGetSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def patch(self, request, base_currency: str=None, spend_accounts: list=None):
+    def patch(self, request):
         uid = request.user.appprofile.user_id
-        if base_currency:
-            result = user_svc.user_update_base_currency(uid=uid, data={'code': base_currency})
-            serializer = AppProfileSerializer(result)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        if spend_accounts:
-            for item in spend_accounts:
-                item = item.lower()
-            if "unknown" in spend_accounts:
-                return Response(status=status.HTTP_403_FORBIDDEN)
-            result = user_svc.user_update_spend_accounts(uid=uid, data=spend_accounts)
-            serializer = AppProfileSerializer(data=result)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        result = user_svc.user_update_info(
+            uid=uid,
+            data=request.data
+        )
+        serializer = AppProfileUpdateSerializer(result, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
 
     def put(self, request):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)

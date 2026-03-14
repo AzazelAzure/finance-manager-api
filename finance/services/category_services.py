@@ -17,15 +17,13 @@ from finance.models import Category
 def add_category(uid, data, *args, **kwargs):
     categories = kwargs.get('categories')
     if isinstance(data, list):
-        reject = kwargs.get('rejected')
+        reject = kwargs.get('rejected',[])
         accept = kwargs.get('accepted')
         categories.bulk_create([Category(**item) for item in data]) 
-        if reject:
-            return {'accepted':accept, 'rejected':reject}
-        return {'accepted': accept}
+        return {'accepted':accept, 'rejected':reject}
     else:
-        categories.create(**data)
-        return {'accepted': data}
+        created = categories.create(**data)
+        return {'accepted': created}
     
 @validator.UserValidator
 @validator.CategoryGetValidator

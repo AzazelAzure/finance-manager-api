@@ -93,6 +93,7 @@ def TransactionIDValidator(func):
             logger.error(f"Transaction does not exist: {tx_id}")
             raise ValidationError("Transaction does not exist")
         kwargs['id_check'] = to_check
+        kwargs['patch'] = True
         return func(uid, tx_id,  profile=profile, *args, **kwargs)
     return _wrapped
 
@@ -142,8 +143,6 @@ def CategoryGetValidator(func):
         return func(uid, cat_name, *args, **kwargs)
     return _wrapped
 
-
-
 # User Validator
 def UserValidator(func):
     """
@@ -172,6 +171,10 @@ def UserValidator(func):
             _validate_timezone(data['timezone'])
         if data.get('base_currency'):
             _validate_currency(data['base_currency'])
+        if data.get('start_week'):
+            if data['start_week'] < 0 or data['start_week'] > 6:
+                logger.error(f"Start week must be between 0 and 6: {data['start_week']}")
+                raise ValidationError("Start week must be between 0 and 6")
         return func(uid, data, *args, **kwargs)
     return _wrapped
 
@@ -242,17 +245,19 @@ def TagSetValidator(func):
     def _wrapped(uid, data, *args, **kwargs):
         logger.debug(f"Validating tag: {data} with uid: {uid}")
         profile = kwargs.get('profile')
-        tags = Tag.objects.for_user(profile.user_id)
-        tag_check = set(tags.values_list('tags', flat=True))
+        tag_obj = Tag.objects.for_user(profile.user_id).first()
+        tags = tag_obj.tags
+        tag_check = set(tags)
         kwargs['tags'] = tags
         for item in data['tags']:
             rejected = []
-            accepted = set()
+            accepted = []
             if item in tag_check:
                 rejected.append(item)
                 logger.error(f"Tag already exists: {item}")
             else:
-                accepted.add(item)
+                item = item.lower()
+                accepted.append(item)
             if not accepted:
                 raise ValidationError("No valid tags")
             kwargs['rejected'] = rejected
@@ -260,27 +265,43 @@ def TagSetValidator(func):
         return func(uid, data, *args, **kwargs)
     return _wrapped
 
-# Created for later, not used in current production
 def TagGetValidator(func):
     @wraps(func)
-    def _wrapped(uid, data, *args, **kwargs):
+    def _wrapped(uid, data:dict, *args, **kwargs):
         logger.debug(f"Validating tag: {data} with uid: {uid}")
         profile = kwargs.get('profile')
-        tags = Tag.objects.for_user(profile.user_id)
-        tag_check = set(tags.values_list('tags', flat=True))
+        tags_obj = Tag.objects.for_user(profile.user_id).first()
+        tags = tags_obj.tags
+        tag_check = set(tags)
         kwargs['tags'] = tags
-        for item in data['tags']:
-            rejected = []
-            accepted = []
-            if item not in tag_check:
-                logger.error(f"Tag does not exist: {data['name']}")
-                rejected.append(item)
-            else:
+        accepted = []
+        rejected = []
+        to_delete = []
+        update = []
+        for key in data['tags'].keys():
+            item = key.lower()
+            try:
+                _validate_tags(item, tag_check)
+                _validate_tags(data['tags'][key], tag_check, update=True)
+                logger.debug(f"Tag validated: {item}")
+                if data['tags'][key] in [None, False, "''", '""', 'delete']:
+                    to_delete.append(item)
+                else:
+                    update.append(item)
                 accepted.append(item)
-            if not accepted:
-                raise ValidationError("No valid tags")
-            kwargs['rejected'] = rejected
-            kwargs['accepted'] = accepted
+            except ValidationError as e:
+                logger.error(f"Tag validation failed: {e}")
+                rejected.append(item)
+        if not accepted:
+            raise ValidationError("No valid tags")
+        if to_delete:
+            if len(to_delete) != len(accepted):
+                raise ValidationError("Cannot delete and update tags at the same time")
+            kwargs['to_delete'] = to_delete
+        if update:
+            kwargs['update'] = update
+        kwargs['rejected'] = rejected
+        kwargs['accepted'] = accepted
         return func(uid, data, *args, **kwargs)
     return _wrapped
 
@@ -356,7 +377,7 @@ def _validate_transaction(uid, data:dict, source_check, tags, upcoming_check, ca
         if new_tags:
             update_tags = list(new_tags|tags)
             Tag.objects.for_user(uid).update(tags=update_tags)
-    if data['date'] > timezone.now(profile.timezone).date():
+    elif data['date'] > timezone.now(profile.timezone).date():
        raise ValidationError("Date cannot be in the future")
     if data.get('bill'):
         if not data['bill'] in upcoming_check:
@@ -375,6 +396,11 @@ def _validate_expense(uid, data:dict, profile, upcoming_check, patch):
             raise ValidationError("Expense already exists")
         if data.get('start_date') and not data.get('due_date'):
             data['due_date'] = data['start_date']
+        if not data.get('start_date') and data.get('due_date'):
+            data['start_date'] = data['due_date']
+        if not data.get('start_date') and not data.get('due_date'):
+            logger.error(f'Must have either a start date or due date: {data}')
+            raise ValidationError('Must have either a start date or due date')
     else:
         if not data['name'] in upcoming_check:
             logger.error(f"Expense does not exist: {data['name']}")
@@ -388,8 +414,7 @@ def _validate_expense(uid, data:dict, profile, upcoming_check, patch):
                 raise ValidationError("End date cannot be before due date")
         if data['end_date'] < timezone.now(profile.timezone).date():
             logger.error(f"End date cannot be in the past: {data['end_date']}")
-            raise ValidationError("End date cannot be in the past")
-            
+            raise ValidationError("End date cannot be in the past")        
     return data
 
 def _validate_source(uid, data:dict, source_check, patch):
@@ -437,6 +462,21 @@ def _validate_category(uid, data:dict, cat_check, patch):
             logger.error(f"Category does not exist: {data['name']}")
             raise ValidationError("Category does not exist")
     return data
+
+def _validate_tags(data, tags, update=False):
+    logger.debug(f"Validating tags: {data}")
+    if update:
+        data = data.lower()
+        if data in tags:
+            logger.error(f"Tag already exists: {data}")
+            raise ValidationError("Tag already exists")
+    else:
+        data = data.lower()
+        if not data in tags:
+            logger.error(f"Tag does not exist: {data}")
+            raise ValidationError("Tag does not exist")
+    return 
+
 
 def _validate_currency(code):
     logger.debug(f"Validating currency: {code}")

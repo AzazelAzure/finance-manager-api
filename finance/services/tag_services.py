@@ -31,8 +31,11 @@ def add_tags(uid, data, *args, **kwargs):
     logger.debug(f"Adding tag: {data}")
     profile = kwargs.get('profile')
     tags = kwargs.get('tags')
-    added = tags.objects.bulk_create([Tag(**item) for item in data])
-    return {'added': added}
+    accepted = kwargs.get('accepted')
+    rejected = kwargs.get('rejected')
+    tags += accepted
+    tags.save()
+    return {'accepted': accepted, 'rejected': rejected}
 
 
 @validator.UserValidator
@@ -50,10 +53,12 @@ def delete_tag(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting tags: {data}")
-    profile = kwargs.get('profile')
     tags = kwargs.get('tags')
-    tags.filter(name=[item.lower() for item in data]).delete()
-    return {'deleted': data}
+    delete_tag = set(kwargs.get('to_delete'))
+    tags = [item for item in tags if item not in delete_tag]
+    tags.save()
+    delete_tag = list(delete_tag)
+    return {'deleted': delete_tag}
 
 @validator.UserValidator
 @validator.TagGetValidator
@@ -70,10 +75,14 @@ def update_tag(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating tag: {data}")
-    profile = kwargs.get('profile')
     tags = kwargs.get('tags')
-    tags.update(**data)
-    return {'updated': data}
+    update_tag = kwargs.get('update')
+    accepted = set(kwargs.get('accepted'))
+    tags += update_tag
+    tags = [item for item in tags if item not in accepted]
+    tags.save()
+    updated = list(accepted)
+    return {'updated': updated}
 
 
 @validator.UserValidator

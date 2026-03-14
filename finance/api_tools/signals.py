@@ -5,16 +5,11 @@ from django.db.models.signals import post_save, pre_delete, pre_save
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from django.utils import timezone
-from dateutil.relativedelta import relativedelta
 from finance.models import (
     Transaction, 
-    CurrentAsset, 
     AppProfile, 
     FinancialSnapshot, 
-    Currency, 
     PaymentSource,
-    UpcomingExpense
 )
 from loguru import logger
 
@@ -57,7 +52,7 @@ def user_logged_in(sender, request, user, **kwargs):
 
     uid = user.appprofile.user_id
 
-    app_profile = AppProfile.objects.for_user(uid)
+    app_profile = AppProfile.objects.for_user(uid).first()
     if not app_profile:
         logger.critical(f'User {user.username} had no app profile.  Database was tampered with, indicating a security breach.  Recreated app profile.')
         _generate_base_profile(app_profile)
@@ -82,7 +77,6 @@ def _generate_base_profile(app_profile):
     FinancialSnapshot.objects.create(uid=app_profile.user_id)
     default_currency = 'USD'
     app_profile.base_currency = default_currency
-    # PaymentSource.save() will automatically create the CurrentAsset
     default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=app_profile.user_id)
     PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=app_profile.user_id)
     app_profile.spend_accounts.set([default_source])

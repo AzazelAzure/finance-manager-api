@@ -120,6 +120,7 @@ class Updater:
             item['uid'] = self.profile.user_id
             item['name'] = item['name'].lower()
             item['currency'] = item['currency'].upper()
+            
 
 
     # Transaction Handler

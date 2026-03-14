@@ -19,7 +19,6 @@ from finance.models import Transaction, UpcomingExpense, AppProfile
 import copy
 
 # TODO: Update Docstrings here too.  Again...
-# TODO: Fix for updaters fix
 
 # Public Functions
 
@@ -83,7 +82,6 @@ def get_transactions(uid,**kwargs):
         'source': 'get_by_source',
         'currency_code': 'get_by_currency',
         'by_year': 'get_by_year',
-        'by_date': 'get_by_date',
         'by_date': 'get_by_date',
         'gte': 'get_gte',
         'lte': 'get_lte',

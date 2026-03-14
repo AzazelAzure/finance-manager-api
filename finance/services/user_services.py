@@ -50,6 +50,8 @@ def user_update(uid: str, data: dict, *args, **kwargs):
         profile.base_currency = data['base_currency'].upper()
     if data.get('timezone'):
         profile.timezone = data['timezone'].upper()
+    if data.get('start_week'):
+        profile.start_of_week = data['start_week']
     profile.save()
     update = Updater(profile=profile, sources=sources)
     snapshot = update.user_handler()
@@ -67,9 +69,17 @@ def user_get_info(uid: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Getting spend accounts and base currency for {uid}")
-    spend_accounts = AppProfile.objects.for_user(uid).get_spend_accounts()
-    base_currency = AppProfile.objects.for_user(uid).get_base_currency()
-    return {'spend_accounts': spend_accounts, 'base_currency': base_currency}
+    profile = kwargs.get('profile')
+    spend_accounts = profile.spend_accounts
+    base_currency = profile.base_currency
+    timezone = profile.timezone
+    start_week = profile.start_of_week
+    return {
+        'spend_accounts': spend_accounts, 
+        'base_currency': base_currency,
+        'timezone': timezone,
+        'start_of_week': start_week
+        }
 
 
 # Data Getterss
