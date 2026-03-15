@@ -18,15 +18,13 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
-from finance.views import(
-    TransactionView,
-    AssetView,
-    SourceView,
-    UpcomingExpenseView,
-    TagView,
-    AppProfileView,
-    UserView
-)
+from finance.views.cat_views import CategoryView
+from finance.views.exp_views import UpcomingExpenseView
+from finance.views.profile_views import AppProfileView
+from finance.views.src_views import SourceView
+from finance.views.tag_views import TagView
+from finance.views.tx_views import TransactionView
+from finance.views.usr_views import UserView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView
@@ -41,19 +39,17 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/auth/', TokenObtainPairView.as_view(), name='token_auth'),
-    path('api/toke/verify/', TokenRefreshView.as_view(), name='token_verify'),
+    path('api/token/verify/', TokenRefreshView.as_view(), name='token_verify'),
     path("finance/transactions/", TransactionView.as_view(), name="transactions_list_create"), # Handles GET (list with filters) and POST (new transaction)
     path("finance/transactions/<str:tx_id>/", TransactionView.as_view(), name="transaction_detail_update_delete"), # Handles GET (single), PUT, DELETE
     path("finance/appprofile/", AppProfileView.as_view(), name="appprofile"), # Handles GET (single)
-    path("finance/appprofile/base_currency/", AppProfileView.as_view(), name="appprofile_base_currency"), # Handles PUT (single)
-    path("finance/appprofile/spend_accounts/", AppProfileView.as_view(), name="appprofile_spend_accounts"), # Handles PUT (single)
-    path("finance/assets/", AssetView.as_view(), name="assets"), # Handles GET (list with filters) and POST (new asset)
-    path("finance/assets/<str:source>/", AssetView.as_view(), name="asset_detail_update_delete"), # Handles GET (single), PUT, DELETE
+    path("finance/appprofile/snapshot/", AppProfileView.as_view(), name="appprofile_snapshot"), # Handles GET with snapshot bool
     path("finance/sources/", SourceView.as_view(), name="sources"), # Handles GET (list with filters) and POST (new source)
     path("finance/sources/<str:source>/", SourceView.as_view(), name="source_detail_update_delete"), # Handles GET (single), PUT, DELETE
     path("finance/upcoming_expenses/", UpcomingExpenseView.as_view(), name="upcoming_expenses"), # Handles GET (list with filters) and POST (new expense)
     path("finance/upcoming_expenses/<str:name>/", UpcomingExpenseView.as_view(), name="upcoming_expense_detail_update_delete"), # Handles GET (single), PUT, DELETE
-    path("finance/tags/", TagView.as_view(), name="tags"), # Handles GET (list with filters) and POST (new tag)
-    path("finance/tags/<str:name>/", TagView.as_view(), name="tag_detail_update_delete"), # Handles GET (single), PUT, DELETE
-    path("finance/user/", UserView.as_view(), name="user"), # Handles GET (single)
+    path("finance/categories/", CategoryView.as_view(), name="categories"), # Handles GET (list with filters) and POST (new category)
+    path("finance/categories/<str:cat_name>/", CategoryView.as_view(), name="category_detail_update_delete"), # Handles GET (single), PUT, DELETE
+    path("finance/tags/", TagView.as_view(), name="tags"), 
+    path("finance/user/", UserView.as_view(), name="user"), 
 ]
