@@ -18,7 +18,7 @@ from loguru import logger
 from finance.models import UpcomingExpense, AppProfile
 
 @validator.UserValidator
-@validator.UpcomingExpenseValidator
+@validator.UpcomingExpenseSetValidator
 @transaction.atomic
 def add_expense(uid, data, *args, **kwargs):
     """
@@ -73,7 +73,7 @@ def delete_expense(uid, expense_name: str, *args, **kwargs):
 
 @validator.UserValidator
 @validator.UpcomingExpenseGetValidator
-@validator.UpcomingExpenseValidator
+@validator.UpcomingExpenseSetValidator
 @transaction.atomic
 def update_expense(uid,  data: dict, expense_name: str, *args, **kwargs):
     """

@@ -215,9 +215,10 @@ class Calculator:
             source_aggregate[source.source] = Decimal(source.amount).quantize(Decimal("0.01"))
         logger.debug(f"Initialized source aggregate: {source_aggregate}")
         for tx in tx_list:
+            amount_to_add = tx.amount
             if tx.currency != source_map[tx.source].currency:
-                tx.amount = convert_currency(tx.amount, tx.currency, source_map[tx.source].currency)
-            source_aggregate[tx.source] += Decimal(tx.amount).quantize(Decimal("0.01"))
+                amount_to_add = convert_currency(tx.amount, tx.currency, source_map[tx.source].currency)
+            source_aggregate[tx.source] += Decimal(amount_to_add).quantize(Decimal("0.01"))
         logger.debug(f"Source aggregate: {source_aggregate}")
         return source_aggregate
 

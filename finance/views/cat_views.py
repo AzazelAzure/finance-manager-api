@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 
 
 import finance.services.category_services as cat_svc
-from api_tools.serializers.cat_serializers import(
+from finance.api_tools.serializers.cat_serializers import(
     CategorySerializer,
     CategorySetReturnSerializer,
     CategoryGetReturnSerializer

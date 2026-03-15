@@ -77,7 +77,7 @@ def delete_source(uid, source: str, *args, **kwargs):
 
 @validator.UserValidator
 @validator.SourceGetValidator
-@validator.SourceValidator
+@validator.SourceSetValidator
 @transaction.atomic
 def update_source(uid, source: str, data: dict, *args, **kwargs):
     """
@@ -102,8 +102,8 @@ def update_source(uid, source: str, data: dict, *args, **kwargs):
     return {'updated': source_obj, 'snapshot': snapshot}
 
 @validator.UserValidator
-@validator.SourceValidator
-def get_sources(uid, data:dict, *args, **kwargs):
+@validator.SourceGetValidator
+def get_sources(uid, data, *args, **kwargs):
     """
     Retrieves a list of payment sources for a user.  Accepts optional filters.
 

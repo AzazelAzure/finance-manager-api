@@ -1,6 +1,14 @@
 import factory
 from django.contrib.auth.models import User
+from django.conf import settings
 from finance.models import *
+from factory import fuzzy, LazyAttribute
+from faker import Faker
+from decimal import Decimal
+
+# Instantiate Faker once globally for factories
+_faker = Faker()
+
 
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -16,59 +24,55 @@ class AppProfileFactory(factory.django.DjangoModelFactory):
     
     user = factory.SubFactory(UserFactory)
 
-class CurrencyFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = Currency
-
-    code = factory.Faker("currency_code")
-    name = factory.Faker("currency_name")
-    symbol = factory.Faker("currency_symbol")
-
 
 class PaymentSourceFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PaymentSource
 
-    uid = factory.SubFactory(AppProfileFactory)
-    source = factory.Faker("word")
-    acc_type = factory.Faker("random_element", elements=("SAVINGS", "CHECKING", "CASH", "INVESTMENT", "EWALLET"))
+    uid = factory.Faker("uuid4")
+    source = factory.Sequence(lambda n: f"source-{n}")
+    acc_type = factory.Faker("random_element", elements=("SAVINGS", "CHECKING", "CASH", "INVESTMENT", "EWALLET", "UNKNOWN"))
+    amount = LazyAttribute(
+        lambda o: _faker.pydecimal(left_digits=5, right_digits=2).quantize(Decimal("0.01")))
+    currency = fuzzy.FuzzyChoice(settings.SUPPORTED_CURRENCIES)
+
+
 
 class TagFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Tag
-    uid = factory.SubFactory(AppProfileFactory)
-    name = factory.Faker("word", optional=True)
+    uid = factory.Faker("uuid4")
+    tags = factory.Faker("word")
 
 class TransactionFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Transaction
 
-    uid = factory.SubFactory(AppProfileFactory)
+    uid = factory.Faker("uuid4")
     date = factory.Faker("date")
-    description = factory.Faker("sentence")
-    amount = factory.Faker("random_int", min=100, max=1000)
-    source = factory.SubFactory(PaymentSourceFactory, uid=factory.SelfAttribute('..uid'))
-    currency = factory.SubFactory(CurrencyFactory, uid=factory.SelfAttribute('..uid'))
+    description = factory.Sequence(lambda n: f"tx-{n}")
+    amount = LazyAttribute(
+        lambda o: _faker.pydecimal(left_digits=5, right_digits=2).quantize(Decimal("0.01")))
+    source = factory.Faker("word")
+    currency = fuzzy.FuzzyChoice(settings.SUPPORTED_CURRENCIES)
     tx_type = factory.Faker("random_element", elements=("EXPENSE", "INCOME", "XFER_OUT", "XFER_IN"))
-    bill = factory.SubFactory("finance.tests.factories.UpcomingExpenseFactory", uid=factory.SelfAttribute('..uid'), optional=True)
+    bill = factory.Faker("word")
 
 
-class CurrentAssetFactory(factory.django.DjangoModelFactory):
+class CategoryFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = CurrentAsset
+        model = Category
 
-    uid = factory.SubFactory(AppProfileFactory)
-    source = factory.SubFactory(PaymentSourceFactory, uid=factory.SelfAttribute('..uid'))
-    amount = factory.Faker("random_int", min=100, max=1000)
-    currency = factory.SubFactory(CurrencyFactory, uid=factory.SelfAttribute('..uid'))
+    uid = factory.Faker("uuid4")
+    name = factory.Sequence(lambda n: f"category-{n}")
 
 
 class UpcomingExpenseFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = UpcomingExpense
 
-    uid = factory.SubFactory(AppProfileFactory)
-    name = factory.Faker("sentence")
+    uid = factory.Faker("uuid4")
+    name = factory.Sequence(lambda n: f"expense-{n}")
     estimated_cost = factory.Faker("random_int", min=100, max=1000)
     due_date = factory.Faker("date")
     start_date = factory.Faker("date")
@@ -77,15 +81,4 @@ class UpcomingExpenseFactory(factory.django.DjangoModelFactory):
     expense_id = factory.Faker("random_int", min=100, max=1000)
     status = factory.Faker("random_element", elements=("PENDING", "ACTIVE", "COMPLETED", "CANCELLED"))
     is_recurring = factory.Faker("boolean")
-    currency = factory.SubFactory(CurrencyFactory, uid=factory.SelfAttribute('..uid'))
-
-
-
-
-
-
-
-
-
-
-
+    currency = fuzzy.FuzzyChoice(settings.SUPPORTED_CURRENCIES)

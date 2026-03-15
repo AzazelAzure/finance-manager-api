@@ -46,3 +46,5 @@ notes.txt
 finance/data/
 finance/logs/
 finance/migrations/
+profiler_html/
+logs/

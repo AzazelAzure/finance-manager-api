@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from base_serializers import FinancialSnapshotSerializer
+from finance.api_tools.serializers.base_serializers import FinancialSnapshotSerializer
 
 class SourceSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=50, required=False)

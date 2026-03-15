@@ -19,7 +19,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 
 
 # Serializer Imports
-from ..api_tools.serializers.base_serializers import UserSerializer
+from finance.api_tools.serializers.base_serializers import UserSerializer
 
 
 # TODO: Add documentation

@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from base_serializers import TransactionSerializer, ExpenseSerializer
+from finance.api_tools.serializers.tx_serializers import TransactionSerializer
+from finance.api_tools.serializers.exp_serializers import ExpenseSerializer
+
 
 
 class SpectacularTxSerializer(serializers.Serializer):

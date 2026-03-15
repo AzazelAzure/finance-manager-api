@@ -1,3 +1,5 @@
+import copy
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,14 +9,14 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 import finance.services.transaction_services as tx_svc
 
 # Serializer Imports
-from api_tools.serializers.tx_serializers import(
+from finance.api_tools.serializers.tx_serializers import(
     TransactionSerializer,
     TransactionSetSerializer,
     TransactionSetReturnSerializer,
     TransactionGetSerializer,
     TransactionGetReturnSerializer
 )
-from api_tools.serializers.spectactular_serializers import SpectacularTxSerializer
+from finance.api_tools.serializers.spectactular_serializers import SpectacularTxSerializer
 
 @extend_schema_view(
     post=extend_schema(
@@ -104,7 +106,9 @@ class TransactionView(APIView):
     def post(self, request):
         # Check if single or list of transactions and serialize
         is_many = isinstance(request.data, list)
-        serializer = TransactionSetSerializer(data=request.data, many=is_many)
+        data = copy.deepcopy(request.data)
+        self._normalize_tags_to_list(data, many=is_many)
+        serializer = TransactionSetSerializer(data=data, many=is_many)
         serializer.is_valid(raise_exception=True)
         check = self._txset_check(serializer.data)
         if isinstance(check, Response):
@@ -190,6 +194,17 @@ class TransactionView(APIView):
         serializer = TransactionGetSerializer(data=result['deleted'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @staticmethod
+    def _normalize_tags_to_list(data, many=False):
+        """Ensure 'tags' is a list for each item so serializer ListField accepts it."""
+        if many:
+            for item in data:
+                if item.get('tags') is not None and not isinstance(item['tags'], list):
+                    item['tags'] = [item['tags']]
+        else:
+            if data.get('tags') is not None and not isinstance(data['tags'], list):
+                data['tags'] = [data['tags']]
+
     @staticmethod
     def _txset_check(data):
         if isinstance(data, list):

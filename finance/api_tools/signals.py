@@ -79,7 +79,7 @@ def _generate_base_profile(app_profile):
     app_profile.base_currency = default_currency
     default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=app_profile.user_id)
     PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=app_profile.user_id)
-    app_profile.spend_accounts.set([default_source])
+    app_profile.spend_accounts = default_source.source
     app_profile.save()
     logger.debug(f"Created user: User: {app_profile.username}.  Base currency: {default_currency}. Default source: {default_source}")
     return

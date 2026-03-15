@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from base_serializers import FinancialSnapshotSerializer
+from finance.api_tools.serializers.base_serializers import FinancialSnapshotSerializer
 
 class TransactionSerializer(serializers.Serializer):
     date = serializers.DateField(required=False)
@@ -13,6 +13,7 @@ class TransactionSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     tags = serializers.ListField(child=serializers.CharField(max_length=200), required=False)
     tx_type = serializers.CharField(max_length=10)
+    category = serializers.CharField(max_length=200, required=False)
 
 class TransactionSetSerializer(TransactionSerializer):
     bill = serializers.CharField(max_length=200, required=False)
@@ -21,17 +22,17 @@ class TransactionAcceptedSerializer(TransactionSetSerializer):
     tx_id = serializers.CharField(max_length=20)
     created_on = serializers.DateField()
 
-class TransactionSetReturnSerializer(TransactionSetSerializer):
+class TransactionSetReturnSerializer(serializers.Serializer):
     rejected = TransactionSetSerializer(many=True, required=False)
     accepted = TransactionAcceptedSerializer(many=True, required=False)
     updated = TransactionAcceptedSerializer(many=True, required=False)
-    snapshot = FinancialSnapshotSerializer(many=True)
+    snapshot = FinancialSnapshotSerializer(required=False)
 
 class TransactionGetSerializer(TransactionSerializer):
     tx_id = serializers.CharField(max_length=20)
     created_on = serializers.DateField()
     bill = serializers.CharField(max_length=200, required=False)
-    snapshot = FinancialSnapshotSerializer(many=True, required=False)
+    snapshot = FinancialSnapshotSerializer(required=False)
 
 
 class TransactionGetReturnSerializer(serializers.Serializer):

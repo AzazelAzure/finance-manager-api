@@ -7,8 +7,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 import finance.services.user_services as user_svc
 
 # Serializer Imports
-from api_tools.serializers.profile_serializers import(
-    AppProfileSerializer,
+from finance.api_tools.serializers.profile_serializers import(
     AppProfileGetSerializer,
     AppProfileUpdateSerializer,
     SnapshotSerializer
@@ -26,16 +25,16 @@ from api_tools.serializers.profile_serializers import(
     get=extend_schema(
         summary="Retrieve app profile",
         description="Retrieves the spend accounts and base currency for a user.",
-        responses={status.HTTP_200_OK: AppProfileSerializer(many=True)},
+        responses={status.HTTP_200_OK: AppProfileGetSerializer(many=True)},
         tags=["App Profiles"]
     ),
     patch=extend_schema(
         summary="Update app profile",
         description="Updates the spend accounts and base currency for a user.\n"
                     "Forbidden for 'unknown' source as that is a default empty source.  This cannot be used as spend account.",
-        request=AppProfileSerializer,
+        request=AppProfileGetSerializer,
         responses={
-            status.HTTP_200_OK: AppProfileSerializer,
+            status.HTTP_200_OK: AppProfileGetSerializer,
             status.HTTP_403_FORBIDDEN: None,
             },
         tags=["App Profiles"]

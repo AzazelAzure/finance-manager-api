@@ -7,13 +7,13 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 import finance.services.expense_services as exp_svc
 
 # Serializer Imports
-from api_tools.serializers.exp_serializers import(
+from finance.api_tools.serializers.exp_serializers import(
     ExpenseSerializer,
     ExpenseSetSerializer,
     ExpenseSetReturnSerializer,
     ExpenseGetReturnSerializer
 )
-from api_tools.serializers.spectactular_serializers import SpectacularExpenseSerializer
+from finance.api_tools.serializers.spectactular_serializers import SpectacularExpenseSerializer
 
 @extend_schema_view(    
     post=extend_schema(

@@ -13,9 +13,14 @@ Attributes:
     UpcomingExpenseValidator: Decorator to validate an upcoming expense.s
 """
 
+from datetime import date, datetime
 from functools import wraps
-from django.core.exceptions import ValidationError
-from django.utils import timezone
+from typing import Any
+
+from django.conf import settings
+from rest_framework.exceptions import ValidationError
+
+import zoneinfo
 from finance.models import (
     AppProfile,
     Transaction,
@@ -26,9 +31,6 @@ from finance.models import (
 )
 from finance.logic.updaters import Updater
 from loguru import logger
-import pycountry
-import zoneinfo
-
 
 
 # Transaction Validators
@@ -55,16 +57,23 @@ def TransactionValidator(func):
         if isinstance(data, list):
             rejected = []
             accepted = []
+            accumulated_new_tags = set()
             for item in data:
                 logger.debug(f"Validating transaction: {item} with uid: {uid}")
                 try:
-                    _validate_transaction(uid, item, source_check, tags, upcoming_check, cat_check, profile)
+                    _validate_transaction(
+                        uid, item, source_check, tags, upcoming_check, cat_check, profile,
+                        accumulated_new_tags=accumulated_new_tags,
+                    )
                     accepted.append(item)
                 except ValidationError as e:
                     logger.error(f"Transaction validation failed: {e}")
                     rejected.append(item)
             if not accepted:
                 raise ValidationError("No valid transactions")
+            if accumulated_new_tags:
+                update_tags = list(tags | accumulated_new_tags)
+                Tag.objects.for_user(uid).update(tags=update_tags)
             kwargs['rejected'] = rejected
             kwargs['accepted'] = accepted
             kwargs['tags'] = tags
@@ -72,7 +81,7 @@ def TransactionValidator(func):
             return func(uid, data,  *args, **kwargs)
         logger.debug(f"Validating transaction: {data} with uid: {uid}")
         _validate_transaction(uid, data, source_check, tags, upcoming_check, cat_check, profile)
-        update.fix_data([data])
+        update.fix_tx_data([data])
         kwargs['tags'] = tags
         return func(uid, data, *args, **kwargs)
     return _wrapped
@@ -158,23 +167,26 @@ def UserValidator(func):
             logger.error(f"User does not exist: {uid}")
             raise ValidationError("User does not exist")
         kwargs['profile'] = profile
-        if data.get('spend_accounts'):
-            sources = PaymentSource.objects.for_user(uid)
-            source_check = set(sources.values_list('source', flat=True))
-            for item in data['spend_accounts']:
-                if not item.lower() in source_check:
-                    logger.error(f"Source does not exist: {item}")
-                    raise ValidationError("Source does not exist")
-            kwargs['sources'] = [sources]
-            kwargs['source_check'] =source_check
-        if data.get('timezone'):
-            _validate_timezone(data['timezone'])
-        if data.get('base_currency'):
-            _validate_currency(data['base_currency'])
-        if data.get('start_week'):
-            if data['start_week'] < 0 or data['start_week'] > 6:
-                logger.error(f"Start week must be between 0 and 6: {data['start_week']}")
-                raise ValidationError("Start week must be between 0 and 6")
+        # Only run user/profile payload checks when data is a dict (e.g. profile update).
+        # When data is a list (e.g. bulk transactions) or a transaction dict, skip these.
+        if isinstance(data, dict):
+            if data.get('spend_accounts'):
+                sources = PaymentSource.objects.for_user(uid)
+                source_check = set(sources.values_list('source', flat=True))
+                for item in data['spend_accounts']:
+                    if not item.lower() in source_check:
+                        logger.error(f"Source does not exist: {item}")
+                        raise ValidationError("Source does not exist")
+                kwargs['sources'] = [sources]
+                kwargs['source_check'] = source_check
+            if data.get('timezone'):
+                _validate_timezone(data['timezone'])
+            if data.get('base_currency'):
+                _validate_currency(data['base_currency'])
+            if data.get('start_week'):
+                if data['start_week'] < 0 or data['start_week'] > 6:
+                    logger.error(f"Start week must be between 0 and 6: {data['start_week']}")
+                    raise ValidationError("Start week must be between 0 and 6")
         return func(uid, data, *args, **kwargs)
     return _wrapped
 
@@ -358,7 +370,7 @@ def SourceGetValidator(func):
 
 
 # Private Functions
-def _validate_transaction(uid, data:dict, source_check, tags, upcoming_check, cat_check, profile):
+def _validate_transaction(uid, data:dict, source_check, tags, upcoming_check, cat_check, profile, *, accumulated_new_tags=None):
     logger.debug(f"Validating transaction: {data} with uid: {uid}")
     if not data['source'] in source_check:
         logger.error(f"Source does not exist: {data['source']}")
@@ -371,14 +383,22 @@ def _validate_transaction(uid, data:dict, source_check, tags, upcoming_check, ca
     if data.get('tags'):
         new_tags = set()
         for tag in data['tags']:
-            if not tag not in tags:
+            if tag not in tags:
                 logger.warning(f"Tag does not exist: {tag}.  Creating...")
                 new_tags.add(tag)
         if new_tags:
-            update_tags = list(new_tags|tags)
-            Tag.objects.for_user(uid).update(tags=update_tags)
-    elif data['date'] > timezone.now(profile.timezone).date():
-       raise ValidationError("Date cannot be in the future")
+            if accumulated_new_tags is not None:
+                accumulated_new_tags.update(new_tags)
+            else:
+                update_tags = list(new_tags | tags)
+                Tag.objects.for_user(uid).update(tags=update_tags)
+    else:
+        today = datetime.now(zoneinfo.ZoneInfo(profile.timezone)).date()
+        tx_date = data['date']
+        if isinstance(tx_date, str):
+            tx_date = date.fromisoformat(tx_date)
+        if tx_date > today:
+            raise ValidationError("Date cannot be in the future")
     if data.get('bill'):
         if not data['bill'] in upcoming_check:
             logger.error(f"Expense does not exist: {data['bill']}")
@@ -412,7 +432,11 @@ def _validate_expense(uid, data:dict, profile, upcoming_check, patch):
             if data['end_date'] < data['due_date']:
                 logger.error(f"End date cannot be before due date: {data['end_date']}")
                 raise ValidationError("End date cannot be before due date")
-        if data['end_date'] < timezone.now(profile.timezone).date():
+        today = datetime.now(zoneinfo.ZoneInfo(profile.timezone)).date()
+        end_date = data['end_date']
+        if isinstance(end_date, str):
+            end_date = date.fromisoformat(end_date)
+        if end_date < today:
             logger.error(f"End date cannot be in the past: {data['end_date']}")
             raise ValidationError("End date cannot be in the past")        
     return data
@@ -477,13 +501,13 @@ def _validate_tags(data, tags, update=False):
             raise ValidationError("Tag does not exist")
     return 
 
-
 def _validate_currency(code):
     logger.debug(f"Validating currency: {code}")
-    if not pycountry.currencies.get(alpha_3=code.upper()):
+    code_upper = code.upper()
+    if code_upper not in settings.SUPPORTED_CURRENCIES:
         logger.error(f"Currency does not exist: {code}")
         raise ValidationError("Currency does not exist")
-    return code
+    return code_upper
 
 def _validate_timezone(tz):
     logger.debug(f"Validating timezone: {tz}")

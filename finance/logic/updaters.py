@@ -7,11 +7,11 @@ Attributes:
     rebalance: Rebalances the user's accounts.
 """
 
+from datetime import datetime
+
 from finance.logic.fincalc import Calculator
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
-from django.db.models.functions import Abs
-from django.utils import timezone
 from finance.models import (
     Transaction, 
     PaymentSource,
@@ -20,6 +20,7 @@ from finance.models import (
 )
 from loguru import logger
 import uuid
+import zoneinfo
 
 # TODO:  Docstrings... again
 
@@ -54,6 +55,7 @@ class Updater:
         self.uid = self.profile.user_id
         self.base_currency = self.profile.base_currency
         self.spend_accounts = self.profile.spend_accounts
+        self.timezone = zoneinfo.ZoneInfo(self.profile.timezone)
         
         
         # Situational settings
@@ -84,20 +86,20 @@ class Updater:
     def fix_tx_data(self, data):
         for item in data:
             item['uid'] = self.profile.user_id
-            item['amount'] = Decimal(Abs(item['amount']))
+            item['amount'] = abs(Decimal(item['amount']))
             item['currency'] = item['currency'].upper()
             item['source'] = item['source'].lower()
             if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
                 item['amount'] = item['amount'] * -1
-            if not item['date']:
-                item['date'] = timezone.now(self.profile.timezone).date()
-            if not item['created_on']:
-                item['created_on'] = timezone.now(self.profile.timezone).date()
-            if not item['tx_id']:
-                date_suffix = timezone.now(self.profile.timezone).date()
+            if not item.get('date'):
+                item['date'] = datetime.now(self.timezone).date()
+            if not item.get('created_on'):
+                item['created_on'] = datetime.now(self.timezone).date()
+            if not item.get('tx_id'):
+                date_suffix = datetime.now(self.timezone).date()
                 unique_id = str(uuid.uuid4())[:8].upper()
                 item['tx_id'] = f"{date_suffix}-{unique_id}"
-            if not item['category']:
+            if not item.get('category'):
                 if item['tx_type'] in ['XFER_IN', 'XFER_OUT']:
                     item['category'] = 'transfer'
                 else:
@@ -210,7 +212,7 @@ class Updater:
                 to_update.append(bill)
 
                 # Flip the 'is recurring' if the end date has passed
-                if bill.end_date and timezone.now(self.profile.timezone).date() >= bill.end_date:
+                if bill.end_date and datetime.now(self.timezone).date() >= bill.end_date:
                     bill.is_recurring = False
                     bill.paid_flag = True
                 
@@ -223,7 +225,8 @@ class Updater:
         return
     
     def _in_current_month(self, date):
-        return date.month == timezone.now(self.profile.timezone).date().month and date.year == timezone.now(self.profile.timezone).date().year
+        now = datetime.now(self.timezone).date()
+        return date.month == now.month and date.year == now.year
     
     def _handle_tx_update(self, tx):
         append_change = False
@@ -256,8 +259,7 @@ class Updater:
         self.snapshots.safe_to_spend = self.fc.calc_sts(self.spend_accounts, debt_list)
         if transfers:
             self.snapshots.leaks = self.fc.calc_leaks(transfers)
-        for total in self.snapshots:
-            if total in type_totals:
-                self.snapshots[total] = type_totals[total]
+        for total in type_totals:
+            setattr(self.snapshots, total, type_totals[total])
         self.snapshots.save()
         return self.snapshots

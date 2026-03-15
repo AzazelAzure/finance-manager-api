@@ -18,6 +18,8 @@ from loguru import logger
 from finance.models import Transaction, UpcomingExpense, AppProfile
 import copy
 
+from django.forms.models import model_to_dict
+
 # TODO: Update Docstrings here too.  Again...
 
 # Public Functions
@@ -122,8 +124,9 @@ def add_transaction(uid, data, *args, **kwargs):
         rejected = kwargs.get('rejected', [])
         accepted = kwargs.get('accepted', [])
         to_update = Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
-        update = Updater(uid, profile=profile, transactions=to_update, upcoming=upcoming)
+        update = Updater(profile=profile, transactions=to_update, upcoming=upcoming)
         snapshot = update.transaction_handler()
+        logger.debug(f'To update first item: {model_to_dict(to_update[0])}')
         return {'accepted': to_update, 'rejected': rejected, 'snapshot': snapshot}
     else:
         logger.debug(f"Adding transaction: {data}")

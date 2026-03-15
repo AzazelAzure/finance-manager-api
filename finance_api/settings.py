@@ -23,6 +23,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env file
 load_dotenv()
 
+# Supported currencies: single source of truth from finance/data/exchange_rates.zip.
+# All validation (SUPPORTED_CURRENCIES) and conversion (CURRENCY_CONVERTER) use this file.
+# Production should have this file present; when missing, SUPPORTED_CURRENCIES is empty and
+# conversion will fail until the file is available (e.g. via update_conversion_file command).
+EXCHANGE_RATES_PATH = BASE_DIR / "finance" / "data" / "exchange_rates.zip"
+
+if EXCHANGE_RATES_PATH.exists():
+    from currency_converter import CurrencyConverter
+    _converter = CurrencyConverter(
+        str(EXCHANGE_RATES_PATH),
+        decimal=True,
+        fallback_on_wrong_date=True,
+        fallback_on_missing_rate=True,
+    )
+    SUPPORTED_CURRENCIES = list(_converter.currencies)
+    CURRENCY_CONVERTER = _converter
+else:
+    SUPPORTED_CURRENCIES = []
+    CURRENCY_CONVERTER = None
+
 # Set up logging configuration
 logging_config()
 

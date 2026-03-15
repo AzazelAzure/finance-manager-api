@@ -1,12 +1,10 @@
-from finance.tests.transaction_tests.transaction_base import TransactionPatchBaseCase
-from finance.models import CurrentAsset
+from finance.tests.transaction_tests.transaction_base import TransactionPatchBase
 from rest_framework import status
 from loguru import logger
 
 
-class TransactionUpdateSourceTestCase(TransactionPatchBaseCase):
-    def setUp(self):
-        super().setUp()
+class TransactionUpdateSourceTestCase(TransactionPatchBase):
+
 
 # Basic Transaction Update Tests
     def test_tx_update_source(self):
@@ -35,7 +33,8 @@ class TransactionUpdateSourceTestCase(TransactionPatchBaseCase):
         response = self.client.patch(self.url, self.update_source_data, format='json')
         logger.info(f'Transaction Source Updated: {response.data}')
         self.assert_tx(response, self.update_source_normalized_data, self.update_source_expected_amount, code=200)
-        adjusted_amount = CurrentAsset.objects.for_user(self.profile.user_id).get_asset(source=self.expense_data['source']).get().amount
+
+        adjusted_amount = self.expense_data['source'].amount
         self.assertEqual(adjusted_amount, self.previous_expected_amount)
     
     def test_tx_update_description(self):

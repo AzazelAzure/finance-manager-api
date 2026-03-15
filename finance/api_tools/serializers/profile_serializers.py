@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from base_serializers import FinancialSnapshotSerializer
-from tx_serializers import TransactionAcceptedSerializer
+from finance.api_tools.serializers.base_serializers import FinancialSnapshotSerializer
+from .tx_serializers import TransactionAcceptedSerializer
 
 
 class AppProfileUpdateSerializer(serializers.Serializer):

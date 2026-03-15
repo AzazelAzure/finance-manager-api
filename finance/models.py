@@ -76,15 +76,12 @@ class Tag(models.Model):
         name (CharField): Name of the tag. Unique per user.
         uid (ForeignKey): Foreign key to the AppProfile model.
     """
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['name', 'uid'], name='unique_tag_per_user')
-        ]
+
     tags = models.JSONField(default=list, null=True, blank=True)
     uid = models.CharField(max_length=200, db_index=True)
-    objects = TagManager()
+    objects = TagManager.as_manager()
     def __str__(self):
-        return self.name
+        return self.tags
 
 
 class PaymentSource(models.Model):
@@ -113,7 +110,7 @@ class PaymentSource(models.Model):
         UNKNOWN = "UNKNOWN", "Unknown"
 
     source = models.CharField(max_length=50, unique=True)
-    acc_type = models.CharField(max_length=10, choices=AccType.choices, default=AccType.UKNOWN)
+    acc_type = models.CharField(max_length=10, choices=AccType.choices, default=AccType.UNKNOWN)
     currency = models.CharField(max_length=3, default="USD")
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
@@ -183,7 +180,7 @@ class Category(models.Model):
 
     name = models.CharField(max_length=200)
     uid = models.CharField(max_length=200, db_index=True)
-    objects = CategoryManager()
+    objects = CategoryManager.as_manager()
     def __str__(self):
         return self.name
 
@@ -217,8 +214,8 @@ class Transaction(models.Model):
     date = models.DateField()
     description = models.CharField(max_length=200, null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    created_on = models.DateTimeField()
-
+    created_on = models.DateField()
+    category = models.CharField(max_length=200, null=True, blank=True)
     # Link to relationship models
     source = models.CharField(max_length=50)
     currency = models.CharField(max_length=3)
