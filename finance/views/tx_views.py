@@ -16,30 +16,24 @@ from finance.api_tools.serializers.tx_serializers import(
     TransactionGetSerializer,
     TransactionGetReturnSerializer
 )
-from finance.api_tools.serializers.spectactular_serializers import SpectacularTxSerializer
-
 @extend_schema_view(
     post=extend_schema(
         summary="Create one or more transactions",
-        description="Allows creation of a single transaction or a list of transactions.\n"
-                    "Transaction amounts are automically fixed by transaction type.\n"
-                    "For example, EXPENSE and XFER_OUT transactions are fixed to negative, and INCOME and XFER_IN transactions are fixed to positive.\n"
-                    "Allows for 0 value transactions.\n"
-                    "Transaction ids and entry ids are auto generated, and cannot be set.\n"
-                    "Will return HTTP 403 Forbidden if either is set.",
-        request=TransactionSerializer,
+        description="Create a single transaction object or a list of transaction objects.\n"
+                    "Amounts are normalized by type (EXPENSE/XFER_OUT negative; INCOME/XFER_IN positive).\n"
+                    "Client-supplied `tx_id` and `entry_id` are rejected.",
+        request=TransactionSetSerializer,
         responses={
-            status.HTTP_201_CREATED: TransactionSerializer,
+            status.HTTP_201_CREATED: TransactionSetReturnSerializer,
             status.HTTP_403_FORBIDDEN: None,
             }, 
         tags=["Transactions"]
     ),
     get=extend_schema(
         summary="Retrieve transactions",
-        description="Retrieves a single transaction by ID or a list of transactions with optional filters.\n"
-                    "If month is set with no year, will return transactions for current month.\n"
-                    "If start_date is set with no end_date, will return all transactions after start_date.\n"
-                    "If end_date is set with no start_date, will return all transactions before end_date.\n",
+        description="Retrieve transactions with optional filtering.\n"
+                    "When no filters are provided, the most recent transaction is returned by service logic.\n"
+                    "Aggregate totals are included in the response payload.",
         parameters=[
             OpenApiParameter(name='tx_type', type=OpenApiTypes.STR, description='Filter by transaction type (e.g., EXPENSE, INCOME)'),
             OpenApiParameter(name='tag_name', type=OpenApiTypes.STR, description='Filter by tag name'),
@@ -60,8 +54,7 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularTx
             OpenApiParameter(name='by_date', type=OpenApiTypes.STR, description='Filter by date'),
         ],
         responses={
-            status.HTTP_200_OK: SpectacularTxSerializer,
-            status.HTTP_200_OK: TransactionGetSerializer
+            status.HTTP_200_OK: TransactionGetReturnSerializer,
             },
         tags=["Transactions"]
     ),
@@ -73,21 +66,21 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularTx
     ),
     patch=extend_schema(
         summary="Update a transaction",
-        description="Updates an existing transaction identified by its ID.\n"
-                    "Forbidden for 'tx_id' and 'entry_id' as they are auto generated unique identifiers.  These cannot be changed.\n"
-                    "If no date is provided, will return HTTP 400 Bad Request.\n" 
-                    "This is to prevent accidentally changing the date to date of transaction.",
-        request=TransactionSerializer,
+        description="Partially update a transaction by `tx_id`.\n"
+                    "`tx_id` and `entry_id` are immutable and rejected.\n"
+                    "A `date` field is required by this view before forwarding to the service layer.",
+        request=TransactionSetSerializer,
         responses={
-            status.HTTP_200_OK: TransactionSerializer(many=True),
+            status.HTTP_200_OK: TransactionSetReturnSerializer,
+            status.HTTP_400_BAD_REQUEST: None,
             status.HTTP_403_FORBIDDEN: None,
             },
         tags=["Transactions"]
     ),
     delete=extend_schema(
         summary="Delete a transaction",
-        description="Deletes an existing transaction identified by its ID.",
-        responses={status.HTTP_200_OK: TransactionSerializer(many=True)},
+        description="Delete an existing transaction by `tx_id`.",
+        responses={status.HTTP_200_OK: TransactionGetSerializer},
         tags=["Transactions"]
     )
 )
@@ -116,8 +109,9 @@ class TransactionView(APIView):
         
         # Handle Transactions based of list or single
         result = tx_svc.add_transaction(
-            data=serializer.data,
-            uid=request.user.appprofile.user_id)
+            request.user.appprofile.user_id,
+            serializer.data,
+        )
             
         # Serialize and return
         serializer = TransactionSetReturnSerializer(result)
@@ -127,7 +121,7 @@ class TransactionView(APIView):
         uid = request.user.appprofile.user_id
         
         if tx_id: # If tx_id is provided in the URL path, get a single transaction
-            result = tx_svc.get_transaction(uid=uid, tx_id=tx_id)
+            result = tx_svc.get_transaction(uid, tx_id)
             serializer = TransactionGetSerializer(result['transaction'])
             return Response({'transaction': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
         
@@ -156,7 +150,7 @@ class TransactionView(APIView):
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
         
         # If no filters are provided, returns most recent transaction
-        result = tx_svc.get_transactions(uid=uid, **filter_params)
+        result = tx_svc.get_transactions(uid, **filter_params)
         serializer = TransactionGetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -173,25 +167,27 @@ class TransactionView(APIView):
 
         # Update transaction
         result = tx_svc.update_transaction(
-            uid=request.user.appprofile.user_id,
-            tx_id=tx_id,
-            data=request.data)
+            request.user.appprofile.user_id,
+            tx_id,
+            request.data,
+        )
         
         # Serialize and return
         serializer = TransactionSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
-    def put(self, request):
+    def put(self, request, *args, **kwargs):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def delete(self, request, tx_id: str):
         # Delete transaction
         result = tx_svc.delete_transaction(
-            uid=request.user.appprofile.user_id,
-            tx_id=tx_id)
+            request.user.appprofile.user_id,
+            tx_id,
+        )
         
-        # Serialize and return
-        serializer = TransactionGetSerializer(data=result['deleted'], many=True)
+        # Serialize from the in-memory instance returned by the service (row may already be deleted)
+        serializer = TransactionGetSerializer(result['deleted'])
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @staticmethod
@@ -207,6 +203,7 @@ class TransactionView(APIView):
 
     @staticmethod
     def _txset_check(data):
+        """Reject immutable identity fields and normalize scalar tags to list."""
         if isinstance(data, list):
             for item in data:
                 if item.get('tags'):
@@ -214,12 +211,16 @@ class TransactionView(APIView):
                         item['tags'] = [item['tags']]
                 if item.get('tx_id'):
                     return Response(status=status.HTTP_403_FORBIDDEN)
+                if item.get('entry_id'):
+                    return Response(status=status.HTTP_403_FORBIDDEN)
         else:
             if data.get('tags'):
                 if not isinstance(data['tags'], list):
                     data['tags'] = [data['tags']]
-                if data.get('tx_id'):
-                    return Response(status=status.HTTP_403_FORBIDDEN)
+            if data.get('tx_id'):
+                return Response(status=status.HTTP_403_FORBIDDEN)
+            if data.get('entry_id'):
+                return Response(status=status.HTTP_403_FORBIDDEN)
         return data
 
 

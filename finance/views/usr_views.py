@@ -1,20 +1,10 @@
-"""
-This module defines all views for the finance manager application.
-
-Attributes:
-    TransactionView: View for transactions.
-    SourceView: View for sources.
-    UpcomingExpenseView: View for upcoming expenses.
-    TagView: View for tags.
-    AppProfileView: View for app profiles.
-    UserView: View for users.
-"""
+"""User account API view endpoints (create/read/password update/delete)."""
 # Django imports
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiTypes
 
 
 
@@ -22,30 +12,23 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 from finance.api_tools.serializers.base_serializers import UserSerializer
 
 
-# TODO: Add documentation
-# TODO: Add logging
-# TODO: Fix extend schemas to look better/more professional.
-    # use description = textwrap.dedent("""example""") and markdown
-
-# TODO: Add views for each URL to fix routing issues
-
 @extend_schema_view(
     post=extend_schema(
         summary="Create one or more users",
-        description="Allows creation of a single user or a list of users.",
+        description="Create a user account from username/email/password payload.",
         request=UserSerializer,
         responses={status.HTTP_201_CREATED: OpenApiTypes.OBJECT}, 
         tags=["Users"]
     ),
     get=extend_schema(
-        summary="Retrieves users email.",
-        description="Retrieves the email for the currently logged in user.",
+        summary="Retrieve current user email",
+        description="Return email for the authenticated user.",
         responses={status.HTTP_200_OK: OpenApiTypes.OBJECT},
         tags=["Users"]
     ),
     patch=extend_schema(
-        summary="Update a user",
-        description="Updates an existing user identified by its username and password.  Used to update password.",
+        summary="Update current user password",
+        description="Update password for the authenticated user. Username must match request user.",
         request=UserSerializer,
         responses={
             status.HTTP_200_OK: UserSerializer,
@@ -54,8 +37,8 @@ from finance.api_tools.serializers.base_serializers import UserSerializer
         tags=["Users"]
     ),
     delete=extend_schema(
-        summary="Delete a user",
-        description="Deletes an existing user identified by its username.",
+        summary="Delete current user",
+        description="Delete the authenticated user account. Username must match request user.",
         responses={
             status.HTTP_200_OK: UserSerializer,
             status.HTTP_403_FORBIDDEN: OpenApiTypes.OBJECT,
@@ -64,6 +47,7 @@ from finance.api_tools.serializers.base_serializers import UserSerializer
     )
 )
 class UserView(APIView):
+    """APIView for basic authenticated user account operations."""
     def post(self, request):
         # Get user model
         User = get_user_model()

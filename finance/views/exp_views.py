@@ -9,26 +9,25 @@ import finance.services.expense_services as exp_svc
 # Serializer Imports
 from finance.api_tools.serializers.exp_serializers import(
     ExpenseSerializer,
-    ExpenseSetSerializer,
-    ExpenseSetReturnSerializer,
-    ExpenseGetReturnSerializer
+    ExpensePostSerializer,
+    ExpensePutSerializer,
+    ExpensePatchSerializer,
+    ExpenseSetReturnSerializer
 )
 from finance.api_tools.serializers.spectactular_serializers import SpectacularExpenseSerializer
 
 @extend_schema_view(    
     post=extend_schema(
         summary="Add an expense",
-        description="Adds a planned expense to the user's account.",
-        request=ExpenseSerializer,
-        responses={status.HTTP_201_CREATED: ExpenseSerializer},
+        description="Create one expense object or a list of expense objects.",
+        request=ExpensePostSerializer,
+        responses={status.HTTP_201_CREATED: ExpenseSetReturnSerializer},
         tags=["Upcoming Expenses"]
     ),
     get=extend_schema(
         summary="Retrieve an expense",
-        description="Retrieves a single planned expense for a user.  Accepts optional filters.\n"
-                    "If start is set with no end, will return all expenses after start.\n"
-                    "If end is set with no start, will return all expenses before end.\n"
-                    "If for_month is set, will return expenses for current month.",
+        description="Retrieve expenses with optional filters.\n"
+                    "Use `name` in path for a single expense, or query params for filtered lists.",
         parameters=[
             OpenApiParameter(name='name', type=OpenApiTypes.STR, description='Filter by expense name'),
             OpenApiParameter(name='due_date', type=OpenApiTypes.STR, description='Filter by due date'),
@@ -46,49 +45,44 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularEx
         tags=["Upcoming Expenses"]
     ),
     patch=extend_schema(
-        summary="Not allowed.",
-        description="For financial fidelity, this endpoint is not allowed.",
-        responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
+        summary="Partially update an expense",
+        description="Partially update an existing expense identified by name.",
+        request=ExpensePatchSerializer,
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
         tags=["Upcoming Expenses"]
     ),
     put=extend_schema(
         summary="Update an expense",
-        description="Updates an existing expense identified by its name.",
-        request=ExpenseSerializer,
-        responses={status.HTTP_200_OK: ExpenseSerializer(many=True)},
+        description="Replace mutable fields for an existing expense identified by name.",
+        request=ExpensePutSerializer,
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
         tags=["Upcoming Expenses"]
     ),
     delete=extend_schema(
         summary="Delete an expense",
         description="Deletes an existing expense identified by its name.",
-        responses={status.HTTP_200_OK: ExpenseSerializer(many=True)},
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
         tags=["Upcoming Expenses"]
     )
 )
 class UpcomingExpenseView(APIView):
     def post(self, request):
         is_many = isinstance(request.data, list)
-        serializer = ExpenseSetSerializer(data=request.data, many=is_many)
+        serializer = ExpensePostSerializer(data=request.data, many=is_many)
         serializer.is_valid(raise_exception=True)
-        if is_many:
-            result = exp_svc.bulk_add_expenses(
-                uid=request.user.appprofile.user,
-                data=serializer.data
-            )
-        else:
-            result = exp_svc.add_expense(
-                uid=request.user.appprofile.user,
-                data=serializer.data
-            )
-        serializer = ExpenseSetReturnSerializer(result['added'], many=True)
+        result = exp_svc.add_expense(
+            request.user.appprofile.user_id,
+            serializer.data,
+        )
+        serializer = ExpenseSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get(self, request, name: str = None):
-        uid = request.user.appprofile.user
+        uid = request.user.appprofile.user_id
         if name:
-            result = exp_svc.get_expense(uid=uid, name=request.query_params['name'])
+            result = exp_svc.get_expense(uid, name)
             serializer = ExpenseSerializer(result['expense'])
-            return Response({'expenses': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
+            return Response({'expense': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
         filter_params = {
             'remaining': request.query_params.get('remaining'),
             'recurring': request.query_params.get('recurring'),
@@ -102,26 +96,33 @@ class UpcomingExpenseView(APIView):
             'end': request.query_params.get('end'),
         }
         filter_params = {k: v for k, v in filter_params.items() if v is not None}
-        result = exp_svc.get_expenses(uid=uid, **filter_params)
-        serializer = ExpenseGetReturnSerializer(result['expenses'], many=True)
+        result = exp_svc.get_expenses(uid, **filter_params)
+        serializer = ExpenseSerializer(result['expenses'], many=True)
         return Response({'expenses': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
 
-    def put(self, request):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-    
-    def patch(self, request):
+    def put(self, request, name: str):
+        serializer = ExpensePutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         result = exp_svc.update_expense(
-            uid=request.user.appprofile.user,
-            expense_name=request.data['name'],
-            data=request.data
+            request.user.appprofile.user_id,
+            name,
+            serializer.data,
         )
-        serializer = ExpenseSetReturnSerializer(result, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)
     
-    def delete(self, request):
-        result = exp_svc.delete_expense(
-            uid=request.user.appprofile.user,
-            expense_name=request.data['name']
+    def patch(self, request, name: str):
+        serializer = ExpensePatchSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        result = exp_svc.update_expense(
+            request.user.appprofile.user_id,
+            name,
+            serializer.data,
         )
-        serializer = ExpenseSetReturnSerializer(result, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, name: str):
+        result = exp_svc.delete_expense(
+            request.user.appprofile.user_id,
+            name,
+        )
+        return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)

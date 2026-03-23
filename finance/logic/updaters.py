@@ -1,11 +1,4 @@
-"""
-This module functions as the data manipulation layer for the financial manager application.
-
-Attributes:
-    new_transaction: Handles new transactions.
-    transaction_updated: Handles transaction updates.
-    rebalance: Rebalances the user's accounts.
-"""
+"""State mutation helpers for transactions, sources, expenses, and snapshots."""
 
 from datetime import datetime
 
@@ -22,29 +15,8 @@ from loguru import logger
 import uuid
 import zoneinfo
 
-# TODO:  Docstrings... again
-
 class Updater:
-    """
-    Class to handle data manipulation for the finance manager application.
-
-    Required Params:
-        - profile: The user AppProfile queryset
-        - sources: The PaymentSource queryset
-        - currencies: The Currency queryset
-
-
-    Optional Params:
-        - transactions: The Transaction queryset
-        - assets: The CurrentAsset queryset
-
-
-    Conditional Params:
-        If Transactions:
-            - tags: Tags queryset
-            - upcoming: UpcomingExpense queryset
-
-    """
+    """Apply data-side effects after CRUD operations across finance domains."""
     def __init__(self, profile, **kwargs):
         
         # Required arguments
@@ -61,21 +33,49 @@ class Updater:
         # Situational settings
         if kwargs.get('transactions'):
             self.transactions = kwargs.get('transactions')
-            self.upcoming = kwargs.get('upcoming') or UpcomingExpense.objects.for_user(self.uid)
-            self.sources = list(PaymentSource.objects.for_user(self.uid))
+            upcoming_obj = kwargs.get('upcoming')
+            self.upcoming = upcoming_obj or UpcomingExpense.objects.for_user(self.uid)
+
+            # `TransactionValidator` may pass preloaded `sources` and `upcoming` as lists.
+            # When lists are provided, avoid re-querying to reduce DB executions.
+            sources_obj = kwargs.get('sources') or PaymentSource.objects.for_user(self.uid)
+            if isinstance(sources_obj, list):
+                self.sources = sources_obj
+            else:
+                self.sources = list(sources_obj)
+
             self.paid_bills = set(tx.bill for tx in self.transactions if tx.bill)
-            self.unpaid = list(self.upcoming.filter(paid_flag=False))
+            if isinstance(upcoming_obj, list):
+                # Keep a queryset around for `.bulk_update(...)` calls,
+                # but compute unpaid in-memory from the preloaded list.
+                self.upcoming = UpcomingExpense.objects.for_user(self.uid)
+                self.unpaid = [b for b in upcoming_obj if not b.paid_flag]
+            elif isinstance(self.upcoming, list):
+                # Defensive fallback; should not normally happen.
+                self.unpaid = [b for b in self.upcoming if not b.paid_flag]
+            else:
+                self.unpaid = list(self.upcoming.filter(paid_flag=False))
             self.spend_accounts = list(source for source in self.sources if source.source in self.spend_accounts)
             
         if kwargs.get('sources'):
             self.sources = kwargs.get('sources')
 
         if kwargs.get('upcoming'):
-            self.sources = kwargs.get('sources') or [PaymentSource.objects.for_user(self.uid)]
-            self.upcoming = kwargs.get('upcoming')
+            self.sources = kwargs.get('sources') or list(PaymentSource.objects.for_user(self.uid))
+            upcoming_obj = kwargs.get('upcoming')
+            # If upcoming was preloaded as a list (TransactionValidator optimization),
+            # we still need a queryset on `self.upcoming` for `.bulk_update(...)`.
+            if isinstance(upcoming_obj, list):
+                self.upcoming = UpcomingExpense.objects.for_user(self.uid)
+            else:
+                self.upcoming = upcoming_obj
 
-        # Single hit for any user, always used
-        self.snapshots = FinancialSnapshot.objects.for_user(self.uid).first()
+        # Snapshot is only required by handlers that mutate or rebuild totals.
+        # Validators sometimes instantiate Updater just to call pure fixers (e.g., fix_tx_data),
+        # and in those cases we should avoid an unnecessary DB hit.
+        self.snapshots = None
+        if kwargs.get('transactions') or kwargs.get('sources') or kwargs.get('upcoming'):
+            self.snapshots = FinancialSnapshot.objects.for_user(self.uid).first()
         
         # Create the calculator instance
         self.fc = Calculator(self.profile)
@@ -84,6 +84,7 @@ class Updater:
 
     # Data fixers
     def fix_tx_data(self, data):
+        """Normalize incoming transaction payload fields in-place."""
         for item in data:
             item['uid'] = self.profile.user_id
             item['amount'] = abs(Decimal(item['amount']))
@@ -107,27 +108,31 @@ class Updater:
         return data
 
     def fix_source_data(self, data):
+        """Normalize incoming source payload fields in-place."""
         for item in data:
             item['uid'] = self.profile.user_id
             item['source'] = item['source'].lower()
             item['acc_type'] = item['acc_type'].upper()
             if item.get('currency'):
-                item['currency'] = data['currency'].upper()
+                item['currency'] = item['currency'].upper()
             if item.get('amount'):
                 item['amount'] = Decimal(item['amount'])
         return data
     
     def fix_expense_data(self, data):
+        """Normalize incoming expense payload fields in-place."""
         for item in data:
             item['uid'] = self.profile.user_id
-            item['name'] = item['name'].lower()
-            item['currency'] = item['currency'].upper()
+            if item.get('name'):
+                item['name'] = item['name'].lower()
+            if item.get('currency'):
+                item['currency'] = item['currency'].upper()
             
 
 
     # Transaction Handler
     def transaction_handler(self, update=None):
-     
+        """Apply transaction effects to sources, upcoming bills, and snapshots."""
         updated_bill = False
         if update:
             updated_bill = self._handle_tx_update(update)
@@ -144,6 +149,7 @@ class Updater:
 
     # Expense Handlers
     def expense_handler(self, old_name=None, new_name=None):
+        """Sync transactions/snapshot fields after expense changes."""
         if old_name:
             txs = Transaction.objects.for_user(self.uid).filter(bill=old_name)
             if new_name:
@@ -159,30 +165,36 @@ class Updater:
 
     # Category Handlers
     def category_changed(self, cat_name, new_name):
-        affected = Transaction.for_user(self.uid).filter(category=cat_name)
+        """Rename transaction category references after category rename."""
+        affected = Transaction.objects.for_user(self.uid).filter(category=cat_name)
         affected.update(category=new_name)
         return
 
     def category_deleted(self, cat_name):
-        affected = list(Transaction.for_user(self.uid).filter(category=cat_name))
+        """Map removed category references back to each transaction type default."""
+        affected = list(Transaction.objects.for_user(self.uid).filter(category=cat_name))
         for item in affected:
             item.category = item.tx_type.lower()
-        affected.bulk_update(affected, ['category'])
+        if affected:
+            Transaction.objects.for_user(self.uid).bulk_update(affected, ["category"])
         return
 
 
     # Source Handlers
     def source_handler(self):
-        logger.debug(f"Source added for {self.uid}")
+        """Recalculate snapshot totals after source create/update/delete."""
+        logger.debug(f"Recalculating snapshot totals after source change for {self.uid}")
         acc_totals = self.fc.calc_acc_types(self.sources)
-        for total in self.snapshots:
-            logger.debug(f'Source added updating snapshot for total: {total}')
-            if total in acc_totals:
-                logger.debug(f'Succesfully updated snapshot for total: {total}')
-                self.snapshots[total] = acc_totals[total]
+        for total, value in acc_totals.items():
+            if hasattr(self.snapshots, total):
+                setattr(self.snapshots, total, value)
 
         accounts = list(source for source in self.sources if source.source in self.spend_accounts)
-        debts = [UpcomingExpense.objects.for_user(self.uid).get_current_month().filter(paid_flag=False)]
+        debts = list(
+            UpcomingExpense.objects.for_user(self.uid)
+            .get_current_month()
+            .filter(paid_flag=False)
+        )
         self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
         self.snapshots.save()
@@ -191,18 +203,18 @@ class Updater:
     
     # User Handler
     def user_handler(self):
-        logger.debug(f'User updated for {self.uid}')
+        """Recompute snapshot fields after profile-level updates."""
+        logger.debug(f"Recalculating snapshot totals after profile update for {self.uid}")
         debts = list(UpcomingExpense.objects.for_user(self.uid).get_current_month().filter(paid_flag=False))
         self.snapshots.safe_to_spend = self.fc.calc_sts(self.sources, debts)
-        self.total_assets = self.fc.calc_total_assets(self.sources)
+        self.snapshots.total_assets = self.fc.calc_total_assets(self.sources)
         self.snapshots.save()
         return self.snapshots
 
 
     # Helper functions
     def _handle_upcoming(self,updated_bill=False):
-        
-
+        """Mark paid bills and roll recurring due dates when transactions settle them."""
         to_update = []
         if updated_bill:
             to_update.append(updated_bill)
@@ -216,7 +228,7 @@ class Updater:
                     bill.is_recurring = False
                     bill.paid_flag = True
                 
-                # If this is recurring, move the due date up one month
+                # Recurring expenses roll forward after payment is recorded.
                 if bill.is_recurring:
                     bill.due_date = bill.due_date + relativedelta(months=1)
 
@@ -225,10 +237,12 @@ class Updater:
         return
     
     def _in_current_month(self, date):
+        """Return True when a date falls within the user's current month."""
         now = datetime.now(self.timezone).date()
         return date.month == now.month and date.year == now.year
     
     def _handle_tx_update(self, tx):
+        """Reverse old transaction effects so the replacement payload can be applied cleanly."""
         append_change = False
         affected_bill = next((bill for bill in self.unpaid if bill.name == tx.bill), None)
         if affected_bill:
@@ -243,11 +257,13 @@ class Updater:
                 append_change = affected_bill
         affected_source = next((source for source in self.sources if source.source == tx.source), None)
         if affected_source:
+            # Flip prior transaction sign to unwind its contribution to source balance.
             tx.amount = tx.amount * -1
             affected_source.amount += tx.amount
         return append_change
     
     def _tx_snapshot_handler(self):
+        """Rebuild snapshot totals from current source/transaction state."""
         debt_list = {
             bill.name: bill 
             for bill in self.unpaid 

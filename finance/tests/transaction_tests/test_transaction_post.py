@@ -2,9 +2,12 @@
 This modules handles POST transaction tests.
 """
 
+from datetime import date
+
+from dateutil.relativedelta import relativedelta
+from decimal import Decimal
+
 from finance.tests.transaction_tests.transaction_base import TransactionBase
-from finance.models import Transaction
-from finance.factories import TransactionFactory
 from rest_framework import status
 from loguru import logger
  
@@ -243,7 +246,6 @@ class TransactionPostTestCase(TransactionBase):
             for key in data:
                 if key == 'uid':
                     continue
-                hold_key = data[key]
                 if test_types[test] is True:
                     payload = {k: v for k, v in data.items() if k != key}
                 else:
@@ -376,72 +378,89 @@ class TransactionPostTestCase(TransactionBase):
         logger.info(f'Int Amount Response: {response.data}')
         self.assert_tx(response, self.expense_normalized_data, self.expense_expected_amount, code=201)
 
+    def test_fix_tx_data_expense_positive_amount_becomes_negative(self):
+        """
+        POST EXPENSE with a positive amount; Updater.fix_tx_data uses abs() then negates for EXPENSE.
 
+        Passes if:
+            - Response 201 and accepted amount matches normalized negative expense (fix_tx_data).
+            - Source balance matches _calculated_expected_amount for the payload.
 
-# TODO: Move this to Delete Transaction Test Case once created
-    # def test_delete_tx(self):
-    #     """
-    #     Tests deleting a transaction.\n
-    #     The delete endpoint returns the deleted transaction with the response.\n
-    #     This allows testing to verify the deleted transaction was correct.
-        
-    #     Passes if:
-    #         - The transaction is deleted
-    #         - The transaction is correct to what was sent
-    #         - The transaction is not in the database
-    #         - The asset amount is correct
-    #         - The database is correct
-        
-    #     Fails if:
-    #         - The transaction is not deleted
-    #         - The transaction is not correct to what was sent
-    #         - The transaction is in the database
-    #         - The asset amount is not correct
-    #         - The database is not correct
-    #     """
-    #     logger.info("Beginning delete transaction test")
-    #     old_amount = self.asset.amount
-    #     tx = TransactionFactory.build(
-    #         uid=self.profile, 
-    #         tx_type='EXPENSE',
-    #         currency=self.currency,
-    #         source=self.source,
-    #         amount=100,
-    #         )
-    #     data ={
-    #         "uid": str(self.profile.user_id),
-    #         "date": tx.date,
-    #         "description": tx.description,
-    #         "amount": tx.amount,
-    #         "source": tx.source.source,     
-    #         "currency": tx.currency.code,
-    #         "tx_type": tx.tx_type,
-    #         "tags": self.tag_list,
-    #     }
-    #     response = self.client.delete(self.url, data, format='json')
-    #     logger.info(f'Delete Transaction Response: {response.data}')
+        Fails if:
+            - Amount sign wrong or DB/response assertions in assert_tx fail.
+        """
+        payload = self.expense_data.copy()
+        payload['amount'] = abs(Decimal(str(payload['amount'])))
+        expected_amount = self._calculated_expected_amount(payload)
+        normalized = self._normalize_tx_data(payload.copy())
+        response = self.client.post(self.url, payload, format='json')
+        self.assert_tx(response, normalized, expected_amount, code=201)
 
-    #     # Assertion 1: General assertions
-    #     self._assert_tx(response, data, code=200)
+    def test_fix_tx_data_income_negative_amount_becomes_positive(self):
+        """
+        POST INCOME with a negative amount; fix_tx_data keeps magnitude positive for INCOME.
 
-    #     # Assertion 2: Check if the transaction is deleted correctly
-    #     if Transaction.objects.filter(tx_id=response.data['tx_id']).exists():
-    #         self.fail("Transaction not deleted")
-    #     else:
-    #         self.assertTrue("Transaction deleted")
+        Passes if:
+            - Response 201 and accepted amount is positive; balances match expected.
 
-    #     # Assertion 3: Check if the asset amount is correct
-    #     self.assertEqual(self.asset.amount, old_amount)
+        Fails if:
+            - Amount sign wrong or assert_tx fails.
+        """
+        payload = self.income_data.copy()
+        payload['amount'] = -abs(Decimal(str(payload['amount'])))
+        expected_amount = self._calculated_expected_amount(payload)
+        normalized = self._normalize_tx_data(payload.copy())
+        response = self.client.post(self.url, payload, format='json')
+        self.assert_tx(response, normalized, expected_amount, code=201)
 
+    def test_bulk_partial_reject_invalid_source(self):
+        """
+        Bulk POST: TransactionValidator accepts valid rows and collects invalid ones in rejected
+        (validators.py); add_transaction persists only accepted (transaction_services.py).
 
-    # TODO: Amount sign fixing by tx_type. Test that fix_tx_data behavior: e.g. POST EXPENSE with
-    #       positive amount and assert created/returned amount is negative; POST INCOME with negative
-    #       amount and assert positive. Use a copy of expense_data/income_data and override amount only,
-    #       then compute expected_amount via _calculated_expected_amount (which already uses abs() and
-    #       sign by tx_type), so base expected-amount calculations stay correct. Do not mutate
-    #       self.expense_expected_amount / self.income_expected_amount for other tests.
-    # TODO: Bulk with partial reject. POST a list of two: one valid transaction, one invalid (e.g. bad
-    #       source). Assert 201, response has accepted (length 1) and rejected (length 1), and the
-    #       accepted item matches the valid payload and DB/snapshot as needed.
-    # TODO: Future date with no tags → 400. POST a transaction with date in the future and tags
-    #       missing or empty; assert status 400 (validator raises when tags are falsy and date > today).
+        Passes if:
+            - 201 with one accepted and one rejected; accepted matches valid row via assert_tx.
+
+        Fails if:
+            - Wrong counts, wrong status, or accepted payload/DB mismatch.
+        """
+        valid = self.expense_data.copy()
+        invalid = self.expense_data.copy()
+        invalid['source'] = 'nonexistent_source_for_partial_reject_test'
+        body = [valid, invalid]
+        response = self.client.post(self.url, body, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data['accepted']), 1)
+        self.assertEqual(len(response.data['rejected']), 1)
+        self.assertEqual(response.data['rejected'][0]['source'], invalid['source'])
+        self.assert_tx(
+            response,
+            self.expense_normalized_data,
+            self.expense_expected_amount,
+            code=201,
+        )
+
+    def test_future_date_without_tags_returns_400(self):
+        """
+        _validate_transaction: when tags are falsy, future tx_date > today raises ValidationError.
+
+        Passes if:
+            - POST returns 400 for future date with tags missing or empty [].
+
+        Fails if:
+            - 201 or other non-400 status.
+        """
+        future = (date.today() + relativedelta(years=2)).isoformat()
+        for tags_value in (None, []):
+            payload = self.expense_data.copy()
+            payload['date'] = future
+            if tags_value is None:
+                payload.pop('tags', None)
+            else:
+                payload['tags'] = tags_value
+            response = self.client.post(self.url, payload, format='json')
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_400_BAD_REQUEST,
+                msg=f'Expected 400 for future date tags={tags_value!r}, got {response.status_code}: {getattr(response, "data", None)}',
+            )

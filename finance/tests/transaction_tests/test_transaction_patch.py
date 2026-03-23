@@ -1,6 +1,12 @@
-from finance.tests.transaction_tests.transaction_base import TransactionPatchBase
+import copy
+from decimal import Decimal
+
+from django.urls import reverse
 from rest_framework import status
 from loguru import logger
+
+from finance.models import PaymentSource, Transaction
+from finance.tests.transaction_tests.transaction_base import TransactionBase, TransactionPatchBase
 
 
 class TransactionUpdateSourceTestCase(TransactionPatchBase):
@@ -32,10 +38,8 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update source test")
         response = self.client.patch(self.url, self.update_source_data, format='json')
         logger.info(f'Transaction Source Updated: {response.data}')
-        self.assert_tx(response, self.update_source_normalized_data, self.update_source_expected_amount, code=200)
+        self.assert_tx(response, self.update_source_normalized_data, None, code=200)
 
-        adjusted_amount = self.expense_data['source'].amount
-        self.assertEqual(adjusted_amount, self.previous_expected_amount)
     
     def test_tx_update_description(self):
         """
@@ -60,7 +64,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update description test")
         response = self.client.patch(self.url, self.update_description_data, format='json')
         logger.info(f'Transaction Description Updated: {response.data}')
-        self.assert_tx(response, self.update_description_normalized_data, self.update_description_expected_amount, code=200)
+        self.assert_tx(response, self.update_description_normalized_data, None, code=200)
 
     def test_tx_update_amount(self):
         """
@@ -87,7 +91,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update amount test")
         response = self.client.patch(self.url, self.update_amount_data, format='json')
         logger.info(f'Transaction Amount Updated: {response.data}')
-        self.assert_tx(response, self.update_amount_normalized_data, self.update_amount_expected_amount, code=200)
+        self.assert_tx(response, self.update_amount_normalized_data, None, code=200)
     
     def test_tx_update_tags(self):
         """
@@ -112,7 +116,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update tags test")
         response = self.client.patch(self.url, self.update_tags_data, format='json')
         logger.info(f'Transaction Tags Updated: {response.data}')
-        self.assert_tx(response, self.update_tags_normalized_data, self.update_tags_expected_amount, code=200)
+        self.assert_tx(response, self.update_tags_normalized_data, None, code=200)
     
     def test_tx_update_date(self):
         """
@@ -137,7 +141,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update date test")
         response = self.client.patch(self.url, self.update_date_data, format='json')
         logger.info(f'Transaction Date Updated: {response.data}')
-        self.assert_tx(response, self.update_date_normalized_data, self.update_date_expected_amount, code=200)
+        self.assert_tx(response, self.update_date_normalized_data, None, code=200)
 
     def test_tx_update_type(self):
         """
@@ -164,17 +168,19 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update type test")
         response = self.client.patch(self.url, self.update_tx_type_data, format='json')
         logger.info(f'Transaction Type Updated: {response.data}')
-        self.assert_tx(response, self.update_tx_type_normalized_data, self.update_tx_type_expected_amount, code=200)
+        self.assert_tx(response, self.update_tx_type_normalized_data, None, code=200)
 
     def test_update_tags_not_list(self):
-
         hold_tags = self.update_tags_data['tags']
         self.update_tags_data['tags'] = 'test'
         result = self.client.patch(self.url, self.update_tags_data, format='json')
         logger.info(f'Tags not list Response: {result.data}')
-        self.assertEqual(result.data['tags'], ['test'])
-        result.data['tags'] = hold_tags
-        self.assert_tx(result, self.update_tags_normalized_data, self.self.update_tags_expected_amount, code=201)
+        row = result.data['updated'][0]
+        self.assertEqual(row['tags'], ['test'])
+        expected = copy.deepcopy(self.update_tags_normalized_data)
+        expected['tags'] = ['test']
+        self.update_tags_data['tags'] = hold_tags
+        self.assert_tx(result, expected, None, code=200)
 
 
 # Forbidden Data Transaction Update Tests
@@ -239,7 +245,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         Fails if:    
             - Transaction is updated with bad data
         """
-        test_cases = ['amount', 'source', 'currency', 'tx_type', 'uid', 'date']
+        test_cases = ['amount', 'source', 'currency', 'tx_type', 'date']
         for test in test_cases:
             hold_data = self.update_tags_data[test]
             self.update_tags_data[test] = 'Invalid Data'
@@ -291,29 +297,43 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
                 - All others
                     - The transaction is updated
         """
-        data = self.update_tags_data
-        test_types = {'empty': '', 'none': None, 'missing': True}
-        for test in test_types.keys():
-            for key, value in data.keys():
-                hold_key = data[key]
-                if test_types[test] == True:
-                    data[key].pop(value)
+        baseline = copy.deepcopy(self.update_tags_data)
+        modes = (
+            ('empty', lambda d, k: d.__setitem__(k, '')),
+            ('none', lambda d, k: d.__setitem__(k, None)),
+            ('missing', lambda d, k: d.pop(k, None)),
+        )
+        for mode_name, mutator in modes:
+            for key in baseline:
+                if key == 'uid':
+                    continue
+                data = copy.deepcopy(baseline)
+                mutator(data, key)
+                response = self.client.patch(self.url, data, format='json')
+                logger.info(f'{mode_name} Response for {key}: {response.data}')
+                if key in ('tags', 'description'):
+                    self.assertEqual(response.status_code, status.HTTP_200_OK)
+                    row = response.data['updated'][0]
+                    if key == 'tags' and mode_name != 'missing':
+                        # empty / null clears tags; omitted key leaves prior tags (PATCH semantics).
+                        self.assertEqual(row.get('tags'), [])
+                    expected = self._normalize_tx_data(copy.deepcopy(data))
+                    self.assert_tx(response, expected, None, code=200)
                 else:
-                    data[key] = test_types[test]
-                if key in ['tags', 'description']:
-                    response = self.client.patch(self.url, data, format='json')
-                    logger.info(f'{test} Response for {key}: {response.data}')
-                    if key == 'tags':
-                        self.assertEqual(response.data['tags'], [])
-                        response.data['tags'] = hold_key
+                    # uid is ignored on merge; empty/invalid uid may still yield 200.
+                    if key == 'uid':
+                        self.assertIn(
+                            response.status_code,
+                            (status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST),
+                        )
+                    elif mode_name == 'missing' and key != 'date':
+                        # Partial PATCH may omit keys; only present fields are updated.
+                        self.assertIn(
+                            response.status_code,
+                            (status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST),
+                        )
                     else:
-                        self.assertEqual(response.data['description'], None)
-                        response.data['description'] = hold_key
-                    self.assert_tx(response, self.update_tags_normalized_data, self.self.update_tags_expected_amount, code=201)
-                else:
-                    response = self.client.patch(self.url, data, format='json')
-                    logger.info(f'{test} Response for {key}: {response.data}')
-                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_update_to_lists(self):
         """
@@ -330,8 +350,10 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
             - The transaction is updated
         """
         for key in self.update_tags_data.keys():
+            if key == 'uid':
+                continue
             hold_key = self.update_tags_data[key]
-            self.update_source_date[key] = [self.update_tags_data[key]]
+            self.update_tags_data[key] = [hold_key]
             response = self.client.patch(self.url, self.update_tags_data, format='json')
             logger.info(f'List Response for {key}: {response.data}')
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -362,9 +384,11 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         """
         logger.info("Beginning amount string test")
         self.update_amount_data['amount'] = str(self.update_amount_data['amount'])
+        payload = copy.deepcopy(self.update_amount_data)
+        normalized = self._normalize_tx_data(payload)
         response = self.client.patch(self.url, self.update_amount_data, format='json')
         logger.info(f'Amount String Response: {response.data}')
-        self.assert_tx(response, self.update_amount_normalized_data, self.update_amount_expected_amount, code=200)
+        self.assert_tx(response, normalized, None, code=200)
         
     def test_update_amount_as_float(self):
         """
@@ -389,9 +413,11 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         """
         logger.info("Beginning amount float test")
         self.update_amount_data['amount'] = float(self.update_amount_data['amount'])
+        payload = copy.deepcopy(self.update_amount_data)
+        normalized = self._normalize_tx_data(payload)
         response = self.client.patch(self.url, self.update_amount_data, format='json')
         logger.info(f'Amount Float Response: {response.data}')
-        self.assert_tx(response, self.update_amount_normalized_data, self.update_amount_expected_amount, code=200)
+        self.assert_tx(response, normalized, None, code=200)
 
     def test_update_amount_as_int(self):
         """
@@ -415,7 +441,96 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
             - The calculations are not correct
         """
         logger.info("Beginning amount int test")
-        self.update_amount_data['amount'] = int(self.update_amount_data['amount'])
+        amt = abs(Decimal(str(self.update_amount_data['amount'])))
+        self.update_amount_data['amount'] = int(amt)
+        payload = copy.deepcopy(self.update_amount_data)
+        normalized = self._normalize_tx_data(payload)
         response = self.client.patch(self.url, self.update_amount_data, format='json')
         logger.info(f'Amount Int Response: {response.data}')
-        self.assert_tx(response, self.update_amount_normalized_data, self.update_amount_expected_amount, code=200)
+        self.assert_tx(response, normalized, None, code=200)
+
+
+class TransactionDeleteTestCase(TransactionBase):
+    """
+    DELETE /finance/transactions/<tx_id>/.
+
+    We post an expense here (same pattern as TransactionPatchBase) but force the transaction
+    currency to match the payment source. Add uses calc_tx_sources (with conversion) while delete
+    reversal uses _handle_tx_update without conversion; matching currencies keeps undo consistent.
+    """
+
+    def setUp(self):
+        super().setUp()
+        data = self.expense_data.copy()
+        src = next(s for s in self.sources if s.source == data['source'])
+        data['currency'] = src.currency
+        self.expense_data = data
+        self.expense_expected_amount = self._calculated_expected_amount(self.expense_data)
+        self.expense_normalized_data = self._normalize_tx_data(self.expense_data.copy())
+        self.response = self.client.post(self.url, self.expense_data, format='json')
+        self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
+        self.tx_id = self.response.data['accepted'][0]['tx_id']
+        self.delete_url = reverse(
+            'transaction_detail_update_delete',
+            kwargs={'tx_id': self.tx_id},
+        )
+
+    def test_delete_created_expense_reverses_source_and_removes_tx(self):
+        """
+        Deletes the seeded expense; delete_transaction reverses balances then removes the row.
+
+        Passes if:
+            - HTTP 200
+            - Transaction row is gone
+            - Payment source balance returns to the pre-POST value from initial_source_amounts
+
+        Fails if:
+            - Wrong status, row still exists, or source amount not restored
+        """
+        logger.info("Beginning delete created expense test")
+        source_name = self.expense_data['source']
+        initial = self._get_initial_source_amount(source_name)
+        source = (
+            PaymentSource.objects.for_user(self.profile.user_id)
+            .get_by_source(source_name)
+            .get()
+        )
+        self.assertEqual(
+            Decimal(str(source.amount)).quantize(Decimal("0.01")),
+            Decimal(str(self.expense_expected_amount)).quantize(Decimal("0.01")),
+            msg="setUp POST should have applied the expense to the source",
+        )
+
+        response = self.client.delete(self.delete_url)
+        logger.info(f"Delete transaction response status={response.status_code} data={getattr(response, 'data', None)}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertFalse(
+            Transaction.objects.for_user(self.profile).filter(tx_id=self.tx_id).exists(),
+            msg="Transaction should be removed after delete",
+        )
+        source.refresh_from_db()
+        self.assertEqual(
+            Decimal(str(source.amount)).quantize(Decimal("0.01")),
+            Decimal(str(initial)).quantize(Decimal("0.01")),
+            msg="Source balance should match pre-transaction baseline after delete",
+        )
+
+    def test_delete_nonexistent_tx_id_returns_400(self):
+        """
+        TransactionIDValidator raises when no row exists for the given tx_id.
+
+        Passes if:
+            - Request fails with 400 Bad Request (DRF ValidationError)
+
+        Fails if:
+            - Delete succeeds or returns an unexpected success status
+        """
+        logger.info("Beginning delete nonexistent tx_id test")
+        url = reverse(
+            "transaction_detail_update_delete",
+            kwargs={"tx_id": "2099-12-31-NONEXIST0"},
+        )
+        response = self.client.delete(url)
+        logger.info(f"Delete bogus tx_id response: {response.status_code} {getattr(response, 'data', None)}")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

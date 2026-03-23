@@ -17,37 +17,37 @@ from finance.api_tools.serializers.profile_serializers import(
 
 @extend_schema_view(
     post=extend_schema(
-        summary="Not allowed.",
-        description="All app profiles are generated automatically.  This endpoint is not allowed. Automatically generated on user creation.",
+        summary="Not allowed",
+        description="App profiles are auto-created alongside users; manual creation is disabled.",
         responses={status.HTTP_403_FORBIDDEN: None},
         tags=["App Profiles"]
     ),
     get=extend_schema(
         summary="Retrieve app profile",
-        description="Retrieves the spend accounts and base currency for a user.",
-        responses={status.HTTP_200_OK: AppProfileGetSerializer(many=True)},
+        description="Retrieve profile settings. Snapshot totals are available on the snapshot route.",
+        responses={status.HTTP_200_OK: AppProfileGetSerializer},
         tags=["App Profiles"]
     ),
     patch=extend_schema(
         summary="Update app profile",
-        description="Updates the spend accounts and base currency for a user.\n"
-                    "Forbidden for 'unknown' source as that is a default empty source.  This cannot be used as spend account.",
-        request=AppProfileGetSerializer,
+        description="Update mutable profile settings (for example, spend accounts/base currency).\n"
+                    "The reserved `unknown` source cannot be selected as a spend account.",
+        request=AppProfileUpdateSerializer,
         responses={
-            status.HTTP_200_OK: AppProfileGetSerializer,
+            status.HTTP_200_OK: AppProfileUpdateSerializer,
             status.HTTP_403_FORBIDDEN: None,
             },
         tags=["App Profiles"]
     ),
     put=extend_schema(
-        summary="Not allowed.",
-        description="Not allowed as only fields that can be updated for user are spend accounts and base currency.\n",
+        summary="Not allowed",
+        description="Only partial updates are supported on this resource.",
         responses={status.HTTP_405_METHOD_NOT_ALLOWED: None},
         tags=["App Profiles"]
     ),
     delete=extend_schema(
-        summary="Not allowed.",
-        description="All app profiles are generated automatically.  This endpoint is not allowed. To delete, delete the user account.",
+        summary="Not allowed",
+        description="Profiles are lifecycle-managed with users; delete the user account instead.",
         responses={status.HTTP_501_NOT_IMPLEMENTED: None},
         tags=["App Profiles"]
     )
@@ -71,20 +71,20 @@ class AppProfileView(APIView):
         # Return the snapshot if requested, otherwise return the app profile
         if snapshot:
             result = user_svc.user_get_totals(uid=uid)
-            serializer = SnapshotSerializer(result, many=True)
+            serializer = SnapshotSerializer(result)
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Return the app profile.  Only returns spend account and base currency.
         result = user_svc.user_get_info(uid=uid)
-        serializer = AppProfileGetSerializer(result, many=True)
+        serializer = AppProfileGetSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request):
         uid = request.user.appprofile.user_id
-        result = user_svc.user_update_info(
+        result = user_svc.user_update(
             uid=uid,
             data=request.data
         )
-        serializer = AppProfileUpdateSerializer(result, many=True)
+        serializer = AppProfileUpdateSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
 

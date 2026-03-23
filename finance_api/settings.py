@@ -54,6 +54,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", default=False)
+DB_HIT_LOGGING_ENABLED = str(DEBUG).lower() in {"1", "true", "yes", "on"}
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", default="*").split(",")
 
@@ -93,6 +94,7 @@ SIMPLE_JWT = {
 }
 
 MIDDLEWARE = [
+    "finance.middleware.db_hit_counter.DBHitCounterMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -124,13 +126,41 @@ WSGI_APPLICATION = "finance_api.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# Default: local SQLite.
+# If Postgres env vars are provided, use PostgreSQL automatically.
+_db_engine = os.getenv("DB_ENGINE", "").strip()
+_db_name = os.getenv("DB_NAME", "").strip()
+_db_user = os.getenv("DB_USER", "").strip()
+_db_password = os.getenv("DB_PASSWORD", "").strip()
+_db_host = os.getenv("DB_HOST", "127.0.0.1").strip()
+_db_port = os.getenv("DB_PORT", "5432").strip()
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_use_postgres = (
+    _db_engine in {"django.db.backends.postgresql", "postgres", "postgresql"}
+    and _db_name
+    and _db_user
+    and _db_password
+)
+
+if _use_postgres:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _db_name,
+            "USER": _db_user,
+            "PASSWORD": _db_password,
+            "HOST": _db_host,
+            "PORT": _db_port,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation

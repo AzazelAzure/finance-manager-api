@@ -5,13 +5,22 @@ from django.db.models.signals import post_save, pre_delete, pre_save
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+import contextvars
 from finance.models import (
     Transaction, 
     AppProfile, 
     FinancialSnapshot, 
     PaymentSource,
+    UpcomingExpense,
+    Category,
+    Tag,
 )
 from loguru import logger
+
+
+_SKIP_PAYMENT_SOURCE_PREDELETE = contextvars.ContextVar(
+    "_SKIP_PAYMENT_SOURCE_PREDELETE", default=False
+)
 
 @receiver(pre_delete, sender=PaymentSource)
 def delete_source(sender, instance, **kwargs):
@@ -19,11 +28,16 @@ def delete_source(sender, instance, **kwargs):
     Signal receiver for PaymentSource deletion.
     Converts any transactions with the deleted source to uncategorized.
     """
+    if _SKIP_PAYMENT_SOURCE_PREDELETE.get():
+        return
     # Get the 'unknown' source
     unknown_source = PaymentSource.objects.filter(uid=instance.uid, source="unknown").first()
 
     # Update all transactions that reference the deleted source to the 'unknown' source
-    Transaction.objects.filter(source=instance).update(source=unknown_source)
+    if unknown_source:
+        Transaction.objects.filter(uid=instance.uid, source=instance.source).update(
+            source=unknown_source.source
+        )
 
 
 # User signals
@@ -67,6 +81,35 @@ def user_logged_in(sender, request, user, **kwargs):
         PaymentSource.objects.create(uid=user.appprofile.user_id, source="unknown", acc_type="UNKNOWN")
 
     return
+
+
+@receiver(pre_delete, sender=User)
+def delete_user_finance_data(sender, instance, **kwargs):
+    """
+    Ensure decoupled finance rows keyed by uid are removed with user deletion.
+    """
+    profile = getattr(instance, "appprofile", None)
+    if not profile:
+        return
+    uid = str(profile.user_id)
+
+    # Delete transaction-like dependents first to avoid source pre_delete side effects.
+    Transaction.objects.filter(uid=uid).delete()
+    UpcomingExpense.objects.filter(uid=uid).delete()
+    Category.objects.filter(uid=uid).delete()
+    Tag.objects.filter(uid=uid).delete()
+
+    # When we're deleting the user, we want PaymentSource deletion to be fast/bulk.
+    # The PaymentSource pre_delete hook triggers per-instance work and disables fast deletes.
+    token = _SKIP_PAYMENT_SOURCE_PREDELETE.set(True)
+    try:
+        pre_delete.disconnect(delete_source, sender=PaymentSource)
+        PaymentSource.objects.filter(uid=uid).delete()
+    finally:
+        pre_delete.connect(delete_source, sender=PaymentSource, weak=False)
+        _SKIP_PAYMENT_SOURCE_PREDELETE.reset(token)
+
+    FinancialSnapshot.objects.filter(uid=uid).delete()
 
 
 # Helper Functions

@@ -5,7 +5,7 @@ from .tx_serializers import TransactionAcceptedSerializer
 
 class AppProfileUpdateSerializer(serializers.Serializer):
     message = serializers.CharField()
-    snapshot = FinancialSnapshotSerializer(many=True)
+    snapshot = FinancialSnapshotSerializer()
 
 class AppProfileGetSerializer(serializers.Serializer):
     spend_accounts = serializers.ListField(child=serializers.CharField(max_length=50))

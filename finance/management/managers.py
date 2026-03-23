@@ -12,9 +12,16 @@ class TransactionManager(models.QuerySet):
         """Returns a queryset for a user."""
         return self.filter(uid=uid)
     
-    def get_latest(self,uid):
-        """Returns a model instance for the latest transaction for a user."""
-        return self.filter(uid=uid).order_by("entry_id").last()
+    def get_latest(self):
+        """
+        Latest transaction by primary key, as a queryset (single row or empty).
+        Used when no list filters are applied; must stay a queryset so ordering
+        and aggregate totals behave consistently.
+        """
+        last = self.order_by("-id").first()
+        if last is None:
+            return self.none()
+        return self.filter(pk=last.pk)
     
     def get_by_period(self, start_date, end_date):
         """Returns a queryset for transactions within a date range."""
@@ -61,19 +68,32 @@ class TransactionManager(models.QuerySet):
         """Returns a queryset for transactions with a given tag name."""
         if not isinstance(tag_name, list):
             tag_name = [tag_name]
-        return self.filter(tags__contains=tag_name)
+        needle = tag_name[0]
+        # JSONField __contains is not supported on SQLite; match in Python.
+        matches = []
+        for row in self.only("pk", "tags"):
+            tags = row.tags or []
+            if needle in tags:
+                matches.append(row.pk)
+            else:
+                n_low = (needle or "").lower()
+                if any((t or "").lower() == n_low for t in tags):
+                    matches.append(row.pk)
+        if not matches:
+            return self.none()
+        return self.filter(pk__in=matches)
     
     def get_by_category(self, cat_name):
         """Returns a queryset for transactions with a given category."""
-        return self.filter(category__name=cat_name)
-    
+        return self.filter(category=cat_name)
+
     def get_by_source(self, source):
-        """Returns a queryset for transactions with a given source."""
-        return self.filter(source__source=source)
-    
+        """Returns a queryset for transactions with a given source name."""
+        return self.filter(source=source)
+
     def get_by_currency(self, code):
-        """Returns a queryset for transactions with a given currency."""
-        return self.filter(currency__code=code)
+        """Returns a queryset for transactions with a given currency code."""
+        return self.filter(currency=str(code).upper())
     
     def get_by_date(self, date):
         """Returns a queryset for transactions with a given date."""

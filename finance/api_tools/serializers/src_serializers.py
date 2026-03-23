@@ -12,10 +12,21 @@ class SourcePostSerializer(SourceSerializer):
     acc_type = serializers.CharField(max_length=10)
 
 
+class SourcePatchSerializer(SourceSerializer):
+    pass
+
+
+class SourcePutSerializer(SourceSerializer):
+    source = serializers.CharField(max_length=50)
+    acc_type = serializers.CharField(max_length=10)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField(max_length=3)
+
+
 class SourceSetReturnSerializer(SourceSerializer):
     rejected = SourceSerializer(many=True, required=False)
     accepted = SourceSerializer(many=True, required=False)
-    updated = SourceSerializer(many=True, required=False)
-    deleted = SourceSerializer(many=True, required=False)
-    snapshot = FinancialSnapshotSerializer(many=True)
+    updated = SourceSerializer(required=False)
+    deleted = SourceSerializer(required=False)
+    snapshot = FinancialSnapshotSerializer(required=False)
 

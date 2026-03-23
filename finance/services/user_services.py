@@ -39,18 +39,18 @@ def user_update(uid: str, data: dict, *args, **kwargs):
     """
     logger.debug(f'Updating {uid}')
     profile = kwargs.get('profile')
-    sources = kwargs.get('sources') or [PaymentSource.objects.for_user(uid)]
+    sources = kwargs.get('sources') or list(PaymentSource.objects.for_user(uid))
     if data.get('spend_accounts'):
         if isinstance(data['spend_accounts'], list):
             data['spend_accounts'] = [item.lower() for item in data['spend_accounts']]
             profile.spend_accounts = data['spend_accounts']
         else:
-            profile.spend_accounts = [data['spend_accounts']]
+            profile.spend_accounts = [str(data['spend_accounts']).lower()]
     if data.get('base_currency'):
         profile.base_currency = data['base_currency'].upper()
     if data.get('timezone'):
         profile.timezone = data['timezone'].upper()
-    if data.get('start_week'):
+    if data.get('start_week') is not None:
         profile.start_of_week = data['start_week']
     profile.save()
     update = Updater(profile=profile, sources=sources)
@@ -97,12 +97,12 @@ def user_get_totals(uid, *args, **kwargs):
     queryset = Transaction.objects.for_user(uid).get_current_month()
     fc = Calculator(profile=kwargs.get('profile'))
     return {
-        'snapshot': FinancialSnapshot.objects.for_user(uid), 
+        'snapshot': FinancialSnapshot.objects.for_user(uid).first(),
         'transactions_for_month': queryset,
-        'total_expenses_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('EXPENSE')),
-        'total_income_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('INCOME')),
-        'total_transfer_out_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_OUT')),
-        'total_transfer_in_for_month': fc.calc_queryset(uid, queryset.get_by_tx_type('XFER_IN')),
+        'total_expenses_for_month': fc.calc_queryset(queryset.get_by_tx_type('EXPENSE')),
+        'total_income_for_month': fc.calc_queryset(queryset.get_by_tx_type('INCOME')),
+        'total_transfer_out_for_month': fc.calc_queryset(queryset.get_by_tx_type('XFER_OUT')),
+        'total_transfer_in_for_month': fc.calc_queryset(queryset.get_by_tx_type('XFER_IN')),
     }
 
 

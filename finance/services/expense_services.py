@@ -11,6 +11,10 @@ Attributes:
 """
 
 import finance.logic.validators as validator
+from finance.validators.expense_validators import (
+    UpcomingExpenseGetValidator,
+    UpcomingExpenseSetValidator,
+)
 from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
 from django.db import transaction
@@ -18,7 +22,7 @@ from loguru import logger
 from finance.models import UpcomingExpense, AppProfile
 
 @validator.UserValidator
-@validator.UpcomingExpenseSetValidator
+@UpcomingExpenseSetValidator
 @transaction.atomic
 def add_expense(uid, data, *args, **kwargs):
     """
@@ -41,16 +45,16 @@ def add_expense(uid, data, *args, **kwargs):
         created = UpcomingExpense.objects.bulk_create([UpcomingExpense(**item) for item in accepted])
         update = Updater(profile=profile, upcoming=upcoming)
         snapshot = update.expense_handler()
-        return {'accepted': accepted, 'rejected': rejected, 'snapshot': snapshot}
+        return {'accepted': list(created), 'rejected': rejected, 'snapshot': snapshot}
     else:
         created = UpcomingExpense.objects.create(**data)
         update = Updater(profile=profile, upcoming=upcoming)
-        snapshot = update.expense_handler([created])
-        return {'accepted': created, 'snapshot': snapshot}
+        snapshot = update.expense_handler()
+        return {'accepted': [created], 'rejected': [], 'snapshot': snapshot}
 
 
 @validator.UserValidator
-@validator.UpcomingExpenseGetValidator
+@UpcomingExpenseGetValidator
 @transaction.atomic
 def delete_expense(uid, expense_name: str, *args, **kwargs):
     """
@@ -69,13 +73,13 @@ def delete_expense(uid, expense_name: str, *args, **kwargs):
     update = Updater(profile=kwargs.get('profile'), upcoming=upcoming)
     expense.delete()
     snapshot = update.expense_handler(old_name=expense.name)
-    return {'deleted': expense, 'snapshot': snapshot}
+    return {'deleted': [expense], 'snapshot': snapshot}
 
 @validator.UserValidator
-@validator.UpcomingExpenseGetValidator
-@validator.UpcomingExpenseSetValidator
+@UpcomingExpenseGetValidator
+@UpcomingExpenseSetValidator
 @transaction.atomic
-def update_expense(uid,  data: dict, expense_name: str, *args, **kwargs):
+def update_expense(uid, expense_name: str, data: dict, *args, **kwargs):
     """
     Updates a planned expense in the user's account.
 
@@ -89,15 +93,20 @@ def update_expense(uid,  data: dict, expense_name: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating expense: {expense_name}")
-    expense = kwargs.get('checked')
+    expense = kwargs.get("checked")
+    old_name = expense.name
+    if not data.get("name"):
+        data["name"] = old_name
     upcoming = kwargs.get('upcoming')
     update = Updater(profile=kwargs.get('profile'), upcoming=upcoming)
-    expense.update(**data)
-    if expense.name != data['name']:
-        snapshot = update.expense_handler(old_name=expense.name, new_name=data['name'])
+    for field, value in data.items():
+        setattr(expense, field, value)
+    expense.save(update_fields=list(data.keys()))
+    if old_name != expense.name:
+        snapshot = update.expense_handler(old_name=old_name, new_name=expense.name)
     else:
         snapshot = update.expense_handler()
-    return {'updated': expense, 'snapshot': snapshot}
+    return {'updated': [expense], 'snapshot': snapshot}
 
 
 @validator.UserValidator
@@ -151,11 +160,11 @@ def get_expenses(uid, **kwargs):
             queryset = method(kwargs[param_name])
     fc = Calculator(profile=kwargs.get('profile'))
     queryset = queryset.order_by('-due_date')
-    return {'expenses': queryset, 'amount': fc.calc_queryset(uid, queryset)}
+    return {'expenses': queryset, 'amount': fc.calc_queryset(queryset)}
 
 
 @validator.UserValidator
-@validator.UpcomingExpenseGetValidator
+@UpcomingExpenseGetValidator
 def get_expense(uid, expense_name: str, *args, **kwargs):
     """
     Retrieves a single planned expense for a user.
@@ -168,4 +177,5 @@ def get_expense(uid, expense_name: str, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Getting expense: {expense_name} for {uid}")
-    return {'expense': kwargs.get('existing')}
+    expense = kwargs.get("checked")
+    return {"expense": expense, "amount": expense.amount}

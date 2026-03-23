@@ -10,12 +10,13 @@ Attributes:
 """
 from django.db import transaction
 import finance.logic.validators as validator
+from finance.validators.tag_validators import TagGetValidator, TagSetValidator
 from loguru import logger
 from finance.models import  Tag
 
 
 @validator.UserValidator
-@validator.TagSetValidator
+@TagSetValidator
 @transaction.atomic
 def add_tags(uid, data, *args, **kwargs):
     """
@@ -29,17 +30,21 @@ def add_tags(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Adding tag: {data}")
-    profile = kwargs.get('profile')
-    tags = kwargs.get('tags')
-    accepted = kwargs.get('accepted')
-    rejected = kwargs.get('rejected')
-    tags += accepted
-    tags.save()
-    return {'accepted': accepted, 'rejected': rejected}
+    accepted = kwargs.get("accepted", [])
+    rejected = kwargs.get("rejected", [])
+    existing = set(kwargs.get("existing_tags", set()))
+    update_tags = sorted(existing | set(accepted))
+    tag_obj = Tag.objects.for_user(uid).first()
+    if tag_obj:
+        tag_obj.tags = update_tags
+        tag_obj.save(update_fields=["tags"])
+    else:
+        Tag.objects.create(uid=uid, tags=update_tags)
+    return {"accepted": accepted, "rejected": rejected}
 
 
 @validator.UserValidator
-@validator.TagGetValidator
+@TagGetValidator
 @transaction.atomic
 def delete_tag(uid, data, *args, **kwargs):
     """
@@ -53,15 +58,17 @@ def delete_tag(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Deleting tags: {data}")
-    tags = kwargs.get('tags')
-    delete_tag = set(kwargs.get('to_delete'))
-    tags = [item for item in tags if item not in delete_tag]
-    tags.save()
-    delete_tag = list(delete_tag)
-    return {'deleted': delete_tag}
+    to_delete = set(kwargs.get("to_delete", []))
+    existing = set(kwargs.get("existing_tags", set()))
+    updated_tags = sorted(existing - to_delete)
+    tag_obj = Tag.objects.for_user(uid).first()
+    if tag_obj:
+        tag_obj.tags = updated_tags
+        tag_obj.save(update_fields=["tags"])
+    return {"deleted": sorted(to_delete), "rejected": kwargs.get("rejected", [])}
 
 @validator.UserValidator
-@validator.TagGetValidator
+@TagGetValidator
 @transaction.atomic
 def update_tag(uid, data, *args, **kwargs):
     """
@@ -75,14 +82,21 @@ def update_tag(uid, data, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Updating tag: {data}")
-    tags = kwargs.get('tags')
-    update_tag = kwargs.get('update')
-    accepted = set(kwargs.get('accepted'))
-    tags += update_tag
-    tags = [item for item in tags if item not in accepted]
-    tags.save()
-    updated = list(accepted)
-    return {'updated': updated}
+    mapping = kwargs.get("update", {})
+    existing = list(kwargs.get("existing_tags", set()))
+    if not mapping:
+        return {"updated": []}
+    normalized = []
+    for tag in existing:
+        if tag in mapping:
+            normalized.append(mapping[tag])
+        else:
+            normalized.append(tag)
+    tag_obj = Tag.objects.for_user(uid).first()
+    if tag_obj:
+        tag_obj.tags = sorted(set(normalized))
+        tag_obj.save(update_fields=["tags"])
+    return {"updated": sorted(mapping.values()), "rejected": kwargs.get("rejected", [])}
 
 
 @validator.UserValidator
@@ -96,4 +110,8 @@ def get_tags(uid, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Getting all tags for {uid}")
-    return {'tags': Tag.objects.for_user(kwargs.get('profile').user_id)}
+    tag_obj = Tag.objects.for_user(uid).first()
+    if not tag_obj:
+        return {"tags": []}
+    tags = tag_obj.tags if isinstance(tag_obj.tags, list) else [tag_obj.tags]
+    return {"tags": sorted({str(item).lower() for item in tags if item})}

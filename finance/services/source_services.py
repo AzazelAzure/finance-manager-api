@@ -1,123 +1,93 @@
-"""
-This module handles all payment source-related functionality for the finance manager application.
-
-Attributes:
-    add_source: Adds a payment source to the user's account.
-    delete_source: Deletes a payment source from the user's account.
-    update_source: Updates a payment source in the user's account.
-    get_sources: Retrieves a list of payment sources for a user.
-    get_source: Retrieves a single payment source for a user.
-"""
+"""Service layer for payment source CRUD operations."""
 
 import finance.logic.validators as validator
+from finance.validators.source_validators import (
+    SourceGetValidator,
+    SourceSetValidator,
+    validate_source_patch_payload,
+    validate_source_put_payload,
+)
 from finance.logic.updaters import Updater 
 from django.db import transaction
 from loguru import logger
 from finance.models import PaymentSource
 
-# TODO:  GUESS WHAT?!?!?!  Fix the docstrings, commments, and logger
-# TODO: Refactor this for the rollin of assets to here
-
-
 # Payment Source Functions
 @validator.UserValidator
-@validator.SourceSetValidator
+@SourceSetValidator
 @transaction.atomic
 def add_source(uid, data, *args, **kwargs):
-    """
-    Adds a payment source to the user's account.
-
-    :param uid: The user id.
-    :type uid: str
-    :param data: The data for the payment source.
-    :type data: dict
-    :returns: {'added': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Adding asset: {data}")
+    """Create one or more sources and return accepted/rejected + snapshot."""
+    logger.debug(f"Creating source payload for {uid}")
     sources = kwargs.get('sources')
     if isinstance(data, list):
         rejected = kwargs.get('rejected',[])
         accepted = kwargs.get('accepted',[])
         sources.bulk_create([PaymentSource(**item) for item in accepted])
-        update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+        update = Updater(profile=kwargs.get('profile'), sources=kwargs.get('sources'))
         snapshot = update.source_handler()
-        return {'added': accepted, 'rejected': rejected, 'snapshot': snapshot}
+        return {'accepted': accepted, 'rejected': rejected, 'snapshot': snapshot}
 
     else:
         new_source = sources.create(**data)
-        if new_source.amount != 0:
-            update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
-            snapshot = update.source_handler()
-    return {'added': new_source, 'snapshot': snapshot}
-
+        update = Updater(profile=kwargs.get('profile'), sources=kwargs.get('sources'))
+        snapshot = update.source_handler()
+    return {'accepted': [new_source], 'rejected': [], 'snapshot': snapshot}
 
 
 @validator.UserValidator
-@validator.SourceGetValidator
+@SourceGetValidator
 @transaction.atomic
 def delete_source(uid, source: str, *args, **kwargs):
-    """
-    Deletes a payment source from the user's account.
-
-    :param uid: The user id.
-    :type uid: str
-    :param source: The source of the payment source to delete.
-    :type source: str
-    :returns: {'deleted': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Deleting source: {source}")
-    source = kwargs.get('source_check')
-    source.delete()
-    update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+    """Delete one source and return deleted payload + refreshed snapshot."""
+    logger.debug(f"Deleting source {source} for {uid}")
+    source_obj = kwargs.get("source_check")
+    source_payload = {
+        "source": source_obj.source,
+        "acc_type": source_obj.acc_type,
+        "amount": source_obj.amount,
+        "currency": source_obj.currency,
+    }
+    source_obj.delete()
+    update = Updater(profile=kwargs.get('profile'), sources=kwargs.get('sources'))
     snapshot = update.source_handler()
-    return {'deleted': source, 'snapshot': snapshot}
+    return {"deleted": source_payload, "snapshot": snapshot}
 
 
 @validator.UserValidator
-@validator.SourceGetValidator
-@validator.SourceSetValidator
+@SourceGetValidator
 @transaction.atomic
-def update_source(uid, source: str, data: dict, *args, **kwargs):
-    """
-    Updates a payment source in the user's account.
-
-    :param uid: The user id.
-    :type uid: str
-    :param source: The source of the payment source to update.
-    :type source: str
-    :param data: The data to update the payment source with.
-    :type data: dict
-    :returns: {'updated': queryset}
-    :rtype: dict
-    """
-    logger.debug(f"Updating source: {source}")
+def update_source(uid, source: str, data: dict, *, partial: bool = False, **kwargs):
+    """Update one source (PATCH/PUT validation differs via ``partial`` flag)."""
+    logger.debug(f"Updating source {source} for {uid}")
     source_obj = kwargs.get('checked')
+    if partial:
+        validate_source_patch_payload(uid, data, source_obj)
+    else:
+        validate_source_put_payload(uid, data, source_obj)
     for field, value in data.items():
         setattr(source_obj, field, value)
-    source_obj.save()
-    update = Updater(profile=kwargs.get('profile'), sources=[kwargs.get('sources')])
+    source_obj.save(update_fields=list(data.keys()))
+    update = Updater(profile=kwargs.get('profile'), sources=kwargs.get('sources'))
     snapshot = update.source_handler()
-    return {'updated': source_obj, 'snapshot': snapshot}
+    return {"updated": source_obj, "snapshot": snapshot}
 
 @validator.UserValidator
-@validator.SourceGetValidator
-def get_sources(uid, data, *args, **kwargs):
-    """
-    Retrieves a list of payment sources for a user.  Accepts optional filters.
+def get_sources(uid, **kwargs):
+    """Return source queryset, optionally filtered by account type/source name."""
+    sources = PaymentSource.objects.for_user(uid)
+    acc_type = kwargs.get("acc_type")
+    source = kwargs.get("source")
+    if acc_type:
+        sources = sources.filter(acc_type=str(acc_type).upper())
+    if source:
+        sources = sources.filter(source__icontains=str(source).lower())
+    return {"sources": sources}
 
-    :param uid: The user id.
-    :type uid: str
-    :param kwargs: A dictionary of filters.
-    :type kwargs: dict
-    :returns: {'sources': queryset}
-    :rtype: dict
-    """
-    sources = kwargs.get('sources')
-    if data.get('acc_type'):
-        sources = sources.filter(acc_type=data['acc_type'])
-    if data.get('source'):
-        sources = sources.filter(source__icontains=data['source'])
-    return {'sources': sources}
+
+@validator.UserValidator
+@SourceGetValidator
+def get_source(uid, source: str, *args, **kwargs):
+    """Return a single validated source object."""
+    return {"source": kwargs.get("checked")}
 
