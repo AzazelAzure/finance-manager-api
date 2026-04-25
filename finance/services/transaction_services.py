@@ -11,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot
 import copy
 from decimal import Decimal
+from finance.api_tools.query_utils import apply_transaction_filters
 
 # Kwargs injected by decorators (not query filters)
 _GET_TX_IGNORE_KEYS = frozenset({"profile"})
@@ -35,50 +36,8 @@ def get_transactions(uid,**kwargs):
     fc = Calculator(profile)
 
     filter_kwargs = {k: v for k, v in kwargs.items() if k not in _GET_TX_IGNORE_KEYS}
-    if not filter_kwargs:
-        queryset = queryset.get_current_month()
-
-    # Handle specific filters that require multiple arguments or no arguments
-    if _query_param_bool(filter_kwargs.get("current_month")):
-        queryset = queryset.get_current_month()
-    if filter_kwargs.get('start_date') and filter_kwargs.get('end_date'):
-        queryset = queryset.get_by_period(filter_kwargs['start_date'], filter_kwargs['end_date'])
-    if filter_kwargs.get('month') and filter_kwargs.get('year'):
-        queryset = queryset.get_by_month(filter_kwargs['month'], filter_kwargs['year'])
-    if _query_param_bool(filter_kwargs.get("last_month")):
-        queryset = queryset.get_last_month()
-    if _query_param_bool(filter_kwargs.get("previous_week")):
-        queryset = queryset.get_previous_week()
-
-    # Handle special case filters due to multiple use arguments
-    if filter_kwargs.get('start_date') and not filter_kwargs.get('end_date'):
-        queryset = queryset.get_all_after(filter_kwargs['start_date'])
-    if filter_kwargs.get('end_date') and not filter_kwargs.get('start_date'):
-        queryset = queryset.get_all_before(filter_kwargs['end_date'])
-    if filter_kwargs.get('month') and not filter_kwargs.get('year'):
-        queryset = queryset.get_current_month()
-    if filter_kwargs.get('year') and not filter_kwargs.get('month'):
-        queryset = queryset.get_by_year(filter_kwargs['year'])
-    
-
-    # Dynamically apply other single-argument filters using getattr
-    # Mapping of query parameter names to manager method names
-    SINGLE_ARG_FILTER_MAP = {
-        'tx_type': 'get_by_tx_type',
-        'tag_name': 'get_by_tag_name',
-        'category': 'get_by_category',
-        'source': 'get_by_source',
-        'currency_code': 'get_by_currency',
-        'by_year': 'get_by_year',
-        'by_date': 'get_by_date',
-        'date': 'get_by_date',
-        'gte': 'get_gte',
-        'lte': 'get_lte',
-    }
-    for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
-        if filter_kwargs.get(param_name) is not None and filter_kwargs.get(param_name) != "":
-            method = getattr(queryset, manager_method_name)
-            queryset = method(filter_kwargs[param_name])
+    # Use shared filtering logic
+    queryset = apply_transaction_filters(queryset, **filter_kwargs)
 
     # Default ordering
     queryset = queryset.order_by('tx_id')

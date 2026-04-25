@@ -14,6 +14,7 @@ Attributes:
 import finance.logic.validators as validator
 from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
+from finance.api_tools.query_utils import apply_transaction_filters
 from django.db import transaction
 from django.db.models import Sum
 from decimal import Decimal
@@ -97,7 +98,10 @@ def user_get_totals(uid, *args, **kwargs):
     :rtype: dict
     """
     logger.debug(f"Getting all totals for {uid}")
-    queryset = Transaction.objects.for_user(uid).get_current_month()
+    
+    # Apply standard transaction filters to support dynamic dashboard charts
+    queryset = Transaction.objects.for_user(uid)
+    queryset = apply_transaction_filters(queryset, **kwargs)
     fc = Calculator(profile=kwargs.get('profile'))
     transfer_out_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_OUT'))
     transfer_in_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_IN'))

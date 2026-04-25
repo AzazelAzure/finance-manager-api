@@ -70,7 +70,7 @@ class AppProfileView(APIView):
         uid = request.user.appprofile.user_id
         # Return the snapshot if requested, otherwise return the app profile
         if snapshot:
-            result = user_svc.user_get_totals(uid=uid)
+            result = user_svc.user_get_totals(uid=uid, **request.query_params.dict())
             serializer = SnapshotSerializer(result)
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Return the app profile.  Only returns spend account and base currency.
