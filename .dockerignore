@@ -1,0 +1,13 @@
+.venv
+db.sqlite3
+logs
+__pycache__
+*.pyc
+.pytest_cache
+profiler_html
+.git
+.gitignore
+.vendor
+**/.DS_Store
+**/*.log
+
