@@ -20,6 +20,7 @@ from finance.logic.fincalc import Calculator
 from django.db import transaction
 from loguru import logger
 from finance.models import UpcomingExpense, AppProfile
+from datetime import datetime, timedelta # Added for month filtering
 
 @validator.UserValidator
 @UpcomingExpenseSetValidator
@@ -115,8 +116,8 @@ def get_expenses(uid, **kwargs):
     Retrieves a list of planned expenses for a user with dynamic filtering and ordering.\n
     If start is set with no end, will return all expenses after start.\n
     If end is set with no start, will return all expenses before end.\n
-    If month is set, will return all expenses for the current month.\n
-    If no kwargs set, will return the current month.
+    If 'for_month' is set, will return all expenses for the specified month (YYYY-MM).\n
+    If no date-related kwargs set, will return all expenses.
 
 
     :param uid: The user id.
@@ -129,21 +130,42 @@ def get_expenses(uid, **kwargs):
     logger.debug(f"Getting expenses for {uid} with filters: {kwargs}")
     queryset = UpcomingExpense.objects.for_user(uid)
 
-    if not kwargs:
-        queryset = queryset.get_current_month()
+    date_filter_applied = False
 
-    # Handle specific filters that require multiple arguments or no arguments
+    # Handle specific date filters that require multiple arguments or no arguments
     if kwargs.get('start') and kwargs.get('end'):
-        queryset = queryset.get_by_period(kwargs['start'], kwargs['end'])
-    if kwargs.get('start') and not kwargs.get('end'):
+        queryset = queryset.get_expenses_by_period(kwargs['start'], kwargs['end'])
+        date_filter_applied = True
+    elif kwargs.get('start') and not kwargs.get('end'):
         queryset = queryset.get_expenses_by_period(kwargs['start'], None)
-    if kwargs.get('end') and not kwargs.get('start'):
+        date_filter_applied = True
+    elif kwargs.get('end') and not kwargs.get('start'):
         queryset = queryset.get_expenses_by_period(None, kwargs['end'])
+        date_filter_applied = True
+    
+    # Fix for 'for_month' filter to parse YYYY-MM
     if kwargs.get('for_month'):
-        queryset = queryset.get_current_month()
-    if kwargs.get('remaining'):
+        month_str = kwargs['for_month'] # Expected format: "YYYY-MM"
+        try:
+            year, month = map(int, month_str.split('-'))
+            start_date = datetime(year, month, 1).date()
+            # Calculate the last day of the month
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+            else:
+                end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            
+            queryset = queryset.get_expenses_by_period(start_date, end_date)
+            date_filter_applied = True
+        except ValueError:
+            logger.warning(f"Invalid 'for_month' format: {month_str}. Expected YYYY-MM. Skipping month filter.")
+            # If the format is invalid, do not apply a month filter.
+            pass # Continue with other filters if any
+            
+    from finance.api_tools.query_utils import _query_param_bool
+    if _query_param_bool(kwargs.get('remaining')) is True:
         queryset = queryset.get_by_remaining()
-    if kwargs.get('upcoming'):
+    if _query_param_bool(kwargs.get('upcoming')) is True:
         queryset = queryset.get_all_upcoming()
     
     SINGLE_ARG_FILTER_MAP = {
@@ -155,12 +177,16 @@ def get_expenses(uid, **kwargs):
         'currency_code': 'get_by_currency'
     }
     for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
-        if kwargs.get(param_name):
+        val = kwargs.get(param_name)
+        if val is not None and val != "":
+            # Interpret string booleans correctly for the manager
+            if param_name in ("paid_flag", "recurring"):
+                val = _query_param_bool(val)
             method = getattr(queryset, manager_method_name)
-            queryset = method(kwargs[param_name])
-    fc = Calculator(profile=kwargs.get('profile'))
-    queryset = queryset.order_by('-due_date')
-    return {'expenses': queryset, 'amount': fc.calc_queryset(queryset)}
+            queryset = method(val)
+    fc = Calculator(profile=kwargs.get("profile"))
+    queryset = queryset.order_by("-due_date")
+    return {"expenses": queryset, "amount": fc.calc_queryset(queryset)}
 
 
 @validator.UserValidator

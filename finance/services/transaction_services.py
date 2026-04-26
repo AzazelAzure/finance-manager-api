@@ -40,7 +40,7 @@ def get_transactions(uid,**kwargs):
     queryset = apply_transaction_filters(queryset, **filter_kwargs)
 
     # Default ordering
-    queryset = queryset.order_by('tx_id')
+    queryset = queryset.order_by('-date', '-tx_id')
 
     # Compute all totals in a single grouped query to avoid repeated aggregates.
     # This keeps GET transactions requests within a small number of DB executions.

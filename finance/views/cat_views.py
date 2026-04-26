@@ -12,6 +12,7 @@ from finance.api_tools.serializers.cat_serializers import(
 
 @extend_schema_view(
     post=extend_schema(
+        operation_id="finance_categories_create",
         summary="Create categories",
         description="Create one category object.",
         request=CategorySerializer,
@@ -19,33 +20,15 @@ from finance.api_tools.serializers.cat_serializers import(
         tags=["Categories"],
     ),
     get=extend_schema(
+        operation_id="finance_categories_list",
         summary="List categories",
         description="List all categories for the authenticated user.",
         responses={status.HTTP_200_OK: CategorySerializer(many=True)},
         tags=["Categories"],
-    ),
-    patch=extend_schema(
-        summary="Rename a category",
-        description="Partially update a category name by path parameter.",
-        request=CategorySerializer,
-        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
-        tags=["Categories"],
-    ),
-    put=extend_schema(
-        summary="Replace category payload",
-        description="Update category name by path parameter.",
-        request=CategorySerializer,
-        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
-        tags=["Categories"],
-    ),
-    delete=extend_schema(
-        summary="Delete category",
-        description="Delete category by path parameter.",
-        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
-        tags=["Categories"],
-    ),
+    )
 )
-class CategoryView(APIView):
+class CategoryListCreateView(APIView):
+    serializer_class = CategorySerializer
     
     def post(self, request):
         serializer = CategorySerializer(data=request.data)
@@ -57,15 +40,51 @@ class CategoryView(APIView):
         serializer = CategorySetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    def get(self, request, cat_name: str = None):
-        if cat_name:
-            result = cat_svc.get_category(request.user.appprofile.user_id, cat_name)
-            serializer = CategorySerializer(result["category"])
-            return Response(serializer.data, status=status.HTTP_200_OK)
+    def get(self, request):
         result = cat_svc.get_categories(request.user.appprofile.user_id)
         serializer = CategorySerializer(result["categories"], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="finance_categories_retrieve",
+        summary="Retrieve category",
+        description="Retrieve a single category by its name.",
+        responses={status.HTTP_200_OK: CategorySerializer},
+        tags=["Categories"],
+    ),
+    patch=extend_schema(
+        operation_id="finance_categories_partial_update",
+        summary="Rename a category",
+        description="Partially update a category name by path parameter.",
+        request=CategorySerializer,
+        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
+        tags=["Categories"],
+    ),
+    put=extend_schema(
+        operation_id="finance_categories_update",
+        summary="Replace category payload",
+        description="Update category name by path parameter.",
+        request=CategorySerializer,
+        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
+        tags=["Categories"],
+    ),
+    delete=extend_schema(
+        operation_id="finance_categories_destroy",
+        summary="Delete category",
+        description="Delete category by path parameter.",
+        responses={status.HTTP_200_OK: CategorySetReturnSerializer},
+        tags=["Categories"],
+    ),
+)
+class CategoryDetailView(APIView):
+    serializer_class = CategorySerializer
+
+    def get(self, request, cat_name: str):
+        result = cat_svc.get_category(request.user.appprofile.user_id, cat_name)
+        serializer = CategorySerializer(result["category"])
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, cat_name: str):
         serializer = CategorySerializer(data=request.data, partial=True)

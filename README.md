@@ -7,7 +7,7 @@ This project is designed for clean multi-user isolation (per-user data partition
 
 ## Version & Status
 
-- Current version: **v1.0.1**
+- Current version: **v1.2.0**
 - Status: production-usable core API
 - Scope: authenticated finance CRUD + profile/snapshot with per-user isolation
 

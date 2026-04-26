@@ -2,6 +2,16 @@
 
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
+## [v1.2.0] - 2026-04-26
+### Features
+- **REST View Split**: Fully refactored combined resource views into standard `ListCreateView` and `DetailView` patterns for Transactions, Categories, Sources, and Upcoming Expenses.
+- **Data Ordering**: Implemented descending chronological sorting (`-date, -tx_id`) as the default for all transaction list retrievals and dashboard totals.
+
+### Bug Fixes
+- **Validation**: Updated `tx_serializers.py` to allow `blank=True` and `null=True` on the `bill` field, resolving 400 Bad Request errors.
+- **Expenses Fix**: Corrected boolean interpretation for `paid_flag` and `recurring` filters in `UpcomingExpense` services to prevent 500 errors from string query parameters.
+- **Schema Stability**: Implemented an explicit `ref_name` monkeypatch for `TokenRefreshSerializer` and `CookieTokenRefreshSerializer` within `finance/apps.py` (`ready()`) to resolve persistent naming collisions between SimpleJWT and DjRestAuth without causing circular imports during boot.
+
 ## [v1.1.0] - 2026-04-26
 ### Documentation
 - **Comprehensive API Documentation**: Created detailed documentation in `design_docs/api_docs/`, covering Architecture, Endpoints, Models, Business Logic, Security, Data Access, and Tools.

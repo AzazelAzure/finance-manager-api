@@ -18,6 +18,7 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularEx
 
 @extend_schema_view(    
     post=extend_schema(
+        operation_id="finance_upcoming_expenses_create",
         summary="Add an expense",
         description="Create one expense object or a list of expense objects.",
         request=ExpensePostSerializer,
@@ -25,9 +26,10 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularEx
         tags=["Upcoming Expenses"]
     ),
     get=extend_schema(
-        summary="Retrieve an expense",
+        operation_id="finance_upcoming_expenses_list",
+        summary="Retrieve expenses list",
         description="Retrieve expenses with optional filters.\n"
-                    "Use `name` in path for a single expense, or query params for filtered lists.",
+                    "Aggregate totals are included in the response payload.",
         parameters=[
             OpenApiParameter(name='name', type=OpenApiTypes.STR, description='Filter by expense name'),
             OpenApiParameter(name='due_date', type=OpenApiTypes.STR, description='Filter by due date'),
@@ -37,35 +39,17 @@ from finance.api_tools.serializers.spectactular_serializers import SpectacularEx
             OpenApiParameter(name='end_date', type=OpenApiTypes.STR, description='Filter by expense end date'),
             OpenApiParameter(name='start', type=OpenApiTypes.STR, description='Filter for a start date'),
             OpenApiParameter(name='end', type=OpenApiTypes.STR, description='Filter for an end date'),
-            OpenApiParameter(name='for_month', type=OpenApiTypes.BOOL, description='Filter by current month'),
+            OpenApiParameter(name='for_month', type=OpenApiTypes.STR, description='Filter by month in YYYY-MM format'),
             OpenApiParameter(name='remaining', type=OpenApiTypes.BOOL, description='Filter by remaining'),
             OpenApiParameter(name='upcoming', type=OpenApiTypes.BOOL, description='Filter by upcoming'),
         ],
         responses={status.HTTP_200_OK: SpectacularExpenseSerializer(many=True)},
         tags=["Upcoming Expenses"]
-    ),
-    patch=extend_schema(
-        summary="Partially update an expense",
-        description="Partially update an existing expense identified by name.",
-        request=ExpensePatchSerializer,
-        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
-        tags=["Upcoming Expenses"]
-    ),
-    put=extend_schema(
-        summary="Update an expense",
-        description="Replace mutable fields for an existing expense identified by name.",
-        request=ExpensePutSerializer,
-        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
-        tags=["Upcoming Expenses"]
-    ),
-    delete=extend_schema(
-        summary="Delete an expense",
-        description="Deletes an existing expense identified by its name.",
-        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
-        tags=["Upcoming Expenses"]
     )
 )
-class UpcomingExpenseView(APIView):
+class UpcomingExpenseListCreateView(APIView):
+    serializer_class = ExpensePostSerializer
+
     def post(self, request):
         is_many = isinstance(request.data, list)
         serializer = ExpensePostSerializer(data=request.data, many=is_many)
@@ -77,12 +61,8 @@ class UpcomingExpenseView(APIView):
         serializer = ExpenseSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    def get(self, request, name: str = None):
+    def get(self, request):
         uid = request.user.appprofile.user_id
-        if name:
-            result = exp_svc.get_expense(uid, name)
-            serializer = ExpenseSerializer(result['expense'])
-            return Response({'expense': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
         filter_params = {
             'remaining': request.query_params.get('remaining'),
             'recurring': request.query_params.get('recurring'),
@@ -99,6 +79,48 @@ class UpcomingExpenseView(APIView):
         result = exp_svc.get_expenses(uid, **filter_params)
         serializer = ExpenseSerializer(result['expenses'], many=True)
         return Response({'expenses': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="finance_upcoming_expenses_retrieve",
+        summary="Retrieve an expense",
+        description="Retrieve a single expense identified by name.",
+        responses={status.HTTP_200_OK: ExpenseSerializer},
+        tags=["Upcoming Expenses"]
+    ),
+    patch=extend_schema(
+        operation_id="finance_upcoming_expenses_partial_update",
+        summary="Partially update an expense",
+        description="Partially update an existing expense identified by name.",
+        request=ExpensePatchSerializer,
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
+        tags=["Upcoming Expenses"]
+    ),
+    put=extend_schema(
+        operation_id="finance_upcoming_expenses_update",
+        summary="Update an expense",
+        description="Replace mutable fields for an existing expense identified by name.",
+        request=ExpensePutSerializer,
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
+        tags=["Upcoming Expenses"]
+    ),
+    delete=extend_schema(
+        operation_id="finance_upcoming_expenses_destroy",
+        summary="Delete an expense",
+        description="Deletes an existing expense identified by its name.",
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
+        tags=["Upcoming Expenses"]
+    )
+)
+class UpcomingExpenseDetailView(APIView):
+    serializer_class = ExpensePutSerializer
+
+    def get(self, request, name: str):
+        uid = request.user.appprofile.user_id
+        result = exp_svc.get_expense(uid, name)
+        serializer = ExpenseSerializer(result['expense'])
+        return Response({'expense': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
 
     def put(self, request, name: str):
         serializer = ExpensePutSerializer(data=request.data)
