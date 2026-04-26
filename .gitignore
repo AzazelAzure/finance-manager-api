@@ -46,6 +46,13 @@ notes.txt
 .docker-config/
 .coverage
 .vendor/
+get_users.py
+print_tx.py
+scratch.py
+test_db.py
+test_full_mappers.py
+test_full_mappers_testuser.py
+test_view.py
 
 ### 5.6 Personal notes (not required for the app to run)
 POSTGRES_TEST_SETUP_NOTES.md
