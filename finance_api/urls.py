@@ -25,9 +25,11 @@ from finance.views.tag_views import TagView
 from finance.views.tx_views import TransactionListCreateView, TransactionDetailView
 from finance.views.usr_views import UserView
 from finance.views.auth_views import GoogleLogin, GitHubLogin
+from finance.views.report_views import BugReportView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
-    TokenRefreshView
+    TokenRefreshView,
+    TokenVerifyView,
 )
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer # Added for subclassing
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -57,7 +59,7 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'), # Modified to use CustomTokenRefreshView
     path('api/token/auth/', TokenObtainPairView.as_view(), name='token_auth'),
-    path('api/token/verify/', CustomTokenRefreshView.as_view(), name='token_verify'), # Modified to use CustomTokenRefreshView
+    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     # Auth & Social Login
     path('api/auth/', include('dj_rest_auth.urls')),
@@ -76,4 +78,5 @@ urlpatterns = [
     path("finance/categories/<str:cat_name>/", CategoryDetailView.as_view(), name="category_detail"),
     path("finance/tags/", TagView.as_view(), name="tags"), 
     path("finance/user/", UserView.as_view(), name="user"), 
+    path("finance/bug-report/", BugReportView.as_view(), name="bug_report"),
 ]

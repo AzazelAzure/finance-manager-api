@@ -13,6 +13,7 @@ def logging_config():
     """
     # Remove any existing handlers so configuration is idempotent
     logger.remove()
+    logger.configure(extra={"uid": "n/a", "username": "n/a"})
 
     # Use the current entrypoint (e.g. manage.py) as the base log filename
     script_name = Path(sys.argv[0]).stem
@@ -36,6 +37,7 @@ def logging_config():
     base_fmt = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<level>{level: <8}</level> | "
+        "uid=<magenta>{extra[uid]}</magenta> user=<cyan>{extra[username]}</cyan> | "
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
         "<level>{message}</level>"
     )

@@ -26,3 +26,8 @@ class PasswordChangeSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Incorrect current password.")
         return value
+
+
+class BugReportSerializer(serializers.Serializer):
+    subject = serializers.CharField(max_length=120)
+    message = serializers.CharField(max_length=4000)

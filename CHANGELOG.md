@@ -2,6 +2,19 @@
 
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
+## [v1.2.1] - 2026-04-27
+### Features
+- **Bug Report Pipeline Baseline**: Added authenticated `POST /finance/bug-report/` support with configurable email routing (`BUG_REPORT_TO_EMAIL`) and integration coverage.
+
+### Security & Contracts
+- **JWT Verify Contract Fix**: Corrected `/api/token/verify/` routing to use `TokenVerifyView` instead of refresh behavior.
+
+### Observability
+- **User-Tagged Logging Baseline**: Added request-scoped log context (`uid`, `username`) and default Loguru extras for per-user operational tracing.
+
+### Tests
+- **Phase 2 API Gate Coverage**: Added targeted tests for token verify route binding and bug report email dispatch.
+
 ## [v1.2.0] - 2026-04-26
 ### Features
 - **REST View Split**: Fully refactored combined resource views into standard `ListCreateView` and `DetailView` patterns for Transactions, Categories, Sources, and Upcoming Expenses.
