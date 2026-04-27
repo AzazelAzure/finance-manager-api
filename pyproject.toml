@@ -60,3 +60,8 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.coverage.run]
+omit = [
+    "finance/management/commands/*",
+]
