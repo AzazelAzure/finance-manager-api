@@ -5,9 +5,11 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 ### Features
 - **Visualization Aggregate Packets**: Added `GET /finance/transactions/visualization/` to return chart-ready transaction flow/type/category aggregates plus upcoming-expense timeline/monthly/status packets for a date range.
+- **Upcoming Expense PATCH Alias**: Added partial-update compatibility for `PATCH /finance/upcoming-expenses/{name}/` requests that send `{"paid": true}` by mapping the alias to the canonical `paid_flag` field.
 
 ### Tests
 - **Visualization Contract Coverage**: Added aggregate correctness tests for mixed transaction types and paid/unpaid upcoming expense summaries.
+- **Expense PATCH Alias Coverage**: Added integration coverage confirming `paid` alias updates `paid_flag` in upcoming expense partial updates.
 
 ### Documentation
 - **README Version Clarification**: Clarified `README.md` to distinguish current code version from public release status for private-repo visibility.
