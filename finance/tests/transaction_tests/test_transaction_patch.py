@@ -471,7 +471,7 @@ class TransactionDeleteTestCase(TransactionBase):
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.tx_id = self.response.data['accepted'][0]['tx_id']
         self.delete_url = reverse(
-            'transaction_detail_update_delete',
+            'transaction_detail',
             kwargs={'tx_id': self.tx_id},
         )
 
@@ -528,7 +528,7 @@ class TransactionDeleteTestCase(TransactionBase):
         """
         logger.info("Beginning delete nonexistent tx_id test")
         url = reverse(
-            "transaction_detail_update_delete",
+            "transaction_detail",
             kwargs={"tx_id": "2099-12-31-NONEXIST0"},
         )
         response = self.client.delete(url)

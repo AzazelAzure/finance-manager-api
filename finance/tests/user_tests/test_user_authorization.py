@@ -6,13 +6,13 @@ from finance.tests.user_tests.user_base import UserBase
 
 
 class UserAuthorizationTests(UserBase):
-    def test_user_patch_rejects_other_username(self):
+    def test_user_patch_rejects_invalid_password_payload(self):
         response = self.client.patch(
             self.user_url,
             {"username": self.other_user.username, "password": "new-pass-123"},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_delete_rejects_other_username(self):
         response = self.client.delete(

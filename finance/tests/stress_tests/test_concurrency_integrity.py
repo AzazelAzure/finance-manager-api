@@ -59,7 +59,7 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             tags=["integrity-tag"],
             bill=self.expense.name,
         )
-        self.tx_detail_url = reverse("transaction_detail_update_delete", kwargs={"tx_id": self.tx.tx_id})
+        self.tx_detail_url = reverse("transaction_detail", kwargs={"tx_id": self.tx.tx_id})
 
     def _client(self) -> APIClient:
         client = APIClient()
@@ -131,7 +131,7 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             return self._client().post(reverse("transactions_list_create"), payload, format="json").status_code
 
         def delete_source():
-            return self._client().delete(reverse("sources"), {"source": contender.source}, format="json").status_code
+            return self._client().delete(reverse("sources_list_create"), {"source": contender.source}, format="json").status_code
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             statuses = list(pool.map(create_tx, range(12)))

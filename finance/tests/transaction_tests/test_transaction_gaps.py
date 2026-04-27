@@ -11,9 +11,9 @@ class TransactionGapTestCase(TransactionPatchBase):
     def setUp(self):
         super().setUp()
         self.tx_list_url = reverse("transactions_list_create")
-        self.expense_list_url = reverse("upcoming_expenses")
+        self.expense_list_url = reverse("upcoming_expenses_list_create")
         self.expense_detail_url = lambda name: reverse(
-            "upcoming_expense_detail_update_delete", kwargs={"name": name}
+            "upcoming_expense_detail", kwargs={"name": name}
         )
 
     def test_patch_forbidden_tx_id_without_tags_still_rejected(self):
