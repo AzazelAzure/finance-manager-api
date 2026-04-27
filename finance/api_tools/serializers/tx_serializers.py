@@ -16,7 +16,7 @@ class TransactionSerializer(serializers.Serializer):
     category = serializers.CharField(max_length=200, required=False)
 
 class TransactionSetSerializer(TransactionSerializer):
-    bill = serializers.CharField(max_length=200, required=False)
+    bill = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
 
 class TransactionAcceptedSerializer(TransactionSetSerializer):
     tx_id = serializers.CharField(max_length=20)
@@ -31,7 +31,7 @@ class TransactionSetReturnSerializer(serializers.Serializer):
 class TransactionGetSerializer(TransactionSerializer):
     tx_id = serializers.CharField(max_length=20)
     created_on = serializers.DateField()
-    bill = serializers.CharField(max_length=200, required=False)
+    bill = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
     snapshot = FinancialSnapshotSerializer(required=False)
 
 

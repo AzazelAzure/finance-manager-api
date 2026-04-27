@@ -1,7 +1,8 @@
 openapi: 3.0.3
 info:
-  title: ''
-  version: 0.0.0
+  title: Finance Manager API
+  version: 1.0.0
+  description: Financial data management API with zero-knowledge aspirations.
 paths:
   /api/auth/github/:
     post:
@@ -33,13 +34,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
       security:
       - jwtAuth: []
       - {}
@@ -80,13 +81,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SocialLogin'
+              $ref: '#/components/schemas/SocialLoginRequest'
       security:
       - jwtAuth: []
       - {}
@@ -114,13 +115,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Login'
+              $ref: '#/components/schemas/LoginRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Login'
+              $ref: '#/components/schemas/LoginRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Login'
+              $ref: '#/components/schemas/LoginRequest'
         required: true
       security:
       - jwtAuth: []
@@ -166,13 +167,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordChange'
+              $ref: '#/components/schemas/PasswordChangeRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PasswordChange'
+              $ref: '#/components/schemas/PasswordChangeRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PasswordChange'
+              $ref: '#/components/schemas/PasswordChangeRequest'
         required: true
       security:
       - jwtAuth: []
@@ -197,13 +198,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/PasswordResetRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/PasswordResetRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/PasswordResetRequest'
         required: true
       security:
       - jwtAuth: []
@@ -231,13 +232,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordResetConfirm'
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PasswordResetConfirm'
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PasswordResetConfirm'
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
         required: true
       security:
       - jwtAuth: []
@@ -262,13 +263,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Register'
+              $ref: '#/components/schemas/RegisterRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Register'
+              $ref: '#/components/schemas/RegisterRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Register'
+              $ref: '#/components/schemas/RegisterRequest'
         required: true
       security:
       - jwtAuth: []
@@ -293,13 +294,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
+              $ref: '#/components/schemas/ResendEmailVerificationRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
+              $ref: '#/components/schemas/ResendEmailVerificationRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
+              $ref: '#/components/schemas/ResendEmailVerificationRequest'
       security:
       - jwtAuth: []
       - {}
@@ -323,13 +324,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VerifyEmail'
+              $ref: '#/components/schemas/VerifyEmailRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/VerifyEmail'
+              $ref: '#/components/schemas/VerifyEmailRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/VerifyEmail'
+              $ref: '#/components/schemas/VerifyEmailRequest'
         required: true
       security:
       - jwtAuth: []
@@ -353,13 +354,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
         required: true
       responses:
         '200':
@@ -380,21 +381,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenVerify'
+              $ref: '#/components/schemas/TokenVerifyRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenVerify'
+              $ref: '#/components/schemas/TokenVerifyRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenVerify'
+              $ref: '#/components/schemas/TokenVerifyRequest'
         required: true
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenVerify'
-          description: ''
+          description: No response body
   /api/auth/user/:
     get:
       operationId: api_auth_user_retrieve
@@ -435,13 +432,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserDetails'
+              $ref: '#/components/schemas/UserDetailsRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserDetails'
+              $ref: '#/components/schemas/UserDetailsRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserDetails'
+              $ref: '#/components/schemas/UserDetailsRequest'
         required: true
       security:
       - jwtAuth: []
@@ -469,13 +466,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserDetails'
+              $ref: '#/components/schemas/PatchedUserDetailsRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserDetails'
+              $ref: '#/components/schemas/PatchedUserDetailsRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserDetails'
+              $ref: '#/components/schemas/PatchedUserDetailsRequest'
       security:
       - jwtAuth: []
       responses:
@@ -484,152 +481,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserDetails'
-          description: ''
-  /api/schema/:
-    get:
-      operationId: api_schema_retrieve
-      description: |-
-        OpenApi3 schema for this API. Format can be selected via content negotiation.
-
-        - YAML: application/vnd.oai.openapi
-        - JSON: application/vnd.oai.openapi+json
-      parameters:
-      - in: query
-        name: format
-        schema:
-          type: string
-          enum:
-          - json
-          - yaml
-      - in: query
-        name: lang
-        schema:
-          type: string
-          enum:
-          - af
-          - ar
-          - ar-dz
-          - ast
-          - az
-          - be
-          - bg
-          - bn
-          - br
-          - bs
-          - ca
-          - ckb
-          - cs
-          - cy
-          - da
-          - de
-          - dsb
-          - el
-          - en
-          - en-au
-          - en-gb
-          - eo
-          - es
-          - es-ar
-          - es-co
-          - es-mx
-          - es-ni
-          - es-ve
-          - et
-          - eu
-          - fa
-          - fi
-          - fr
-          - fy
-          - ga
-          - gd
-          - gl
-          - he
-          - hi
-          - hr
-          - hsb
-          - ht
-          - hu
-          - hy
-          - ia
-          - id
-          - ig
-          - io
-          - is
-          - it
-          - ja
-          - ka
-          - kab
-          - kk
-          - km
-          - kn
-          - ko
-          - ky
-          - lb
-          - lt
-          - lv
-          - mk
-          - ml
-          - mn
-          - mr
-          - ms
-          - my
-          - nb
-          - ne
-          - nl
-          - nn
-          - os
-          - pa
-          - pl
-          - pt
-          - pt-br
-          - ro
-          - ru
-          - sk
-          - sl
-          - sq
-          - sr
-          - sr-latn
-          - sv
-          - sw
-          - ta
-          - te
-          - tg
-          - th
-          - tk
-          - tr
-          - tt
-          - udm
-          - ug
-          - uk
-          - ur
-          - uz
-          - vi
-          - zh-hans
-          - zh-hant
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/vnd.oai.openapi:
-              schema:
-                type: object
-                additionalProperties: {}
-            application/yaml:
-              schema:
-                type: object
-                additionalProperties: {}
-            application/vnd.oai.openapi+json:
-              schema:
-                type: object
-                additionalProperties: {}
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
           description: ''
   /api/token/:
     post:
@@ -643,13 +494,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
         required: true
       responses:
         '200':
@@ -670,13 +521,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenObtainPair'
+              $ref: '#/components/schemas/TokenObtainPairRequest'
         required: true
       responses:
         '200':
@@ -697,13 +548,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
         required: true
       responses:
         '200':
@@ -724,13 +575,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenRefresh'
+              $ref: '#/components/schemas/TokenRefreshRequest'
         required: true
       responses:
         '200':
@@ -741,9 +592,9 @@ paths:
           description: ''
   /finance/appprofile/:
     get:
-      operationId: finance_appprofile_retrieve
-      description: Retrieve profile settings. Snapshot totals are available on the
-        snapshot route.
+      operationId: finance_profile_retrieve
+      description: Retrieve profile settings. Detailed snapshot totals are available
+        on the snapshot route.
       summary: Retrieve app profile
       tags:
       - App Profiles
@@ -757,33 +608,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/AppProfileGet'
           description: ''
-    post:
-      operationId: finance_appprofile_create
-      description: App profiles are auto-created alongside users; manual creation
-        is disabled.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '403':
-          description: No response body
-    put:
-      operationId: finance_appprofile_update
-      description: Only partial updates are supported on this resource.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '405':
-          description: No response body
     patch:
-      operationId: finance_appprofile_partial_update
+      operationId: finance_profile_partial_update
       description: |-
         Update mutable profile settings (for example, spend accounts/base currency).
         The reserved `unknown` source cannot be selected as a spend account.
@@ -794,13 +620,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
+              $ref: '#/components/schemas/PatchedAppProfileUpdateRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
+              $ref: '#/components/schemas/PatchedAppProfileUpdateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
+              $ref: '#/components/schemas/PatchedAppProfileUpdateRequest'
       security:
       - jwtAuth: []
       - {}
@@ -812,26 +638,12 @@ paths:
                 $ref: '#/components/schemas/AppProfileUpdate'
           description: ''
         '403':
-          description: No response body
-    delete:
-      operationId: finance_appprofile_destroy
-      description: Profiles are lifecycle-managed with users; delete the user account
-        instead.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '501':
           description: No response body
   /finance/appprofile/snapshot/:
     get:
-      operationId: finance_appprofile_snapshot_retrieve
-      description: Retrieve profile settings. Snapshot totals are available on the
-        snapshot route.
-      summary: Retrieve app profile
+      operationId: finance_profile_snapshot
+      description: Retrieve calculated totals and snapshot data for the app profile.
+      summary: Retrieve profile snapshot
       tags:
       - App Profiles
       security:
@@ -842,77 +654,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AppProfileGet'
+                $ref: '#/components/schemas/Snapshot'
           description: ''
-    post:
-      operationId: finance_appprofile_snapshot_create
-      description: App profiles are auto-created alongside users; manual creation
-        is disabled.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '403':
-          description: No response body
-    put:
-      operationId: finance_appprofile_snapshot_update
-      description: Only partial updates are supported on this resource.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '405':
-          description: No response body
-    patch:
-      operationId: finance_appprofile_snapshot_partial_update
-      description: |-
-        Update mutable profile settings (for example, spend accounts/base currency).
-        The reserved `unknown` source cannot be selected as a spend account.
-      summary: Update app profile
-      tags:
-      - App Profiles
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedAppProfileUpdate'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AppProfileUpdate'
-          description: ''
-        '403':
-          description: No response body
-    delete:
-      operationId: finance_appprofile_snapshot_destroy
-      description: Profiles are lifecycle-managed with users; delete the user account
-        instead.
-      summary: Not allowed
-      tags:
-      - App Profiles
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '501':
-          description: No response body
   /finance/categories/:
     get:
       operationId: finance_categories_list
@@ -942,13 +685,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
         required: true
       security:
       - jwtAuth: []
@@ -960,23 +703,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/CategorySetReturn'
           description: ''
+  /finance/categories/{cat_name}/:
+    get:
+      operationId: finance_categories_retrieve
+      description: Retrieve a single category by its name.
+      summary: Retrieve category
+      parameters:
+      - in: path
+        name: cat_name
+        schema:
+          type: string
+        required: true
+      tags:
+      - Categories
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
     put:
       operationId: finance_categories_update
       description: Update category name by path parameter.
       summary: Replace category payload
+      parameters:
+      - in: path
+        name: cat_name
+        schema:
+          type: string
+        required: true
       tags:
       - Categories
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
         required: true
       security:
       - jwtAuth: []
@@ -992,19 +764,25 @@ paths:
       operationId: finance_categories_partial_update
       description: Partially update a category name by path parameter.
       summary: Rename a category
+      parameters:
+      - in: path
+        name: cat_name
+        schema:
+          type: string
+        required: true
       tags:
       - Categories
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
       security:
       - jwtAuth: []
       - {}
@@ -1017,148 +795,6 @@ paths:
           description: ''
     delete:
       operationId: finance_categories_destroy
-      description: Delete category by path parameter.
-      summary: Delete category
-      tags:
-      - Categories
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CategorySetReturn'
-          description: ''
-  /finance/categories/{cat_name}/:
-    get:
-      operationId: finance_categories_list_2
-      description: List all categories for the authenticated user.
-      summary: List categories
-      parameters:
-      - in: path
-        name: cat_name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Categories
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Category'
-          description: ''
-    post:
-      operationId: finance_categories_create_2
-      description: Create one category object.
-      summary: Create categories
-      parameters:
-      - in: path
-        name: cat_name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Categories
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Category'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Category'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Category'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CategorySetReturn'
-          description: ''
-    put:
-      operationId: finance_categories_update_2
-      description: Update category name by path parameter.
-      summary: Replace category payload
-      parameters:
-      - in: path
-        name: cat_name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Categories
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Category'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Category'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Category'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CategorySetReturn'
-          description: ''
-    patch:
-      operationId: finance_categories_partial_update_2
-      description: Partially update a category name by path parameter.
-      summary: Rename a category
-      parameters:
-      - in: path
-        name: cat_name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Categories
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedCategory'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedCategory'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedCategory'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CategorySetReturn'
-          description: ''
-    delete:
-      operationId: finance_categories_destroy_2
       description: Delete category by path parameter.
       summary: Delete category
       parameters:
@@ -1182,9 +818,9 @@ paths:
   /finance/sources/:
     get:
       operationId: finance_sources_list
-      description: Retrieves a list of payment sources for a user.  Accepts optional
+      description: Retrieves a list of payment sources for a user. Accepts optional
         filters.
-      summary: Retrieve sources
+      summary: Retrieve sources list
       parameters:
       - in: query
         name: acc_type
@@ -1222,13 +858,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourcePost'
+              $ref: '#/components/schemas/SourcePostRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SourcePost'
+              $ref: '#/components/schemas/SourcePostRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SourcePost'
+              $ref: '#/components/schemas/SourcePostRequest'
         required: true
       security:
       - jwtAuth: []
@@ -1240,25 +876,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/SourceSetReturn'
           description: ''
+  /finance/sources/{source}/:
+    get:
+      operationId: finance_sources_retrieve
+      description: Retrieve a single source by its name.
+      summary: Retrieve source
+      parameters:
+      - in: path
+        name: source
+        schema:
+          type: string
+        required: true
+      tags:
+      - Sources
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+          description: ''
     put:
       operationId: finance_sources_update
       description: |-
         Replace mutable fields for an existing source.
         The reserved source name `unknown` cannot be modified.
       summary: Update a payment source
+      parameters:
+      - in: path
+        name: source
+        schema:
+          type: string
+        required: true
       tags:
       - Sources
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourcePut'
+              $ref: '#/components/schemas/SourcePutRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SourcePut'
+              $ref: '#/components/schemas/SourcePutRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SourcePut'
+              $ref: '#/components/schemas/SourcePutRequest'
         required: true
       security:
       - jwtAuth: []
@@ -1278,19 +943,25 @@ paths:
         Patch mutable fields for an existing source.
         The reserved source name `unknown` cannot be modified.
       summary: Partially update a payment source
+      parameters:
+      - in: path
+        name: source
+        schema:
+          type: string
+        required: true
       tags:
       - Sources
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
+              $ref: '#/components/schemas/PatchedSourcePatchRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
+              $ref: '#/components/schemas/PatchedSourcePatchRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
+              $ref: '#/components/schemas/PatchedSourcePatchRequest'
       security:
       - jwtAuth: []
       - {}
@@ -1306,174 +977,7 @@ paths:
     delete:
       operationId: finance_sources_destroy
       description: |-
-        Delete an existing source passed as `source` in request body.
-        The reserved source name `unknown` cannot be deleted.
-      summary: Delete a payment source
-      tags:
-      - Sources
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SourceSetReturn'
-          description: ''
-        '403':
-          description: No response body
-  /finance/sources/{source}/:
-    get:
-      operationId: finance_sources_list_2
-      description: Retrieves a list of payment sources for a user.  Accepts optional
-        filters.
-      summary: Retrieve sources
-      parameters:
-      - in: query
-        name: acc_type
-        schema:
-          type: string
-        description: Filter by account type (e.g., CASH, INVESTMENT, SAVINGS)
-      - in: path
-        name: source
-        schema:
-          type: string
-        required: true
-      - in: query
-        name: source
-        schema:
-          type: string
-        description: Filter by source (e.g., VISA, MASTERCARD, AMEX)
-      tags:
-      - Sources
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Source'
-          description: ''
-    post:
-      operationId: finance_sources_create_2
-      description: |-
-        Create one source object or a list of source objects.
-        The reserved source name `unknown` is rejected by validation.
-      summary: Add a payment source
-      parameters:
-      - in: path
-        name: source
-        schema:
-          type: string
-        required: true
-      tags:
-      - Sources
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SourcePost'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SourcePost'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SourcePost'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SourceSetReturn'
-          description: ''
-    put:
-      operationId: finance_sources_update_2
-      description: |-
-        Replace mutable fields for an existing source.
-        The reserved source name `unknown` cannot be modified.
-      summary: Update a payment source
-      parameters:
-      - in: path
-        name: source
-        schema:
-          type: string
-        required: true
-      tags:
-      - Sources
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SourcePut'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SourcePut'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SourcePut'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SourceSetReturn'
-          description: ''
-        '403':
-          description: No response body
-    patch:
-      operationId: finance_sources_partial_update_2
-      description: |-
-        Patch mutable fields for an existing source.
-        The reserved source name `unknown` cannot be modified.
-      summary: Partially update a payment source
-      parameters:
-      - in: path
-        name: source
-        schema:
-          type: string
-        required: true
-      tags:
-      - Sources
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedSourcePatch'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SourceSetReturn'
-          description: ''
-        '403':
-          description: No response body
-    delete:
-      operationId: finance_sources_destroy_2
-      description: |-
-        Delete an existing source passed as `source` in request body.
+        Delete an existing source.
         The reserved source name `unknown` cannot be deleted.
       summary: Delete a payment source
       parameters:
@@ -1527,13 +1031,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Tag'
+              $ref: '#/components/schemas/TagRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Tag'
+              $ref: '#/components/schemas/TagRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Tag'
+              $ref: '#/components/schemas/TagRequest'
         required: true
       security:
       - jwtAuth: []
@@ -1555,13 +1059,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TagPatchPut'
+              $ref: '#/components/schemas/TagPatchPutRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TagPatchPut'
+              $ref: '#/components/schemas/TagPatchPutRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TagPatchPut'
+              $ref: '#/components/schemas/TagPatchPutRequest'
         required: true
       security:
       - jwtAuth: []
@@ -1583,13 +1087,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedTagPatchPut'
+              $ref: '#/components/schemas/PatchedTagPatchPutRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedTagPatchPut'
+              $ref: '#/components/schemas/PatchedTagPatchPutRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedTagPatchPut'
+              $ref: '#/components/schemas/PatchedTagPatchPutRequest'
       security:
       - jwtAuth: []
       - {}
@@ -1618,12 +1122,12 @@ paths:
           description: ''
   /finance/transactions/:
     get:
-      operationId: finance_transactions_retrieve
+      operationId: finance_transactions_list
       description: |-
         Retrieve transactions with optional filtering.
         When no filters are provided, the most recent transaction is returned by service logic.
         Aggregate totals are included in the response payload.
-      summary: Retrieve transactions
+      summary: Retrieve transactions list
       parameters:
       - in: query
         name: by_date
@@ -1735,13 +1239,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TransactionSet'
+              $ref: '#/components/schemas/TransactionSetRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TransactionSet'
+              $ref: '#/components/schemas/TransactionSetRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TransactionSet'
+              $ref: '#/components/schemas/TransactionSetRequest'
         required: true
       security:
       - jwtAuth: []
@@ -1755,18 +1259,29 @@ paths:
           description: ''
         '403':
           description: No response body
-    put:
-      operationId: finance_transactions_update
-      description: For transactional fidelity, this endpoint is not allowed.
-      summary: Not allowed.
+  /finance/transactions/{tx_id}/:
+    get:
+      operationId: finance_transactions_retrieve
+      description: Retrieve a single transaction by its `tx_id`.
+      summary: Retrieve a transaction
+      parameters:
+      - in: path
+        name: tx_id
+        schema:
+          type: string
+        required: true
       tags:
       - Transactions
       security:
       - jwtAuth: []
       - {}
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionGet'
+          description: ''
     patch:
       operationId: finance_transactions_partial_update
       description: |-
@@ -1774,19 +1289,25 @@ paths:
         `tx_id` and `entry_id` are immutable and rejected.
         A `date` field is required by this view before forwarding to the service layer.
       summary: Update a transaction
+      parameters:
+      - in: path
+        name: tx_id
+        schema:
+          type: string
+        required: true
       tags:
       - Transactions
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
+              $ref: '#/components/schemas/PatchedTransactionSetRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
+              $ref: '#/components/schemas/PatchedTransactionSetRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
+              $ref: '#/components/schemas/PatchedTransactionSetRequest'
       security:
       - jwtAuth: []
       - {}
@@ -1803,230 +1324,6 @@ paths:
           description: No response body
     delete:
       operationId: finance_transactions_destroy
-      description: Delete an existing transaction by `tx_id`.
-      summary: Delete a transaction
-      tags:
-      - Transactions
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionGet'
-          description: ''
-  /finance/transactions/{tx_id}/:
-    get:
-      operationId: finance_transactions_retrieve_2
-      description: |-
-        Retrieve transactions with optional filtering.
-        When no filters are provided, the most recent transaction is returned by service logic.
-        Aggregate totals are included in the response payload.
-      summary: Retrieve transactions
-      parameters:
-      - in: query
-        name: by_date
-        schema:
-          type: string
-        description: Filter by date
-      - in: query
-        name: by_year
-        schema:
-          type: integer
-        description: Filter by year
-      - in: query
-        name: category
-        schema:
-          type: string
-        description: Filter by category
-      - in: query
-        name: currency_code
-        schema:
-          type: string
-        description: Filter by currency code
-      - in: query
-        name: current_month
-        schema:
-          type: boolean
-        description: Filter by current month
-      - in: query
-        name: date
-        schema:
-          type: string
-        description: Filter by date
-      - in: query
-        name: end_date
-        schema:
-          type: string
-        description: Filter by end date
-      - in: query
-        name: gte
-        schema:
-          type: integer
-        description: Filter by greater than or equal to
-      - in: query
-        name: last_month
-        schema:
-          type: boolean
-        description: Filter by last month
-      - in: query
-        name: lte
-        schema:
-          type: integer
-        description: Filter by less than or equal to
-      - in: query
-        name: month
-        schema:
-          type: integer
-        description: Filter by month
-      - in: query
-        name: previous_week
-        schema:
-          type: boolean
-        description: Filter by previous week
-      - in: query
-        name: source
-        schema:
-          type: string
-        description: Filter by source
-      - in: query
-        name: start_date
-        schema:
-          type: string
-        description: Filter by start date
-      - in: query
-        name: tag_name
-        schema:
-          type: string
-        description: Filter by tag name
-      - in: path
-        name: tx_id
-        schema:
-          type: string
-        required: true
-      - in: query
-        name: tx_type
-        schema:
-          type: string
-        description: Filter by transaction type (e.g., EXPENSE, INCOME)
-      - in: query
-        name: year
-        schema:
-          type: integer
-        description: Filter by year
-      tags:
-      - Transactions
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionGetReturn'
-          description: ''
-    post:
-      operationId: finance_transactions_create_2
-      description: |-
-        Create a single transaction object or a list of transaction objects.
-        Amounts are normalized by type (EXPENSE/XFER_OUT negative; INCOME/XFER_IN positive).
-        Client-supplied `tx_id` and `entry_id` are rejected.
-      summary: Create one or more transactions
-      parameters:
-      - in: path
-        name: tx_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Transactions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TransactionSet'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TransactionSet'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TransactionSet'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionSetReturn'
-          description: ''
-        '403':
-          description: No response body
-    put:
-      operationId: finance_transactions_update_2
-      description: For transactional fidelity, this endpoint is not allowed.
-      summary: Not allowed.
-      parameters:
-      - in: path
-        name: tx_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Transactions
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '405':
-          description: No response body
-    patch:
-      operationId: finance_transactions_partial_update_2
-      description: |-
-        Partially update a transaction by `tx_id`.
-        `tx_id` and `entry_id` are immutable and rejected.
-        A `date` field is required by this view before forwarding to the service layer.
-      summary: Update a transaction
-      parameters:
-      - in: path
-        name: tx_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Transactions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedTransactionSet'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionSetReturn'
-          description: ''
-        '400':
-          description: No response body
-        '403':
-          description: No response body
-    delete:
-      operationId: finance_transactions_destroy_2
       description: Delete an existing transaction by `tx_id`.
       summary: Delete a transaction
       parameters:
@@ -2052,8 +1349,8 @@ paths:
       operationId: finance_upcoming_expenses_list
       description: |-
         Retrieve expenses with optional filters.
-        Use `name` in path for a single expense, or query params for filtered lists.
-      summary: Retrieve an expense
+        Aggregate totals are included in the response payload.
+      summary: Retrieve expenses list
       parameters:
       - in: query
         name: due_date
@@ -2134,13 +1431,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ExpensePost'
+              $ref: '#/components/schemas/ExpensePostRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ExpensePost'
+              $ref: '#/components/schemas/ExpensePostRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ExpensePost'
+              $ref: '#/components/schemas/ExpensePostRequest'
         required: true
       security:
       - jwtAuth: []
@@ -2152,23 +1449,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseSetReturn'
           description: ''
+  /finance/upcoming_expenses/{name}/:
+    get:
+      operationId: finance_upcoming_expenses_retrieve
+      description: Retrieve a single expense identified by name.
+      summary: Retrieve an expense
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - Upcoming Expenses
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+          description: ''
     put:
       operationId: finance_upcoming_expenses_update
       description: Replace mutable fields for an existing expense identified by name.
       summary: Update an expense
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
       tags:
       - Upcoming Expenses
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ExpensePut'
+              $ref: '#/components/schemas/ExpensePutRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ExpensePut'
+              $ref: '#/components/schemas/ExpensePutRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ExpensePut'
+              $ref: '#/components/schemas/ExpensePutRequest'
         required: true
       security:
       - jwtAuth: []
@@ -2184,19 +1510,25 @@ paths:
       operationId: finance_upcoming_expenses_partial_update
       description: Partially update an existing expense identified by name.
       summary: Partially update an expense
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
       tags:
       - Upcoming Expenses
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
+              $ref: '#/components/schemas/PatchedExpensePatchRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
+              $ref: '#/components/schemas/PatchedExpensePatchRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
+              $ref: '#/components/schemas/PatchedExpensePatchRequest'
       security:
       - jwtAuth: []
       - {}
@@ -2209,205 +1541,6 @@ paths:
           description: ''
     delete:
       operationId: finance_upcoming_expenses_destroy
-      description: Deletes an existing expense identified by its name.
-      summary: Delete an expense
-      tags:
-      - Upcoming Expenses
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpenseSetReturn'
-          description: ''
-  /finance/upcoming_expenses/{name}/:
-    get:
-      operationId: finance_upcoming_expenses_list_2
-      description: |-
-        Retrieve expenses with optional filters.
-        Use `name` in path for a single expense, or query params for filtered lists.
-      summary: Retrieve an expense
-      parameters:
-      - in: query
-        name: due_date
-        schema:
-          type: string
-        description: Filter by due date
-      - in: query
-        name: end
-        schema:
-          type: string
-        description: Filter for an end date
-      - in: query
-        name: end_date
-        schema:
-          type: string
-        description: Filter by expense end date
-      - in: query
-        name: for_month
-        schema:
-          type: boolean
-        description: Filter by current month
-      - in: path
-        name: name
-        schema:
-          type: string
-        required: true
-      - in: query
-        name: name
-        schema:
-          type: string
-        description: Filter by expense name
-      - in: query
-        name: paid_flag
-        schema:
-          type: boolean
-        description: Filter by paid flag
-      - in: query
-        name: recurring
-        schema:
-          type: boolean
-        description: Filter by recurring flag
-      - in: query
-        name: remaining
-        schema:
-          type: boolean
-        description: Filter by remaining
-      - in: query
-        name: start
-        schema:
-          type: string
-        description: Filter for a start date
-      - in: query
-        name: start_date
-        schema:
-          type: string
-        description: Filter by expense start date
-      - in: query
-        name: upcoming
-        schema:
-          type: boolean
-        description: Filter by upcoming
-      tags:
-      - Upcoming Expenses
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SpectacularExpense'
-          description: ''
-    post:
-      operationId: finance_upcoming_expenses_create_2
-      description: Create one expense object or a list of expense objects.
-      summary: Add an expense
-      parameters:
-      - in: path
-        name: name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Upcoming Expenses
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExpensePost'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExpensePost'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExpensePost'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpenseSetReturn'
-          description: ''
-    put:
-      operationId: finance_upcoming_expenses_update_2
-      description: Replace mutable fields for an existing expense identified by name.
-      summary: Update an expense
-      parameters:
-      - in: path
-        name: name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Upcoming Expenses
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExpensePut'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExpensePut'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExpensePut'
-        required: true
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpenseSetReturn'
-          description: ''
-    patch:
-      operationId: finance_upcoming_expenses_partial_update_2
-      description: Partially update an existing expense identified by name.
-      summary: Partially update an expense
-      parameters:
-      - in: path
-        name: name
-        schema:
-          type: string
-        required: true
-      tags:
-      - Upcoming Expenses
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedExpensePatch'
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExpenseSetReturn'
-          description: ''
-    delete:
-      operationId: finance_upcoming_expenses_destroy_2
       description: Deletes an existing expense identified by its name.
       summary: Delete an expense
       parameters:
@@ -2456,13 +1589,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/UserRequest'
         required: true
       security:
       - jwtAuth: []
@@ -2477,8 +1610,8 @@ paths:
           description: ''
     patch:
       operationId: finance_user_partial_update
-      description: Update password for the authenticated user. Username must match
-        request user.
+      description: Update password for the authenticated user. Requires current password
+        verification.
       summary: Update current user password
       tags:
       - Users
@@ -2486,13 +1619,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedPasswordChangeRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedPasswordChangeRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedPasswordChangeRequest'
       security:
       - jwtAuth: []
       - {}
@@ -2501,7 +1634,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
         '403':
           content:
@@ -2512,8 +1653,8 @@ paths:
           description: ''
     delete:
       operationId: finance_user_destroy
-      description: Delete the authenticated user account. Username must match request
-        user.
+      description: Delete the authenticated user account. Requires password verification.
+        This action is permanent.
       summary: Delete current user
       tags:
       - Users
@@ -2525,7 +1666,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                type: object
+                additionalProperties: {}
           description: ''
         '403':
           content:
@@ -2575,6 +1717,15 @@ components:
           maxLength: 200
       required:
       - name
+    CategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+      - name
     CategorySetReturn:
       type: object
       properties:
@@ -2619,11 +1770,12 @@ components:
           maxLength: 3
         is_recurring:
           type: boolean
-    ExpensePost:
+    ExpensePostRequest:
       type: object
       properties:
         name:
           type: string
+          minLength: 1
           maxLength: 200
         amount:
           type: string
@@ -2645,6 +1797,7 @@ components:
           type: boolean
         currency:
           type: string
+          minLength: 1
           maxLength: 3
         is_recurring:
           type: boolean
@@ -2652,11 +1805,12 @@ components:
       - amount
       - currency
       - name
-    ExpensePut:
+    ExpensePutRequest:
       type: object
       properties:
         name:
           type: string
+          minLength: 1
           maxLength: 200
         amount:
           type: string
@@ -2678,6 +1832,7 @@ components:
           type: boolean
         currency:
           type: string
+          minLength: 1
           maxLength: 3
         is_recurring:
           type: boolean
@@ -2790,6 +1945,60 @@ components:
       - total_monthly_spending
       - total_remaining_expenses
       - total_savings
+    FinancialSnapshotRequest:
+      type: object
+      properties:
+        safe_to_spend:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_assets:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_savings:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_checking:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_investment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_cash:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_ewallet:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_monthly_spending:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_remaining_expenses:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_leaks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - safe_to_spend
+      - total_assets
+      - total_cash
+      - total_checking
+      - total_ewallet
+      - total_investment
+      - total_leaks
+      - total_monthly_spending
+      - total_remaining_expenses
+      - total_savings
     JWT:
       type: object
       description: Serializer for JWT authentication.
@@ -2804,7 +2013,7 @@ components:
       - access
       - refresh
       - user
-    Login:
+    LoginRequest:
       type: object
       properties:
         username:
@@ -2814,66 +2023,77 @@ components:
           format: email
         password:
           type: string
+          minLength: 1
       required:
       - password
-    PasswordChange:
+    PasswordChangeRequest:
       type: object
       properties:
         new_password1:
           type: string
+          minLength: 1
           maxLength: 128
         new_password2:
           type: string
+          minLength: 1
           maxLength: 128
       required:
       - new_password1
       - new_password2
-    PasswordReset:
+    PasswordResetConfirmRequest:
+      type: object
+      description: Serializer for confirming a password reset attempt.
+      properties:
+        new_password1:
+          type: string
+          minLength: 1
+          maxLength: 128
+        new_password2:
+          type: string
+          minLength: 1
+          maxLength: 128
+        uid:
+          type: string
+          minLength: 1
+        token:
+          type: string
+          minLength: 1
+      required:
+      - new_password1
+      - new_password2
+      - token
+      - uid
+    PasswordResetRequest:
       type: object
       description: Serializer for requesting a password reset e-mail.
       properties:
         email:
           type: string
           format: email
+          minLength: 1
       required:
       - email
-    PasswordResetConfirm:
-      type: object
-      description: Serializer for confirming a password reset attempt.
-      properties:
-        new_password1:
-          type: string
-          maxLength: 128
-        new_password2:
-          type: string
-          maxLength: 128
-        uid:
-          type: string
-        token:
-          type: string
-      required:
-      - new_password1
-      - new_password2
-      - token
-      - uid
-    PatchedAppProfileUpdate:
+    PatchedAppProfileUpdateRequest:
       type: object
       properties:
         message:
           type: string
+          minLength: 1
         snapshot:
-          $ref: '#/components/schemas/FinancialSnapshot'
-    PatchedCategory:
+          $ref: '#/components/schemas/FinancialSnapshotRequest'
+    PatchedCategoryRequest:
       type: object
       properties:
         name:
           type: string
+          minLength: 1
           maxLength: 200
-    PatchedExpensePatch:
+    PatchedExpensePatchRequest:
       type: object
       properties:
         name:
           type: string
+          minLength: 1
           maxLength: 200
         amount:
           type: string
@@ -2895,17 +2115,29 @@ components:
           type: boolean
         currency:
           type: string
+          minLength: 1
           maxLength: 3
         is_recurring:
           type: boolean
-    PatchedSourcePatch:
+    PatchedPasswordChangeRequest:
+      type: object
+      properties:
+        old_password:
+          type: string
+          minLength: 1
+        new_password:
+          type: string
+          minLength: 1
+    PatchedSourcePatchRequest:
       type: object
       properties:
         source:
           type: string
+          minLength: 1
           maxLength: 50
         acc_type:
           type: string
+          minLength: 1
           maxLength: 10
         amount:
           type: string
@@ -2913,8 +2145,9 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         currency:
           type: string
+          minLength: 1
           maxLength: 3
-    PatchedTagPatchPut:
+    PatchedTagPatchPutRequest:
       type: object
       properties:
         tags:
@@ -2922,7 +2155,7 @@ components:
           additionalProperties:
             type: string
             nullable: true
-    PatchedTransactionSet:
+    PatchedTransactionSetRequest:
       type: object
       properties:
         date:
@@ -2937,86 +2170,77 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         source:
           type: string
+          minLength: 1
           maxLength: 50
         currency:
           type: string
+          minLength: 1
           maxLength: 3
         tags:
           type: array
           items:
             type: string
+            minLength: 1
             maxLength: 200
         tx_type:
           type: string
+          minLength: 1
           maxLength: 10
         category:
           type: string
+          minLength: 1
           maxLength: 200
         bill:
           type: string
+          nullable: true
           maxLength: 200
-    PatchedUser:
-      type: object
-      properties:
-        username:
-          type: string
-        user_email:
-          type: string
-          format: email
-        password:
-          type: string
-          writeOnly: true
-    PatchedUserDetails:
+    PatchedUserDetailsRequest:
       type: object
       description: User model w/o password
       properties:
-        pk:
-          type: integer
-          readOnly: true
-          title: ID
         username:
           type: string
+          minLength: 1
           description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
             only.
           pattern: ^[\w.@+-]+$
           maxLength: 150
-        email:
-          type: string
-          format: email
-          readOnly: true
-          title: Email address
         first_name:
           type: string
           maxLength: 150
         last_name:
           type: string
           maxLength: 150
-    Register:
+    RegisterRequest:
       type: object
       properties:
         username:
           type: string
-          maxLength: 150
           minLength: 1
+          maxLength: 150
         email:
           type: string
           format: email
+          minLength: 1
         password1:
           type: string
           writeOnly: true
+          minLength: 1
         password2:
           type: string
           writeOnly: true
+          minLength: 1
       required:
       - password1
       - password2
       - username
-    ResendEmailVerification:
+    ResendEmailVerificationRequest:
       type: object
       properties:
         email:
           type: string
           format: email
+          minLength: 1
     RestAuthDetail:
       type: object
       properties:
@@ -3025,7 +2249,78 @@ components:
           readOnly: true
       required:
       - detail
+    Snapshot:
+      type: object
+      properties:
+        snapshot:
+          $ref: '#/components/schemas/FinancialSnapshot'
+        transactions_for_month:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionAccepted'
+        flow_series:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        expense_by_category:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        source_balances:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        daily_spend:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        daily_income:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        total_expenses_for_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_income_for_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_transfer_out_for_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_transfer_in_for_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        total_leaks_for_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - snapshot
+      - total_expenses_for_month
+      - total_income_for_month
+      - total_leaks_for_month
+      - total_transfer_in_for_month
+      - total_transfer_out_for_month
+      - transactions_for_month
     SocialLogin:
+      type: object
+      properties:
+        access_token:
+          type: string
+        code:
+          type: string
+        id_token:
+          type: string
+    SocialLoginRequest:
       type: object
       properties:
         access_token:
@@ -3050,14 +2345,16 @@ components:
         currency:
           type: string
           maxLength: 3
-    SourcePost:
+    SourcePostRequest:
       type: object
       properties:
         source:
           type: string
+          minLength: 1
           maxLength: 50
         acc_type:
           type: string
+          minLength: 1
           maxLength: 10
         amount:
           type: string
@@ -3065,18 +2362,21 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         currency:
           type: string
+          minLength: 1
           maxLength: 3
       required:
       - acc_type
       - source
-    SourcePut:
+    SourcePutRequest:
       type: object
       properties:
         source:
           type: string
+          minLength: 1
           maxLength: 50
         acc_type:
           type: string
+          minLength: 1
           maxLength: 10
         amount:
           type: string
@@ -3084,6 +2384,7 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         currency:
           type: string
+          minLength: 1
           maxLength: 3
       required:
       - acc_type
@@ -3144,7 +2445,7 @@ components:
             maxLength: 200
       required:
       - tags
-    TagPatchPut:
+    TagPatchPutRequest:
       type: object
       properties:
         tags:
@@ -3152,6 +2453,17 @@ components:
           additionalProperties:
             type: string
             nullable: true
+      required:
+      - tags
+    TagRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
       required:
       - tags
     TagSetReturn:
@@ -3180,12 +2492,6 @@ components:
     TokenObtainPair:
       type: object
       properties:
-        username:
-          type: string
-          writeOnly: true
-        password:
-          type: string
-          writeOnly: true
         access:
           type: string
           readOnly: true
@@ -3194,8 +2500,20 @@ components:
           readOnly: true
       required:
       - access
-      - password
       - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
       - username
     TokenRefresh:
       type: object
@@ -3208,12 +2526,21 @@ components:
       required:
       - access
       - refresh
-    TokenVerify:
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TokenVerifyRequest:
       type: object
       properties:
         token:
           type: string
           writeOnly: true
+          minLength: 1
       required:
       - token
     TransactionAccepted:
@@ -3248,6 +2575,7 @@ components:
           maxLength: 200
         bill:
           type: string
+          nullable: true
           maxLength: 200
         tx_id:
           type: string
@@ -3300,6 +2628,7 @@ components:
           format: date
         bill:
           type: string
+          nullable: true
           maxLength: 200
         snapshot:
           $ref: '#/components/schemas/FinancialSnapshot'
@@ -3382,6 +2711,51 @@ components:
           maxLength: 200
         bill:
           type: string
+          nullable: true
+          maxLength: 200
+      required:
+      - amount
+      - currency
+      - source
+      - tx_type
+    TransactionSetRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          maxLength: 200
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        source:
+          type: string
+          minLength: 1
+          maxLength: 50
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+        tx_type:
+          type: string
+          minLength: 1
+          maxLength: 10
+        category:
+          type: string
+          minLength: 1
+          maxLength: 200
+        bill:
+          type: string
+          nullable: true
           maxLength: 200
       required:
       - amount
@@ -3405,21 +2779,6 @@ components:
             $ref: '#/components/schemas/TransactionAccepted'
         snapshot:
           $ref: '#/components/schemas/FinancialSnapshot'
-    User:
-      type: object
-      properties:
-        username:
-          type: string
-        user_email:
-          type: string
-          format: email
-        password:
-          type: string
-          writeOnly: true
-      required:
-      - password
-      - user_email
-      - username
     UserDetails:
       type: object
       description: User model w/o password
@@ -3449,12 +2808,50 @@ components:
       - email
       - pk
       - username
-    VerifyEmail:
+    UserDetailsRequest:
+      type: object
+      description: User model w/o password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - username
+    UserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        user_email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - user_email
+      - username
+    VerifyEmailRequest:
       type: object
       properties:
         key:
           type: string
           writeOnly: true
+          minLength: 1
       required:
       - key
   securitySchemes:

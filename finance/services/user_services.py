@@ -102,6 +102,7 @@ def user_get_totals(uid, *args, **kwargs):
     # Apply standard transaction filters to support dynamic dashboard charts
     queryset = Transaction.objects.for_user(uid)
     queryset = apply_transaction_filters(queryset, **kwargs)
+    queryset = queryset.order_by('-date', '-tx_id')
     fc = Calculator(profile=kwargs.get('profile'))
     transfer_out_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_OUT'))
     transfer_in_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_IN'))

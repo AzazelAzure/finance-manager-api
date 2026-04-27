@@ -7,7 +7,7 @@ This project is designed for clean multi-user isolation (per-user data partition
 
 ## Version & Status
 
-- Current version: **v1.0.1**
+- Current version: **v1.2.1**
 - Status: production-usable core API
 - Scope: authenticated finance CRUD + profile/snapshot with per-user isolation
 
@@ -68,6 +68,7 @@ pytest
 
 - API documentation (Swagger UI): `/api/docs/`
 - OpenAPI schema: `/api/schema/`
+- Beta cross-repo contract matrix: `../design_docs/20_Roadmap/Beta_Contract_Compatibility_Matrix.md`
 - JWT token endpoints:
   - Obtain access/refresh token pair: `/api/token/`
   - Refresh: `/api/token/refresh/`
