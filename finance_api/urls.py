@@ -38,12 +38,11 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer # Added for subclassing
 from rest_framework_simplejwt.exceptions import InvalidToken
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from drf_spectacular.utils import extend_schema_serializer # Added for schema customization
-
-
 # Custom serializer and view to resolve drf_spectacular warnings about identical component names
 @extend_schema_serializer(component_name="SimpleJWTTokenRefresh")
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
@@ -58,6 +57,31 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             # Missing/deleted users should produce auth failure, not a 500.
             raise InvalidToken("No active account found for this token.") from exc
 
+
+@extend_schema_serializer(component_name="SimpleJWTTokenObtainPair")
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Allow token login using username or email identifier."""
+
+    def validate(self, attrs):
+        identifier = str(attrs.get(self.username_field, "")).strip()
+        attrs = dict(attrs)
+        attrs[self.username_field] = identifier
+        if identifier:
+            if "@" in identifier:
+                user = get_user_model().objects.filter(email__iexact=identifier).first()
+            else:
+                user = get_user_model().objects.filter(username__iexact=identifier).first()
+            if user is not None:
+                attrs[self.username_field] = getattr(user, self.username_field)
+        return super().validate(attrs)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """Use serializer that accepts username or email identifier."""
+
+    serializer_class = CustomTokenObtainPairSerializer
+
+
 class CustomTokenRefreshView(TokenRefreshView):
     """
     Custom TokenRefreshView to use the CustomTokenRefreshSerializer.
@@ -70,9 +94,9 @@ urlpatterns = [
     path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'), # Modified to use CustomTokenRefreshView
-    path('api/token/auth/', TokenObtainPairView.as_view(), name='token_auth'),
+    path('api/token/auth/', CustomTokenObtainPairView.as_view(), name='token_auth'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     # Auth & Social Login
