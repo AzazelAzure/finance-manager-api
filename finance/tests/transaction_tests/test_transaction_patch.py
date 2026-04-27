@@ -471,7 +471,7 @@ class TransactionDeleteTestCase(TransactionBase):
         self.assertEqual(self.response.status_code, status.HTTP_201_CREATED)
         self.tx_id = self.response.data['accepted'][0]['tx_id']
         self.delete_url = reverse(
-            'transaction_detail_update_delete',
+            'transaction_detail',
             kwargs={'tx_id': self.tx_id},
         )
 
