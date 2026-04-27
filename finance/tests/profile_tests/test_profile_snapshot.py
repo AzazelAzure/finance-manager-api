@@ -33,6 +33,15 @@ class AppProfileSnapshotTests(ProfileBase):
         self.assertIn("total_transfer_out_for_month", response.data)
         self.assertIn("total_transfer_in_for_month", response.data)
 
+    def test_snapshot_includes_dashboard_chart_support_fields(self):
+        response = self.client.get(self.snapshot_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("expense_by_category", response.data)
+        self.assertIn("source_balances", response.data)
+        self.assertIsInstance(response.data["expense_by_category"], list)
+        self.assertIsInstance(response.data["source_balances"], list)
+        self.assertGreaterEqual(len(response.data["source_balances"]), 1)
+
     def test_base_currency_change_updates_snapshot_totals(self):
         before = self.client.get(self.snapshot_url)
         self.assertEqual(before.status_code, 200)
