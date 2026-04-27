@@ -22,7 +22,7 @@ class UserDeleteCascadeTests(UserBase):
 
         response = self.client.delete(
             self.user_url,
-            {"username": self.user.username},
+            {"password": "testpassword"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)

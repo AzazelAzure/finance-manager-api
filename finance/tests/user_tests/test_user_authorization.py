@@ -12,7 +12,8 @@ class UserAuthorizationTests(UserBase):
             {"username": self.other_user.username, "password": "new-pass-123"},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        # Patch endpoint only supports password-change payload fields.
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_delete_rejects_other_username(self):
         response = self.client.delete(

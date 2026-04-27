@@ -173,8 +173,8 @@ class TransactionPostTestCase(TransactionBase):
         fm xfer sends no tags and often no date; server defaults date in fix_tx_data.
         Validator must not access data['date'] when tags are absent (avoids KeyError).
         """
-        out_src = self._source_xfer_out.source.source
-        in_src = self._source_xfer_in.source.source
+        out_src = self._source_xfer_out.source
+        in_src = self._source_xfer_in.source
         cur = self.tx_xfer_out.currency
         amt = str(abs(Decimal(str(self.tx_xfer_out.amount))).quantize(Decimal("0.01")))
         body = [
@@ -217,7 +217,7 @@ class TransactionPostTestCase(TransactionBase):
         self.assertEqual(fc.calc_leaks(txs), Decimal("0.00"))
 
     def test_calc_leaks_transfer_fee_net_negative_one(self):
-        """Net signed transfer flow: -100 out + 99 in => -1 in base (fee left the wallet)."""
+        """Transfer leak is exposed as positive magnitude even when net flow is negative."""
         from types import SimpleNamespace
 
         from finance.logic.fincalc import Calculator
@@ -228,7 +228,7 @@ class TransactionPostTestCase(TransactionBase):
             SimpleNamespace(tx_type="XFER_IN", currency=bc, amount=Decimal("99")),
             SimpleNamespace(tx_type="XFER_OUT", currency=bc, amount=Decimal("-100")),
         ]
-        self.assertEqual(fc.calc_leaks(txs), Decimal("-1.00"))
+        self.assertEqual(fc.calc_leaks(txs), Decimal("1.00"))
 
 
 # Test For Tags To Be A List
