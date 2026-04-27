@@ -16,6 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.urls import path, include
 from django.http import JsonResponse
 from finance.views.cat_views import CategoryListCreateView, CategoryDetailView
@@ -38,6 +39,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer # Added for subclassing
+from rest_framework_simplejwt.exceptions import InvalidToken
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from drf_spectacular.utils import extend_schema_serializer # Added for schema customization
 
@@ -49,7 +51,12 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
     Custom TokenRefreshSerializer to provide a unique component name for drf_spectacular.
     This resolves warnings about multiple schemas with the same name (TokenRefreshRequest).
     """
-    pass
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except get_user_model().DoesNotExist as exc:
+            # Missing/deleted users should produce auth failure, not a 500.
+            raise InvalidToken("No active account found for this token.") from exc
 
 class CustomTokenRefreshView(TokenRefreshView):
     """
