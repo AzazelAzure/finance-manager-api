@@ -42,6 +42,16 @@ class AppProfileSnapshotTests(ProfileBase):
         self.assertIsInstance(response.data["source_balances"], list)
         self.assertGreaterEqual(len(response.data["source_balances"]), 1)
 
+    def test_snapshot_includes_dashboard_series_support_fields(self):
+        response = self.client.get(self.snapshot_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("flow_series", response.data)
+        self.assertIn("daily_spend", response.data)
+        self.assertIn("daily_income", response.data)
+        self.assertIsInstance(response.data["flow_series"], list)
+        self.assertIsInstance(response.data["daily_spend"], list)
+        self.assertIsInstance(response.data["daily_income"], list)
+
     def test_base_currency_change_updates_snapshot_totals(self):
         before = self.client.get(self.snapshot_url)
         self.assertEqual(before.status_code, 200)
