@@ -12,6 +12,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **Dashboard Snapshot Contract Coverage**: Added profile snapshot assertions that enforce `expense_by_category` and `source_balances` dashboard-support fields in the snapshot payload.
 - **Expense PATCH Alias Coverage**: Added integration coverage confirming `paid` alias updates `paid_flag` in upcoming expense partial updates.
 - **Dashboard Series Contract Coverage**: Added snapshot assertions for `flow_series`, `daily_spend`, and `daily_income` to protect dashboard chart-support payload shape.
+- **Transaction Serializer Optional-Field Coverage**: Added serializer-level checks that transaction payloads accept Decimal/tag data and optional category + nullable bill fields for quick-entry compatibility.
 
 ### Documentation
 - **README Version Clarification**: Clarified `README.md` to distinguish current code version from public release status for private-repo visibility.
