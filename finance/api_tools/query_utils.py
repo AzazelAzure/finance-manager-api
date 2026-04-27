@@ -34,6 +34,11 @@ def apply_transaction_filters(queryset, **kwargs):
         'lte': 'get_lte',
     }
 
+    filter_keys = (
+        'tx_type', 'tag_name', 'category', 'source', 'currency_code',
+        'gte', 'lte', 'date', 'by_date', 'by_year',
+    )
+
     # Handle period-based filters first
     if _query_param_bool(kwargs.get("current_month")):
         queryset = queryset.get_current_month()
@@ -53,9 +58,8 @@ def apply_transaction_filters(queryset, **kwargs):
         queryset = queryset.get_current_month()
     elif kwargs.get('year'):
         queryset = queryset.get_by_year(_safe_int(kwargs['year']))
-    elif not any(k in kwargs for k in ('tx_type', 'tag_name', 'category', 'source', 'currency_code', 'gte', 'lte', 'date')):
-        # Default to current month if no other filters are provided
-        queryset = queryset.get_current_month()
+    elif not any(k in kwargs for k in filter_keys):
+        queryset = queryset.get_latest()
 
     # Dynamically apply other single-argument filters
     for param_name, manager_method_name in SINGLE_ARG_FILTER_MAP.items():
