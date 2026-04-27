@@ -5,12 +5,13 @@ from finance.validators.tx_validators import TransactionIDValidator, Transaction
 from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from loguru import logger
 from rest_framework.exceptions import ValidationError
 from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot
 import copy
 from decimal import Decimal
+from datetime import timedelta
 from finance.api_tools.query_utils import apply_transaction_filters
 
 # Kwargs injected by decorators (not query filters)
@@ -208,3 +209,191 @@ def get_transaction(uid, tx_id: str, *args, **kwargs):
     logger.debug(f"Fetching transaction {tx_id} for {uid}")
     tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id).first())
     return {'transaction': tx, 'amount': tx.amount}
+
+
+@validator.UserValidator
+def get_transaction_calendar(uid, *, start_date, end_date, **kwargs):
+    """Return calendar aggregates (daily/weekly/monthly) and selected-day drill rows."""
+    queryset = (
+        Transaction.objects.for_user(uid=uid)
+        .filter(date__gte=start_date, date__lte=end_date)
+        .order_by("date", "tx_id")
+    )
+
+    rows = list(queryset.values("date", "amount"))
+    quant = Decimal("0.01")
+    daily_map: dict = {}
+    weekly_map: dict = {}
+    monthly_map: dict = {}
+    for row in rows:
+        tx_date = row["date"]
+        amount = Decimal(str(row["amount"] or 0))
+
+        current_daily = daily_map.get(tx_date, {"amount": Decimal("0"), "tx_count": 0})
+        current_daily["amount"] += amount
+        current_daily["tx_count"] += 1
+        daily_map[tx_date] = current_daily
+
+        week_start = tx_date - timedelta(days=tx_date.weekday())
+        weekly_map[week_start] = weekly_map.get(week_start, Decimal("0")) + amount
+
+        month_start = tx_date.replace(day=1)
+        monthly_map[month_start] = monthly_map.get(month_start, Decimal("0")) + amount
+
+    daily = [
+        {
+            "date": d,
+            "amount": values["amount"].quantize(quant),
+            "tx_count": values["tx_count"],
+        }
+        for d, values in sorted(daily_map.items())
+    ]
+    weekly = [
+        {"period": period.isoformat(), "amount": amount.quantize(quant)}
+        for period, amount in sorted(weekly_map.items())
+    ]
+    monthly = [
+        {"period": period.isoformat(), "amount": amount.quantize(quant)}
+        for period, amount in sorted(monthly_map.items())
+    ]
+
+    day_drill = queryset.filter(date=start_date).order_by("date", "tx_id")
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "monthly": monthly,
+        "weekly": weekly,
+        "daily": daily,
+        "day_drill": day_drill,
+    }
+
+
+@validator.UserValidator
+def get_transaction_visualization(uid, *, start_date, end_date, **kwargs):
+    """Return chart-ready packets for transaction and upcoming-expense deep-dive views."""
+    quant = Decimal("0.01")
+    tx_queryset = (
+        Transaction.objects.for_user(uid=uid)
+        .filter(date__gte=start_date, date__lte=end_date)
+        .order_by("date", "tx_id")
+    )
+    tx_rows = list(tx_queryset.values("date", "tx_type", "amount", "category"))
+
+    daily_map: dict = {}
+    type_totals = {
+        "EXPENSE": Decimal("0"),
+        "INCOME": Decimal("0"),
+        "XFER_OUT": Decimal("0"),
+        "XFER_IN": Decimal("0"),
+    }
+    expense_categories: dict[str, Decimal] = {}
+    for row in tx_rows:
+        tx_date = row["date"]
+        tx_type = str(row["tx_type"] or "")
+        amount = Decimal(str(row["amount"] or 0))
+        abs_amount = abs(amount)
+
+        day_bucket = daily_map.get(
+            tx_date,
+            {"income": Decimal("0"), "expense": Decimal("0"), "net": Decimal("0"), "tx_count": 0},
+        )
+        if tx_type in {"INCOME", "XFER_IN"}:
+            day_bucket["income"] += abs_amount
+        else:
+            day_bucket["expense"] += abs_amount
+        day_bucket["net"] = day_bucket["income"] - day_bucket["expense"]
+        day_bucket["tx_count"] += 1
+        daily_map[tx_date] = day_bucket
+
+        if tx_type in type_totals:
+            type_totals[tx_type] += abs_amount
+
+        if tx_type == "EXPENSE":
+            category_name = str(row["category"] or "Uncategorized").strip() or "Uncategorized"
+            expense_categories[category_name] = expense_categories.get(category_name, Decimal("0")) + abs_amount
+
+    flow_daily = [
+        {
+            "date": d,
+            "income": values["income"].quantize(quant),
+            "expense": values["expense"].quantize(quant),
+            "net": values["net"].quantize(quant),
+            "tx_count": values["tx_count"],
+        }
+        for d, values in sorted(daily_map.items())
+    ]
+    tx_type_totals = [
+        {"tx_type": key, "amount": value.quantize(quant)}
+        for key, value in type_totals.items()
+        if value > 0
+    ]
+    top_expense_categories = [
+        {"category": category, "amount": amount.quantize(quant)}
+        for category, amount in sorted(expense_categories.items(), key=lambda item: item[1], reverse=True)[:8]
+    ]
+
+    upcoming_queryset = (
+        UpcomingExpense.objects.for_user(uid)
+        .filter(due_date__isnull=False, due_date__gte=start_date, due_date__lte=end_date)
+        .order_by("due_date", "name")
+    )
+    upcoming_rows = list(
+        upcoming_queryset.values("due_date", "name", "amount", "currency", "paid_flag")
+    )
+
+    upcoming_monthly_map: dict = {}
+    paid_count = 0
+    unpaid_count = 0
+    paid_amount = Decimal("0")
+    unpaid_amount = Decimal("0")
+    timeline = []
+    for row in upcoming_rows:
+        due_date = row["due_date"]
+        amount = Decimal(str(row["amount"] or 0))
+        timeline.append(
+            {
+                "due_date": due_date,
+                "name": str(row["name"] or ""),
+                "amount": amount.quantize(quant),
+                "currency": str(row["currency"] or ""),
+                "paid_flag": bool(row["paid_flag"]),
+            }
+        )
+        month_start = due_date.replace(day=1)
+        bucket = upcoming_monthly_map.get(month_start, {"amount": Decimal("0"), "expense_count": 0})
+        bucket["amount"] += amount
+        bucket["expense_count"] += 1
+        upcoming_monthly_map[month_start] = bucket
+
+        if row["paid_flag"]:
+            paid_count += 1
+            paid_amount += amount
+        else:
+            unpaid_count += 1
+            unpaid_amount += amount
+
+    upcoming_expenses_monthly = [
+        {
+            "period": period.isoformat(),
+            "amount": values["amount"].quantize(quant),
+            "expense_count": values["expense_count"],
+        }
+        for period, values in sorted(upcoming_monthly_map.items())
+    ]
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "flow_daily": flow_daily,
+        "tx_type_totals": tx_type_totals,
+        "top_expense_categories": top_expense_categories,
+        "upcoming_expenses_timeline": timeline,
+        "upcoming_expenses_monthly": upcoming_expenses_monthly,
+        "upcoming_expenses_status": {
+            "paid_count": paid_count,
+            "unpaid_count": unpaid_count,
+            "paid_amount": paid_amount.quantize(quant),
+            "unpaid_amount": unpaid_amount.quantize(quant),
+        },
+    }

@@ -2,6 +2,16 @@
 
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
+## [Unreleased]
+### Features
+- **Visualization Aggregate Packets**: Added `GET /finance/transactions/visualization/` to return chart-ready transaction flow/type/category aggregates plus upcoming-expense timeline/monthly/status packets for a date range.
+
+### Tests
+- **Visualization Contract Coverage**: Added aggregate correctness tests for mixed transaction types and paid/unpaid upcoming expense summaries.
+
+### Documentation
+- **README Version Clarification**: Clarified `README.md` to distinguish current code version from public release status for private-repo visibility.
+
 ## [v1.2.1] - 2026-04-27
 ### Features
 - **Bug Report Pipeline Baseline**: Added authenticated `POST /finance/bug-report/` support with configurable email routing (`BUG_REPORT_TO_EMAIL`) and integration coverage.

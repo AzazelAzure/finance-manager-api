@@ -1,9 +1,11 @@
 import copy
+from datetime import date
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
+from rest_framework.exceptions import ValidationError
 
 # Service Imports
 import finance.services.transaction_services as tx_svc
@@ -14,7 +16,9 @@ from finance.api_tools.serializers.tx_serializers import(
     TransactionSetSerializer,
     TransactionSetReturnSerializer,
     TransactionGetSerializer,
-    TransactionGetReturnSerializer
+    TransactionGetReturnSerializer,
+    TransactionCalendarReturnSerializer,
+    TransactionVisualizationReturnSerializer,
 )
 class TransactionBaseView(APIView):
     """Base logic shared between transaction views."""
@@ -212,4 +216,77 @@ class TransactionDetailView(TransactionBaseView):
         serializer = TransactionGetSerializer(result['deleted'])
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="finance_transactions_calendar",
+        summary="Retrieve calendar aggregates",
+        description="Return daily, weekly, and monthly amount aggregates plus day-drill rows for start_date.",
+        parameters=[
+            OpenApiParameter(name='start_date', type=OpenApiTypes.DATE, required=True, description='Start date (YYYY-MM-DD)'),
+            OpenApiParameter(name='end_date', type=OpenApiTypes.DATE, required=True, description='End date (YYYY-MM-DD)'),
+        ],
+        responses={status.HTTP_200_OK: TransactionCalendarReturnSerializer},
+        tags=["Transactions"],
+    )
+)
+class TransactionCalendarView(APIView):
+    serializer_class = TransactionCalendarReturnSerializer
+
+    @staticmethod
+    def _parse_date_or_400(raw: str | None, field_name: str) -> date:
+        if not raw:
+            raise ValidationError({field_name: "This query parameter is required."})
+        try:
+            return date.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValidationError({field_name: "Use YYYY-MM-DD format."}) from exc
+
+    def get(self, request):
+        uid = request.user.appprofile.user_id
+        start_date = self._parse_date_or_400(request.query_params.get("start_date"), "start_date")
+        end_date = self._parse_date_or_400(request.query_params.get("end_date"), "end_date")
+        if end_date < start_date:
+            raise ValidationError({"end_date": "Must be on or after start_date."})
+        result = tx_svc.get_transaction_calendar(uid, start_date=start_date, end_date=end_date)
+        serializer = TransactionCalendarReturnSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="finance_transactions_visualization",
+        summary="Retrieve visualization aggregate packets",
+        description=(
+            "Return chart-ready transaction and upcoming-expense aggregates for the date range."
+        ),
+        parameters=[
+            OpenApiParameter(name='start_date', type=OpenApiTypes.DATE, required=True, description='Start date (YYYY-MM-DD)'),
+            OpenApiParameter(name='end_date', type=OpenApiTypes.DATE, required=True, description='End date (YYYY-MM-DD)'),
+        ],
+        responses={status.HTTP_200_OK: TransactionVisualizationReturnSerializer},
+        tags=["Transactions"],
+    )
+)
+class TransactionVisualizationView(APIView):
+    serializer_class = TransactionVisualizationReturnSerializer
+
+    @staticmethod
+    def _parse_date_or_400(raw: str | None, field_name: str) -> date:
+        if not raw:
+            raise ValidationError({field_name: "This query parameter is required."})
+        try:
+            return date.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValidationError({field_name: "Use YYYY-MM-DD format."}) from exc
+
+    def get(self, request):
+        uid = request.user.appprofile.user_id
+        start_date = self._parse_date_or_400(request.query_params.get("start_date"), "start_date")
+        end_date = self._parse_date_or_400(request.query_params.get("end_date"), "end_date")
+        if end_date < start_date:
+            raise ValidationError({"end_date": "Must be on or after start_date."})
+        result = tx_svc.get_transaction_visualization(uid, start_date=start_date, end_date=end_date)
+        serializer = TransactionVisualizationReturnSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

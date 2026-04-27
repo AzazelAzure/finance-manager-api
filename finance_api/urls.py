@@ -23,7 +23,12 @@ from finance.views.exp_views import UpcomingExpenseListCreateView, UpcomingExpen
 from finance.views.profile_views import AppProfileView, AppProfileSnapshotView
 from finance.views.src_views import SourceListCreateView, SourceDetailView
 from finance.views.tag_views import TagView
-from finance.views.tx_views import TransactionListCreateView, TransactionDetailView
+from finance.views.tx_views import (
+    TransactionCalendarView,
+    TransactionDetailView,
+    TransactionListCreateView,
+    TransactionVisualizationView,
+)
 from finance.views.usr_views import UserView
 from finance.views.auth_views import GoogleLogin, GitHubLogin
 from finance.views.report_views import BugReportView
@@ -69,6 +74,8 @@ urlpatterns = [
     path('api/auth/google/', GoogleLogin.as_view(), name='google_login'),
     path('api/auth/github/', GitHubLogin.as_view(), name='github_login'),
     path("finance/transactions/", TransactionListCreateView.as_view(), name="transactions_list_create"),
+    path("finance/transactions/calendar/", TransactionCalendarView.as_view(), name="transactions_calendar"),
+    path("finance/transactions/visualization/", TransactionVisualizationView.as_view(), name="transactions_visualization"),
     path("finance/transactions/<str:tx_id>/", TransactionDetailView.as_view(), name="transaction_detail"),
     path("finance/appprofile/", AppProfileView.as_view(), name="appprofile"),
     path("finance/appprofile/snapshot/", AppProfileSnapshotView.as_view(), name="appprofile_snapshot"),

@@ -4,10 +4,15 @@ Backend API for a personal finance/budgeting workflow: manage payment sources, u
 
 This project is designed for clean multi-user isolation (per-user data partitioning) and "financial fidelity" (immutable transaction identity, controlled update semantics, and consistent recalculation of balances/snapshots after mutations).
 
+## Design Docs
+
+- Canonical design docs repo: [finance-manager-design-docs](https://github.com/AzazelAzure/finance-manager-design-docs)
+
 
 ## Version & Status
 
 - Current version: **v1.2.1**
+- Latest public release: **Not published yet** (private repository)
 - Status: production-usable core API
 - Scope: authenticated finance CRUD + profile/snapshot with per-user isolation
 
@@ -63,6 +68,8 @@ pytest
 
 - Stabilized core finance resource surface for API consumers (CLI/Reflex).
 - Preserved transaction fidelity invariants and snapshot recalculation flow across write paths.
+
+> Note: release notes list formal milestone tags. In this private repo, the "current version" may be ahead of publicly published releases.
 
 ## Quick Links
 
