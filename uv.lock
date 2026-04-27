@@ -438,7 +438,7 @@ wheels = [
 
 [[package]]
 name = "finance-manager-api"
-version = "1.2.0"
+version = "1.2.2"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
