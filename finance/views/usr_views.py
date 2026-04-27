@@ -72,9 +72,16 @@ class UserView(APIView):
 
         # Create user (use validated_data: write_only fields like password are omitted from .data)
         vd = serializer.validated_data
+        username = vd["username"].strip()
+        email = vd["user_email"].strip().lower()
+        if User.objects.filter(username__iexact=username).exists() or User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"detail": "username/email already exists"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user = User.objects.create_user(
-            username=vd["username"],
-            email=vd["user_email"],
+            username=username,
+            email=email,
             password=vd["password"],
         )
         return Response({'message': "User created successfully"}, status=status.HTTP_201_CREATED)
