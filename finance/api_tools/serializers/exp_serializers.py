@@ -30,7 +30,15 @@ class ExpensePutSerializer(serializers.Serializer):
 
 
 class ExpensePatchSerializer(ExpenseSerializer):
-    pass
+    # Compatibility alias for clients that send `paid` in partial updates.
+    paid = serializers.BooleanField(required=False, write_only=True)
+
+    def validate(self, attrs):
+        paid_alias = attrs.pop("paid", None)
+        if paid_alias is not None:
+            attrs["paid_flag"] = paid_alias
+        return attrs
+
 
 class ExpenseSetReturnSerializer(ExpenseSerializer):
     rejected = ExpenseSerializer(many=True, required=False)
