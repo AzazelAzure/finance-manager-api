@@ -87,3 +87,24 @@ Summary columns:
 2. run `10 -> 50 -> 100 -> 250 -> 500 -> 1000`
 3. review `results/summary.csv`
 4. run Django internal integrity tests after each phase
+
+## Calendar/Visualization Service Benchmark
+
+For deterministic aggregate-service timing (without full Locust orchestration), use:
+
+```bash
+uv run python manage.py benchmark_calendar_visualization --seed --users 1 --transactions-per-user 10000 --iterations 10 --window-days 30
+```
+
+Writes JSON output to:
+
+- `stress_tests/results/calendar_visualization_benchmark.json`
+
+### Recommended Presets
+
+- **10k baseline**
+  - `--users 1 --transactions-per-user 10000 --iterations 10 --window-days 30`
+- **25k stress check**
+  - `--users 1 --transactions-per-user 25000 --iterations 10 --window-days 30`
+
+Use this command for PERF evidence capture tied to calendar (`/finance/transactions/calendar/`) and visualization (`/finance/transactions/visualization/`) aggregate paths.
