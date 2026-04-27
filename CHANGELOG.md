@@ -7,6 +7,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **Visualization Aggregate Packets**: Added `GET /finance/transactions/visualization/` to return chart-ready transaction flow/type/category aggregates plus upcoming-expense timeline/monthly/status packets for a date range.
 - **Upcoming Expense PATCH Alias**: Added partial-update compatibility for `PATCH /finance/upcoming-expenses/{name}/` requests that send `{"paid": true}` by mapping the alias to the canonical `paid_flag` field.
 - **Calendar Contract Freeze (Phase 1)**: Expanded `GET /finance/transactions/calendar/` with explicit `base_currency`, `display_currency_mode`, `heat_metric_mode`, `heat_max`, per-day `heat_value`/`heat_intensity`, and `due_events` overlays while keeping daily/weekly/monthly aggregates base-currency normalized.
+- **Refresh Missing-User Hardening**: Wrapped JWT refresh serializer validation paths so refresh tokens that reference deleted users now return `401` InvalidToken responses instead of `500` server errors.
 
 ### Tests
 - **Visualization Contract Coverage**: Added aggregate correctness tests for mixed transaction types and paid/unpaid upcoming expense summaries.
@@ -16,6 +17,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **Transaction Serializer Contract Coverage**: Added deterministic serializer-level checks confirming transaction payload Decimal parsing and tag-list acceptance for quick-entry compatible request shapes.
 - **Dashboard Series Contract Coverage**: Added snapshot assertions for `flow_series`, `daily_spend`, and `daily_income` to protect dashboard chart-support payload shape.
 - **Transaction Serializer Optional-Field Coverage**: Added serializer-level checks that transaction payloads accept Decimal/tag data and optional category + nullable bill fields for quick-entry compatibility.
+- **Refresh Resilience Coverage**: Added regression coverage for both `/api/token/refresh/` and `/api/auth/token/refresh/` to ensure deleted-user refresh tokens fail with auth errors rather than 500s.
 
 ### Documentation
 - **README Version Clarification**: Clarified `README.md` to distinguish current code version from public release status for private-repo visibility.
