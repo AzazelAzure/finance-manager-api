@@ -1,0 +1,11 @@
+{
+  "scenario": "calendar_and_visualization_aggregate",
+  "users": 1,
+  "transactions_per_user": 20000,
+  "iterations": 10,
+  "calendar_avg_ms": 52.24,
+  "calendar_p95_ms": 74.6,
+  "visualization_avg_ms": 51.53,
+  "visualization_p95_ms": 74.42,
+  "measured_at_utc": "2026-04-27T05:59:36.447617+00:00"
+}
