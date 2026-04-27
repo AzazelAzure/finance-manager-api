@@ -42,3 +42,30 @@ class PermissionDefaultsTests(BaseTestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_user_create_rejects_duplicate_username_or_email(self):
+        self.client.force_authenticate(user=None)
+
+        duplicate_username = self.client.post(
+            reverse("user"),
+            {
+                "username": self.user.username,
+                "user_email": f"new-{uuid4().hex[:8]}@example.com",
+                "password": "passphrase-1234",
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate_username.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(duplicate_username.data.get("detail"), "username/email already exists")
+
+        duplicate_email = self.client.post(
+            reverse("user"),
+            {
+                "username": f"new-user-{uuid4().hex[:8]}",
+                "user_email": self.user.email,
+                "password": "passphrase-1234",
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate_email.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(duplicate_email.data.get("detail"), "username/email already exists")

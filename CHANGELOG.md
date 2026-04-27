@@ -6,9 +6,11 @@ All notable changes to the API codebase must be documented in this file by the e
 ### Features
 - **Visualization Aggregate Packets**: Added `GET /finance/transactions/visualization/` to return chart-ready transaction flow/type/category aggregates plus upcoming-expense timeline/monthly/status packets for a date range.
 - **Upcoming Expense PATCH Alias**: Added partial-update compatibility for `PATCH /finance/upcoming-expenses/{name}/` requests that send `{"paid": true}` by mapping the alias to the canonical `paid_flag` field.
+- **Calendar Contract Freeze (Phase 1)**: Expanded `GET /finance/transactions/calendar/` with explicit `base_currency`, `display_currency_mode`, `heat_metric_mode`, `heat_max`, per-day `heat_value`/`heat_intensity`, and `due_events` overlays while keeping daily/weekly/monthly aggregates base-currency normalized.
 
 ### Tests
 - **Visualization Contract Coverage**: Added aggregate correctness tests for mixed transaction types and paid/unpaid upcoming expense summaries.
+- **Calendar Contract Coverage**: Added assertions for heatmap metadata, due-event overlays, and display/heat mode query semantics in the transactions calendar response.
 - **Dashboard Snapshot Contract Coverage**: Added profile snapshot assertions that enforce `expense_by_category` and `source_balances` dashboard-support fields in the snapshot payload.
 - **Expense PATCH Alias Coverage**: Added integration coverage confirming `paid` alias updates `paid_flag` in upcoming expense partial updates.
 - **Transaction Serializer Contract Coverage**: Added deterministic serializer-level checks confirming transaction payload Decimal parsing and tag-list acceptance for quick-entry compatible request shapes.
