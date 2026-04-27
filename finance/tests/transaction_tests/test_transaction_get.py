@@ -25,7 +25,7 @@ class TransactionGetSingleTestCase(TransactionGetBase):
             - Wrong status, shape, or values.
         """
         url = reverse(
-            "transaction_detail_update_delete",
+            "transaction_detail",
             kwargs={"tx_id": self.income_tx_id},
         )
         response = self.client.get(url)
@@ -41,7 +41,7 @@ class TransactionGetSingleTestCase(TransactionGetBase):
 
     def test_get_by_nonexistent_tx_id_returns_400(self):
         url = reverse(
-            "transaction_detail_update_delete",
+            "transaction_detail",
             kwargs={"tx_id": "2099-01-01-NOSUCHTX"},
         )
         response = self.client.get(url)

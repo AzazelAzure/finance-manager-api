@@ -19,7 +19,8 @@ class SourceBase(BaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.url = reverse("sources")
+        self.url = reverse("sources_list_create")
+        self.detail_url = lambda source: reverse("source_detail", kwargs={"source": source})
 
         # Use explicit non-conflicting values (tests run with fresh DB per class).
         self.source_value = "TestSource-POST"

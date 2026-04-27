@@ -24,7 +24,7 @@ class CategoryDeleteTestCase(CategoryBase):
         self.assertEqual(tx.status_code, status.HTTP_201_CREATED)
         tx_id = tx.data["accepted"][0]["tx_id"]
         before_amount = Transaction.objects.for_user(self.profile.user_id).get_tx(tx_id).first().amount
-        url = reverse("category_detail_update_delete", kwargs={"cat_name": name})
+        url = reverse("category_detail", kwargs={"cat_name": name})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         tx_obj = Transaction.objects.for_user(self.profile.user_id).get_tx(tx_id).first()
@@ -32,6 +32,6 @@ class CategoryDeleteTestCase(CategoryBase):
         self.assertEqual(Decimal(str(tx_obj.amount)), Decimal(str(before_amount)))
 
     def test_delete_nonexistent_rejected(self):
-        url = reverse("category_detail_update_delete", kwargs={"cat_name": "not-real"})
+        url = reverse("category_detail", kwargs={"cat_name": "not-real"})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

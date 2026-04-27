@@ -21,7 +21,7 @@ class CategoryPutTestCase(CategoryBase):
         tx = self.client.post(reverse("transactions_list_create"), tx_payload, format="json")
         self.assertEqual(tx.status_code, status.HTTP_201_CREATED)
         tx_id = tx.data["accepted"][0]["tx_id"]
-        url = reverse("category_detail_update_delete", kwargs={"cat_name": name})
+        url = reverse("category_detail", kwargs={"cat_name": name})
         response = self.client.put(url, {"name": "new-cat"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["updated"]["name"], "new-cat")
@@ -30,6 +30,6 @@ class CategoryPutTestCase(CategoryBase):
 
     def test_put_invalid_payload_rejected(self):
         name = self.seed_category("put-invalid")
-        url = reverse("category_detail_update_delete", kwargs={"cat_name": name})
+        url = reverse("category_detail", kwargs={"cat_name": name})
         response = self.client.put(url, {"name": ""}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

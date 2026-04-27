@@ -21,12 +21,12 @@ class SourceGetTestCase(SourceBase):
 
     def test_get_detail_returns_single_source(self):
         expected = self.seed_source("detail-source")
-        url = reverse("source_detail_update_delete", kwargs={"source": expected["source"]})
+        url = reverse("source_detail", kwargs={"source": expected["source"]})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["source"], expected["source"])
 
     def test_get_detail_missing_source_returns_400(self):
-        url = reverse("source_detail_update_delete", kwargs={"source": "missing-source"})
+        url = reverse("source_detail", kwargs={"source": "missing-source"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

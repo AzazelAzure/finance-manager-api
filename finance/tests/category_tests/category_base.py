@@ -6,7 +6,7 @@ from finance.tests.basetest import BaseTestCase
 class CategoryBase(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.url = reverse("categories")
+        self.url = reverse("categories_list_create")
 
     def seed_category(self, name="custom-category"):
         payload = {"name": name}

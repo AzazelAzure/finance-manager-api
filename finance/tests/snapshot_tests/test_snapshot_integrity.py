@@ -11,7 +11,7 @@ from finance.tests.basetest import BaseTestCase
 class FinancialSnapshotIntegrityTests(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.sources_url = reverse("sources")
+        self.sources_url = reverse("sources_list_create")
         self.tx_url = reverse("transactions_list_create")
         self.snapshot_url = reverse("appprofile_snapshot")
         self.uid = str(self.profile.user_id)

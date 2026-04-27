@@ -59,7 +59,7 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             tags=["integrity-tag"],
             bill=self.expense.name,
         )
-        self.tx_detail_url = reverse("transaction_detail_update_delete", kwargs={"tx_id": self.tx.tx_id})
+        self.tx_detail_url = reverse("transaction_detail", kwargs={"tx_id": self.tx.tx_id})
 
     def _client(self) -> APIClient:
         client = APIClient()
@@ -131,7 +131,8 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             return self._client().post(reverse("transactions_list_create"), payload, format="json").status_code
 
         def delete_source():
-            return self._client().delete(reverse("sources"), {"source": contender.source}, format="json").status_code
+            url = reverse("source_detail", kwargs={"source": contender.source})
+            return self._client().delete(url).status_code
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             statuses = list(pool.map(create_tx, range(12)))
@@ -143,8 +144,8 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
         self.assertTrue(any(code in {200, 201} for code in statuses))
 
     def test_snapshot_endpoint_stable_after_burst_contention(self):
-        category_url = reverse("category_detail_update_delete", kwargs={"cat_name": self.category.name})
-        expense_url = reverse("upcoming_expense_detail_update_delete", kwargs={"name": self.expense.name})
+        category_url = reverse("category_detail", kwargs={"cat_name": self.category.name})
+        expense_url = reverse("upcoming_expense_detail", kwargs={"name": self.expense.name})
 
         def mutate_category(i: int):
             return self._client().patch(category_url, {"name": f"integrity-cat-{i}"}, format="json").status_code
