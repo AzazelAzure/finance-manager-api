@@ -9,8 +9,10 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ### Tests
 - **Visualization Contract Coverage**: Added aggregate correctness tests for mixed transaction types and paid/unpaid upcoming expense summaries.
+- **Dashboard Snapshot Contract Coverage**: Added profile snapshot assertions that enforce `expense_by_category` and `source_balances` dashboard-support fields in the snapshot payload.
 - **Expense PATCH Alias Coverage**: Added integration coverage confirming `paid` alias updates `paid_flag` in upcoming expense partial updates.
 - **Transaction Serializer Contract Coverage**: Added deterministic serializer-level checks confirming transaction payload Decimal parsing and tag-list acceptance for quick-entry compatible request shapes.
+- **Dashboard Series Contract Coverage**: Added snapshot assertions for `flow_series`, `daily_spend`, and `daily_income` to protect dashboard chart-support payload shape.
 
 ### Documentation
 - **README Version Clarification**: Clarified `README.md` to distinguish current code version from public release status for private-repo visibility.
