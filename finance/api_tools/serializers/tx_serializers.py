@@ -54,14 +54,31 @@ class CalendarDayAggregateSerializer(serializers.Serializer):
     date = serializers.DateField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     tx_count = serializers.IntegerField(min_value=0)
+    heat_value = serializers.DecimalField(max_digits=12, decimal_places=2)
+    heat_intensity = serializers.IntegerField(min_value=0)
+
+
+class CalendarDueEventSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    expense_name = serializers.CharField(max_length=200)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    amount_base = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField(max_length=3)
+    paid_flag = serializers.BooleanField()
+    is_recurring = serializers.BooleanField()
 
 
 class TransactionCalendarReturnSerializer(serializers.Serializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
+    base_currency = serializers.CharField(max_length=3)
+    display_currency_mode = serializers.ChoiceField(choices=["base", "original"])
+    heat_metric_mode = serializers.ChoiceField(choices=["net", "expense_only", "count"])
+    heat_max = serializers.DecimalField(max_digits=12, decimal_places=2)
     monthly = CalendarBucketSerializer(many=True)
     weekly = CalendarBucketSerializer(many=True)
     daily = CalendarDayAggregateSerializer(many=True)
+    due_events = CalendarDueEventSerializer(many=True)
     day_drill = TransactionGetSerializer(many=True)
 
 

@@ -214,37 +214,68 @@ def get_transaction(uid, tx_id: str, *args, **kwargs):
 @validator.UserValidator
 def get_transaction_calendar(uid, *, start_date, end_date, **kwargs):
     """Return calendar aggregates (daily/weekly/monthly) and selected-day drill rows."""
+    profile = kwargs.get("profile", AppProfile.objects.for_user(uid))
+    fc = Calculator(profile)
+    display_currency_mode = str(kwargs.get("display_currency_mode", "base")).lower()
+    if display_currency_mode not in {"base", "original"}:
+        raise ValidationError({"display_currency_mode": "Use 'base' or 'original'."})
+    heat_metric_mode = str(kwargs.get("heat_metric_mode", "net")).lower()
+    if heat_metric_mode not in {"net", "expense_only", "count"}:
+        raise ValidationError({"heat_metric_mode": "Use 'net', 'expense_only', or 'count'."})
+
     queryset = (
         Transaction.objects.for_user(uid=uid)
         .filter(date__gte=start_date, date__lte=end_date)
         .order_by("date", "tx_id")
     )
 
-    rows = list(queryset.values("date", "amount"))
+    rows = list(queryset.values("date", "amount", "currency", "tx_type"))
     quant = Decimal("0.01")
     daily_map: dict = {}
     weekly_map: dict = {}
     monthly_map: dict = {}
+    heat_values: dict = {}
     for row in rows:
         tx_date = row["date"]
-        amount = Decimal(str(row["amount"] or 0))
+        raw_amount = Decimal(str(row["amount"] or 0))
+        amount_base = Decimal(
+            str(fc._calc_totals(str(row["currency"] or fc.base_currency), fc.base_currency, raw_amount))
+        ).quantize(quant)
 
         current_daily = daily_map.get(tx_date, {"amount": Decimal("0"), "tx_count": 0})
-        current_daily["amount"] += amount
+        current_daily["amount"] += amount_base
         current_daily["tx_count"] += 1
         daily_map[tx_date] = current_daily
 
         week_start = tx_date - timedelta(days=tx_date.weekday())
-        weekly_map[week_start] = weekly_map.get(week_start, Decimal("0")) + amount
+        weekly_map[week_start] = weekly_map.get(week_start, Decimal("0")) + amount_base
 
         month_start = tx_date.replace(day=1)
-        monthly_map[month_start] = monthly_map.get(month_start, Decimal("0")) + amount
+        monthly_map[month_start] = monthly_map.get(month_start, Decimal("0")) + amount_base
+
+        metric = heat_values.get(tx_date, Decimal("0"))
+        if heat_metric_mode == "count":
+            metric += Decimal("1")
+        elif heat_metric_mode == "expense_only":
+            if str(row["tx_type"] or "").upper() in {"EXPENSE", "XFER_OUT"}:
+                metric += abs(amount_base)
+        else:
+            metric += abs(amount_base)
+        heat_values[tx_date] = metric
+
+    heat_max = max(heat_values.values(), default=Decimal("0")).quantize(quant)
 
     daily = [
         {
             "date": d,
             "amount": values["amount"].quantize(quant),
             "tx_count": values["tx_count"],
+            "heat_value": heat_values.get(d, Decimal("0")).quantize(quant),
+            "heat_intensity": (
+                int((heat_values.get(d, Decimal("0")) / heat_max) * 100)
+                if heat_max > 0
+                else 0
+            ),
         }
         for d, values in sorted(daily_map.items())
     ]
@@ -258,13 +289,37 @@ def get_transaction_calendar(uid, *, start_date, end_date, **kwargs):
     ]
 
     day_drill = queryset.filter(date=start_date).order_by("date", "tx_id")
+    due_events_queryset = (
+        UpcomingExpense.objects.for_user(uid)
+        .filter(due_date__isnull=False, due_date__gte=start_date, due_date__lte=end_date)
+        .order_by("due_date", "name")
+    )
+    due_events = [
+        {
+            "date": item.due_date,
+            "expense_name": str(item.name or ""),
+            "amount": Decimal(str(item.amount or 0)).quantize(quant),
+            "amount_base": Decimal(
+                str(fc._calc_totals(str(item.currency or fc.base_currency), fc.base_currency, item.amount))
+            ).quantize(quant),
+            "currency": str(item.currency or ""),
+            "paid_flag": bool(item.paid_flag),
+            "is_recurring": bool(item.is_recurring),
+        }
+        for item in due_events_queryset
+    ]
 
     return {
         "start_date": start_date,
         "end_date": end_date,
+        "base_currency": fc.base_currency,
+        "display_currency_mode": display_currency_mode,
+        "heat_metric_mode": heat_metric_mode,
+        "heat_max": heat_max,
         "monthly": monthly,
         "weekly": weekly,
         "daily": daily,
+        "due_events": due_events,
         "day_drill": day_drill,
     }
 

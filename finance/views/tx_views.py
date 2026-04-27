@@ -225,6 +225,18 @@ class TransactionDetailView(TransactionBaseView):
         parameters=[
             OpenApiParameter(name='start_date', type=OpenApiTypes.DATE, required=True, description='Start date (YYYY-MM-DD)'),
             OpenApiParameter(name='end_date', type=OpenApiTypes.DATE, required=True, description='End date (YYYY-MM-DD)'),
+            OpenApiParameter(
+                name='display_currency_mode',
+                type=OpenApiTypes.STR,
+                required=False,
+                description="Transaction-row display mode: 'base' or 'original'.",
+            ),
+            OpenApiParameter(
+                name='heat_metric_mode',
+                type=OpenApiTypes.STR,
+                required=False,
+                description="Heatmap metric: 'net', 'expense_only', or 'count'.",
+            ),
         ],
         responses={status.HTTP_200_OK: TransactionCalendarReturnSerializer},
         tags=["Transactions"],
@@ -248,7 +260,13 @@ class TransactionCalendarView(APIView):
         end_date = self._parse_date_or_400(request.query_params.get("end_date"), "end_date")
         if end_date < start_date:
             raise ValidationError({"end_date": "Must be on or after start_date."})
-        result = tx_svc.get_transaction_calendar(uid, start_date=start_date, end_date=end_date)
+        result = tx_svc.get_transaction_calendar(
+            uid,
+            start_date=start_date,
+            end_date=end_date,
+            display_currency_mode=request.query_params.get("display_currency_mode", "base"),
+            heat_metric_mode=request.query_params.get("heat_metric_mode", "net"),
+        )
         serializer = TransactionCalendarReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
