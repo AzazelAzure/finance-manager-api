@@ -89,3 +89,14 @@ urlpatterns = [
     path("finance/user/", UserView.as_view(), name="user"), 
     path("finance/bug-report/", BugReportView.as_view(), name="bug_report"),
 ]
+
+# Backwards-compatible route names used by existing tests and older Django clients.
+urlpatterns += [
+    path("finance/transactions/<str:tx_id>/", TransactionDetailView.as_view(), name="transaction_detail_update_delete"),
+    path("finance/sources/", SourceListCreateView.as_view(), name="sources"),
+    path("finance/sources/<str:source>/", SourceDetailView.as_view(), name="source_detail_update_delete"),
+    path("finance/upcoming_expenses/", UpcomingExpenseListCreateView.as_view(), name="upcoming_expenses"),
+    path("finance/upcoming_expenses/<str:name>/", UpcomingExpenseDetailView.as_view(), name="upcoming_expense_detail_update_delete"),
+    path("finance/categories/", CategoryListCreateView.as_view(), name="categories"),
+    path("finance/categories/<str:cat_name>/", CategoryDetailView.as_view(), name="category_detail_update_delete"),
+]

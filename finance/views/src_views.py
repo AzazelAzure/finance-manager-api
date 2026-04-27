@@ -37,6 +37,18 @@ from finance.api_tools.serializers.src_serializers import(
         ],
         responses={status.HTTP_200_OK: SourceSerializer(many=True)},
         tags=["Sources"]
+    ),
+    delete=extend_schema(
+        operation_id="finance_sources_delete_by_body",
+        summary="Delete a payment source",
+        description="Delete a source identified by the `source` field in the request body.",
+        request=SourcePatchSerializer,
+        responses={
+            status.HTTP_200_OK: SourceSetReturnSerializer,
+            status.HTTP_400_BAD_REQUEST: None,
+            status.HTTP_403_FORBIDDEN: None,
+        },
+        tags=["Sources"]
     )
 )
 class SourceListCreateView(APIView):
@@ -57,6 +69,19 @@ class SourceListCreateView(APIView):
     def get(self, request):
         result = src_svc.get_sources(request.user.appprofile.user_id, **request.query_params.dict())
         serializer = SourceSerializer(result["sources"], many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request):
+        source = request.data.get("source")
+        if not source:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        if str(source).lower() == "unknown":
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        result = src_svc.delete_source(
+            request.user.appprofile.user_id,
+            source,
+        )
+        serializer = SourceSetReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
