@@ -25,7 +25,7 @@ class TransactionGetSingleTestCase(TransactionGetBase):
             - Wrong status, shape, or values.
         """
         url = reverse(
-            "transaction_detail_update_delete",
+            "transaction_detail",
             kwargs={"tx_id": self.income_tx_id},
         )
         response = self.client.get(url)
@@ -41,7 +41,7 @@ class TransactionGetSingleTestCase(TransactionGetBase):
 
     def test_get_by_nonexistent_tx_id_returns_400(self):
         url = reverse(
-            "transaction_detail_update_delete",
+            "transaction_detail",
             kwargs={"tx_id": "2099-01-01-NOSUCHTX"},
         )
         response = self.client.get(url)
@@ -53,18 +53,18 @@ class TransactionGetListDefaultTestCase(TransactionGetBase):
 
     def test_get_no_query_params_returns_latest_transaction_only(self):
         """
-        With no filters, get_transactions uses get_latest (most recent by entry_id).
+        With no filters, get_transactions defaults to current_month filtering.
 
         Passes if:
-            - One transaction returned and it is the last POST from seeding (exp_latest).
+            - Returned rows match current-month query output.
 
         Fails if:
-            - Wrong count or wrong tx_id.
+            - Returned rows don't match current_month behavior.
         """
         response = self.client.get(self.list_url)
+        expected = self.client.get(self.list_url, {"current_month": "true"})
         self.assert_get_list_shape(response, code=200)
-        self.assertEqual(len(response.data["transactions"]), 1)
-        self.assertEqual(response.data["transactions"][0]["tx_id"], self.latest_tx_id)
+        self.assertEqual(response.data["transactions"], expected.data["transactions"])
 
 
 class TransactionGetFiltersTestCase(TransactionGetBase):

@@ -12,7 +12,7 @@ class UserBase(BaseTestCase):
     def setUp(self):
         super().setUp()
         self.user_url = reverse("user")
-        self.tx_detail_url_name = "transaction_detail_update_delete"
+        self.tx_detail_url_name = "transaction_detail"
 
         # PaymentSource.source is globally unique in this schema; free reserved defaults
         # so a second user can be created for ownership-boundary tests.

@@ -459,7 +459,7 @@ class TransactionPatchBase(TransactionBase):
         self.response = self.client.post(self.url, self.expense_data, format='json')
         self.tx_id = self.response.data['accepted'][0]['tx_id']
         self.url = reverse(
-            'transaction_detail_update_delete',
+            'transaction_detail',
             kwargs={'tx_id': self.tx_id},
             )
         # Ground-truth balance after POST (matches Updater/Calculator; avoids drift vs _calculated_expected_amount).

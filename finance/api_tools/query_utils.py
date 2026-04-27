@@ -53,7 +53,21 @@ def apply_transaction_filters(queryset, **kwargs):
         queryset = queryset.get_current_month()
     elif kwargs.get('year'):
         queryset = queryset.get_by_year(_safe_int(kwargs['year']))
-    elif not any(k in kwargs for k in ('tx_type', 'tag_name', 'category', 'source', 'currency_code', 'gte', 'lte', 'date')):
+    elif not any(
+        k in kwargs
+        for k in (
+            'tx_type',
+            'tag_name',
+            'category',
+            'source',
+            'currency_code',
+            'gte',
+            'lte',
+            'date',
+            'by_date',
+            'by_year',
+        )
+    ):
         # Default to current month if no other filters are provided
         queryset = queryset.get_current_month()
 

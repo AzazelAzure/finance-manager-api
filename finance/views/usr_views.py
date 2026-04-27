@@ -4,12 +4,22 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
+from rest_framework.permissions import BasePermission
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiTypes
 
 
 
 # Serializer Imports
 from finance.api_tools.serializers.base_serializers import UserSerializer, PasswordChangeSerializer
+
+
+class IsAuthenticatedOrCreateOnly(BasePermission):
+    """Allow open signup while requiring auth for account operations."""
+
+    def has_permission(self, request, view):
+        if request.method == "POST":
+            return True
+        return bool(request.user and request.user.is_authenticated)
 
 
 @extend_schema_view(
@@ -50,6 +60,8 @@ from finance.api_tools.serializers.base_serializers import UserSerializer, Passw
 )
 class UserView(APIView):
     """APIView for basic authenticated user account operations."""
+    permission_classes = [IsAuthenticatedOrCreateOnly]
+
     def post(self, request):
         # Get user model
         User = get_user_model()
