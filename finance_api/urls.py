@@ -17,6 +17,7 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 from finance.views.cat_views import CategoryListCreateView, CategoryDetailView
 from finance.views.exp_views import UpcomingExpenseListCreateView, UpcomingExpenseDetailView
 from finance.views.profile_views import AppProfileView, AppProfileSnapshotView
@@ -54,6 +55,7 @@ class CustomTokenRefreshView(TokenRefreshView):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
