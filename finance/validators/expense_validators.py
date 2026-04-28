@@ -115,38 +115,38 @@ def _validate_expense(
         upcoming_lower = {n.lower() for n in upcoming_check}
     if not patch:
         if data["name"].strip().lower() in upcoming_lower:
-            logger.error(f"Expense already exists: {data['name']}")
+            logger.error("Expense already exists (name omitted from logs)")
             raise ValidationError("Expense already exists")
         if data.get("start_date") and not data.get("due_date"):
             data["due_date"] = data["start_date"]
         if not data.get("start_date") and data.get("due_date"):
             data["start_date"] = data["due_date"]
         if not data.get("start_date") and not data.get("due_date"):
-            logger.error(f"Must have either a start date or due date: {data}")
+            logger.error("Must have either a start date or due date (payload keys omitted from logs)")
             raise ValidationError("Must have either a start date or due date")
     else:
         if existing_name and str(existing_name).lower() not in upcoming_lower:
-            logger.error(f"Expense does not exist: {existing_name}")
+            logger.error("Expense does not exist (name omitted from logs)")
             raise ValidationError("Expense does not exist")
         new_name = data.get("name")
         if new_name is not None:
             nn = str(new_name).strip()
             en = str(existing_name).strip() if existing_name else ""
             if nn and nn.lower() != en.lower() and nn.lower() in upcoming_lower:
-                logger.error(f"Expense already exists: {new_name}")
+                logger.error("Expense already exists under new name (name omitted from logs)")
                 raise ValidationError("Expense already exists")
 
     if data.get("currency"):
         _validate_currency(data["currency"])
     if data.get("end_date"):
         if data.get("due_date") and data["end_date"] < data["due_date"]:
-            logger.error(f"End date cannot be before due date: {data['end_date']}")
+            logger.error("End date cannot be before due date (values omitted from logs)")
             raise ValidationError("End date cannot be before due date")
         today = datetime.now(zoneinfo.ZoneInfo(profile.timezone)).date()
         end_date = data["end_date"]
         if isinstance(end_date, str):
             end_date = date.fromisoformat(end_date)
         if end_date < today:
-            logger.error(f"End date cannot be in the past: {data['end_date']}")
+            logger.error("End date cannot be in the past (value omitted from logs)")
             raise ValidationError("End date cannot be in the past")
     return data

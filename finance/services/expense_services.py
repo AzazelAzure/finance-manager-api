@@ -19,6 +19,7 @@ from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
 from django.db import transaction
 from loguru import logger
+from finance.api_tools.redaction import payload_keys_preview
 from finance.models import UpcomingExpense, AppProfile
 from datetime import datetime, timedelta # Added for month filtering
 
@@ -36,11 +37,11 @@ def add_expense(uid, data, *args, **kwargs):
     :returns: {'added': queryset}
     :rtype: dict
     """
-    logger.debug(f"Adding expense: {data}")
+    logger.debug("Adding expense | keys={}", payload_keys_preview(data))
     profile = kwargs.get('profile')
     upcoming = kwargs.get('upcoming')
     if isinstance(data,list):
-        logger.debug(f"Adding multiple expenses: {data}")
+        logger.debug("Adding multiple expenses | len={}", len(data) if isinstance(data, list) else 0)
         accepted = kwargs.get('accepted', [])
         rejected = kwargs.get('rejected', [])
         created = UpcomingExpense.objects.bulk_create([UpcomingExpense(**item) for item in accepted])

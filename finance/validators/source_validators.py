@@ -3,6 +3,7 @@ from functools import wraps
 from rest_framework.exceptions import ValidationError
 
 from loguru import logger
+from finance.api_tools.redaction import payload_keys_preview
 
 from finance.logic.updaters import Updater
 from finance.validators.validation_core import _validate_currency
@@ -32,7 +33,7 @@ def SourceSetValidator(func):
         update = Updater(profile=profile)
         kwargs["sources"] = sources
 
-        logger.debug(f"Validating source payload: {data} with uid: {uid}")
+        logger.debug("Validating source payload | uid={} | keys={}", uid, payload_keys_preview(data))
 
         if isinstance(data, list):
             rejected = []
@@ -68,12 +69,12 @@ def SourceGetValidator(func):
 
     @wraps(func)
     def _wrapped(uid, source: str, *args, **kwargs):
-        logger.debug(f"Validating source: {source} with uid: {uid}")
+        logger.debug("Validating source | uid={}", uid)
         sources = PaymentSource.objects.for_user(uid)
 
         source_obj = sources.get_by_source(source=source.lower()).first()
         if not source_obj:
-            logger.error(f"Source does not exist: {source}")
+            logger.error("Source does not exist (name omitted from logs)")
             raise ValidationError("Source does not exist")
 
         # Keep both historical keys since different service functions read different kwargs.
@@ -114,7 +115,7 @@ def _validate_source(uid, data: dict, source_check: set, patch: bool):
 
         valid_acc_types = {choice[0] for choice in PaymentSource.AccType.choices}
         if incoming_acc_type not in valid_acc_types:
-            logger.error(f"Account type does not exist: {data['acc_type']}")
+            logger.error("Account type does not exist (value omitted from logs)")
             raise ValidationError("Account type does not exist")
 
         data["acc_type"] = incoming_acc_type

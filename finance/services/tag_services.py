@@ -13,6 +13,7 @@ import finance.logic.validators as validator
 from finance.validators.tag_validators import TagGetValidator, TagSetValidator
 from loguru import logger
 from finance.models import  Tag
+from finance.api_tools.redaction import payload_keys_preview
 
 
 @validator.UserValidator
@@ -29,7 +30,7 @@ def add_tags(uid, data, *args, **kwargs):
     :returns: {'added': queryset}
     :rtype: dict
     """
-    logger.debug(f"Adding tag: {data}")
+    logger.debug("Adding tag | keys={}", payload_keys_preview(data))
     accepted = kwargs.get("accepted", [])
     rejected = kwargs.get("rejected", [])
     existing = set(kwargs.get("existing_tags", set()))
@@ -57,7 +58,7 @@ def delete_tag(uid, data, *args, **kwargs):
     :returns: {'deleted': queryset}
     :rtype: dict
     """
-    logger.debug(f"Deleting tags: {data}")
+    logger.debug("Deleting tags | keys={}", payload_keys_preview(data))
     to_delete = set(kwargs.get("to_delete", []))
     existing = set(kwargs.get("existing_tags", set()))
     updated_tags = sorted(existing - to_delete)
@@ -81,7 +82,7 @@ def update_tag(uid, data, *args, **kwargs):
     :returns: {'updated': queryset}
     :rtype: dict
     """
-    logger.debug(f"Updating tag: {data}")
+    logger.debug("Updating tag | keys={}", payload_keys_preview(data))
     mapping = kwargs.get("update", {})
     existing = list(kwargs.get("existing_tags", set()))
     if not mapping:
