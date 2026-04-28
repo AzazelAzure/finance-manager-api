@@ -113,7 +113,13 @@ class TransactionListCreateView(TransactionBaseView):
         serializer = TransactionSetSerializer(data=data, many=is_many)
         if not serializer.is_valid():
             from loguru import logger
-            logger.warning("transaction_validation_failed | errors={errors} | data={data}", errors=serializer.errors, data=data)
+            from finance.api_tools.redaction import payload_keys_preview
+
+            logger.warning(
+                "transaction_validation_failed | errors={errors} | data_keys={keys}",
+                errors=serializer.errors,
+                keys=payload_keys_preview(data),
+            )
             serializer.is_valid(raise_exception=True)
         check = self._txset_check(serializer.data)
         if isinstance(check, Response):

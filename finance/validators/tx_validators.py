@@ -132,14 +132,14 @@ def _validate_transaction(
     if data.get("source") is None or data.get("source") == "":
         raise ValidationError("Source does not exist")
     if not data["source"] in source_check:
-        logger.error(f"Source does not exist: {data['source']}")
+        logger.error("Source does not exist (rejected at validation; value omitted from logs)")
         raise ValidationError("Source does not exist")
     if data.get("currency") is None or data.get("currency") == "":
         raise ValidationError("Currency does not exist")
     _validate_currency(data["currency"])
     if (validate_keys is None or "category" in validate_keys) and data.get("category"):
         if data["category"] not in cat_check:
-            logger.error(f"Category does not exist: {data['category']}")
+            logger.error("Category does not exist (rejected at validation; value omitted from logs)")
             raise ValidationError("Category does not exist")
     if "tags" in data:
         if data["tags"] is None or data["tags"] == "":
@@ -177,10 +177,10 @@ def _validate_transaction(
                 raise ValidationError("Date cannot be in the future")
     if data.get("bill"):
         if not data["bill"] in upcoming_check:
-            logger.error(f"Expense does not exist: {data['bill']}")
+            logger.error("Linked expense not found (rejected at validation; value omitted from logs)")
             raise ValidationError("Expense does not exist")
         if data["tx_type"] != "EXPENSE":
-            logger.error(f"Expense must be an expense: {data['tx_type']}")
+            logger.error("Bill field requires tx_type=EXPENSE (tx_type value omitted from logs)")
             raise ValidationError("Expense must be an expense")
     return data
 

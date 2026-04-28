@@ -6,6 +6,8 @@ All notable changes to the API codebase must be documented in this file by the e
 ### Security & Configuration
 - **Production settings parsing**: `DEBUG` and boolean deployment flags (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`) now use explicit environment boolean parsing so `DEBUG=False` is not misread as true.
 - **TLS-related settings**: Optional HTTPS/cookie hardening can be enabled per environment for beta and `manage.py check --deploy` runs. Residual HSTS sub-domain/preload warnings (W005, W021) may remain until the public domain and proxy policy are fixed.
+- **Secret hygiene**: Removed tracked `.env.bak`; `.gitignore` now covers `.env*` and `*.bak`; added `.env.example`. **Rotate** any credentials ever present in removed env backups (out of band).
+- **Log privacy defaults**: Request log context uses `username=authenticated` unless `LOG_FULL_USERNAME=1`. Transaction validation and several service/validator logs use key previews instead of raw payloads or user-entered values; see `finance/api_tools/redaction.py`.
 
 ### Tests
 - **Pytest collection scope**: `pytest.ini` now sets `testpaths = finance/tests` so ad-hoc root-level helper scripts are not collected as tests.

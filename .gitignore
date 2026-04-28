@@ -34,6 +34,9 @@ thumbs.db
 ### 5. LOCAL CONFIG & SECRETS
 # Never commit your API keys or local DB paths
 .env
+.env.*
+!.env.example
+*.bak
 config.json
 *.log
 .csv
