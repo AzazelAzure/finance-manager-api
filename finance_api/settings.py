@@ -78,9 +78,27 @@ ALLOWED_HOSTS = [
 
 # CSRF and CORS (simplified for local HTTPS simulation)
 CSRF_TRUSTED_ORIGINS = [
-    "https://financemanager.local:8443",
-    "https://api.financemanager.local:8443",
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://financemanager.local:8443,https://api.financemanager.local:8443,"
+        "https://thehivemanager.com,https://www.thehivemanager.com,"
+        "https://api.thehivemanager.com,https://reflex-api.thehivemanager.com,"
+        "https://jsdevtesting.thehivemanager.com",
+    ).split(",")
+    if origin.strip()
 ]
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:4173,http://127.0.0.1:4173,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "https://thehivemanager.com,https://jsdevtesting.thehivemanager.com",
+    ).split(",")
+    if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Application definition
@@ -110,6 +128,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
+    "corsheaders",
 ]
 
 SITE_ID = 1
@@ -151,6 +170,7 @@ MIDDLEWARE = [
     "finance.middleware.db_hit_counter.DBHitCounterMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
