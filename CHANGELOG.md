@@ -3,6 +3,14 @@
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
 ## [Unreleased]
+### Security & Configuration
+- **Production settings parsing**: `DEBUG` and boolean deployment flags (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`) now use explicit environment boolean parsing so `DEBUG=False` is not misread as true.
+- **TLS-related settings**: Optional HTTPS/cookie hardening can be enabled per environment for beta and `manage.py check --deploy` runs. Residual HSTS sub-domain/preload warnings (W005, W021) may remain until the public domain and proxy policy are fixed.
+
+### Tests
+- **Pytest collection scope**: `pytest.ini` now sets `testpaths = finance/tests` so ad-hoc root-level helper scripts are not collected as tests.
+- **URL reverse names**: Aligned `urlpatterns` names with integration tests for categories, upcoming expenses, and source detail routes; source delete and stress tests use detail-route DELETE; profile method-denial tests expect `405` for unsupported HTTP methods on `AppProfileView`.
+
 ### Features
 - **Visualization Aggregate Packets**: Added `GET /finance/transactions/visualization/` to return chart-ready transaction flow/type/category aggregates plus upcoming-expense timeline/monthly/status packets for a date range.
 - **Upcoming Expense PATCH Alias**: Added partial-update compatibility for `PATCH /finance/upcoming-expenses/{name}/` requests that send `{"paid": true}` by mapping the alias to the canonical `paid_flag` field.

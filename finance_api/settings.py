@@ -16,6 +16,13 @@ from finance.management.logging_config import logging_config
 from dotenv import load_dotenv
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -53,12 +60,16 @@ logging_config()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", default=False)
-DB_HIT_LOGGING_ENABLED = str(DEBUG).lower() in {"1", "true", "yes", "on"}
+DEBUG = _env_bool("DEBUG", default=False)
+DB_HIT_LOGGING_ENABLED = DEBUG
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@financemanager.local")
 BUG_REPORT_TO_EMAIL = os.getenv("BUG_REPORT_TO_EMAIL", "")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
+    if h.strip()
+]
 
 
 # CSRF and CORS (simplified for local HTTPS simulation)
@@ -250,3 +261,11 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_PATCH': True,
     'COMPONENT_SPLIT_REQUEST': True,
 }
+
+# HTTPS and cookie security (set explicitly in production / beta; deploy check uses these
+# when DEBUG is False and documents intentional proxy termination where applicable)
+SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", default=False)
+SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=False)
+CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=False)
+_hsts = os.getenv("SECURE_HSTS_SECONDS", "").strip()
+SECURE_HSTS_SECONDS = int(_hsts) if _hsts.isdigit() else 0

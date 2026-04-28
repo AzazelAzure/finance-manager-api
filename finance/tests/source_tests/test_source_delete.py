@@ -6,9 +6,13 @@ from finance.tests.source_tests.source_base import SourceBase
 
 
 class SourceDeleteTestCase(SourceBase):
+    @staticmethod
+    def _detail_url(source_name: str) -> str:
+        return reverse("source_detail_update_delete", kwargs={"source": source_name})
+
     def test_delete_collection_body_success(self):
         expected = self.seed_source("delete-source")
-        response = self.client.delete(self.url, {"source": expected["source"]}, format="json")
+        response = self.client.delete(self._detail_url(expected["source"]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(
             PaymentSource.objects.for_user(self.profile.user_id)
@@ -17,18 +21,18 @@ class SourceDeleteTestCase(SourceBase):
         )
 
     def test_delete_nonexistent_source_rejected(self):
-        response = self.client.delete(self.url, {"source": "missing"}, format="json")
+        response = self.client.delete(self._detail_url("missing"))
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_delete_unknown_rejected(self):
-        response = self.client.delete(self.url, {"source": "unknown"}, format="json")
+        response = self.client.delete(self._detail_url("unknown"))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_updates_safe_to_spend_for_spend_account(self):
         expected = self.seed_source("spend-delete", amount="200.00")
         self.profile.spend_accounts = [expected["source"]]
         self.profile.save(update_fields=["spend_accounts"])
-        response = self.client.delete(self.url, {"source": expected["source"]}, format="json")
+        response = self.client.delete(self._detail_url(expected["source"]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("snapshot", response.data)
         self.assertIsNotNone(response.data["snapshot"]["safe_to_spend"])
@@ -47,7 +51,7 @@ class SourceDeleteTestCase(SourceBase):
         }
         tx_response = self.client.post(reverse("transactions_list_create"), tx_payload, format="json")
         self.assertEqual(tx_response.status_code, status.HTTP_201_CREATED)
-        response = self.client.delete(self.url, {"source": expected["source"]}, format="json")
+        response = self.client.delete(self._detail_url(expected["source"]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         tx = Transaction.objects.for_user(self.profile.user_id).get_tx(
             tx_response.data["accepted"][0]["tx_id"]
