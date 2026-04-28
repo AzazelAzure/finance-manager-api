@@ -14,8 +14,8 @@ class PermissionDefaultsTests(BaseTestCase):
             reverse("appprofile"),
             reverse("appprofile_snapshot"),
             reverse("sources_list_create"),
-            reverse("upcoming_expenses_list_create"),
-            reverse("categories_list_create"),
+            reverse("upcoming_expenses"),
+            reverse("categories"),
             reverse("tags"),
             reverse("bug_report"),
         ]

@@ -131,7 +131,9 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             return self._client().post(reverse("transactions_list_create"), payload, format="json").status_code
 
         def delete_source():
-            return self._client().delete(reverse("sources_list_create"), {"source": contender.source}, format="json").status_code
+            return self._client().delete(
+                reverse("source_detail_update_delete", kwargs={"source": contender.source})
+            ).status_code
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             statuses = list(pool.map(create_tx, range(12)))
