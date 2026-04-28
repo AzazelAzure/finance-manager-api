@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 ### Security & Configuration
 - **Production settings parsing**: `DEBUG` and boolean deployment flags (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`) now use explicit environment boolean parsing so `DEBUG=False` is not misread as true.
+- **HSTS policy flags**: Added env-driven `SECURE_HSTS_INCLUDE_SUBDOMAINS` and `SECURE_HSTS_PRELOAD` so deploy-check warnings `W005`/`W021` can be explicitly enabled for beta/prod domains.
 - **TLS-related settings**: Optional HTTPS/cookie hardening can be enabled per environment for beta and `manage.py check --deploy` runs. Residual HSTS sub-domain/preload warnings (W005, W021) may remain until the public domain and proxy policy are fixed.
 - **Secret hygiene**: Removed tracked `.env.bak`; `.gitignore` now covers `.env*` and `*.bak`; added `.env.example`. **Rotate** any credentials ever present in removed env backups (out of band).
 - **Log privacy defaults**: Request log context uses `username=authenticated` unless `LOG_FULL_USERNAME=1`. Transaction validation and several service/validator logs use key previews instead of raw payloads or user-entered values; see `finance/api_tools/redaction.py`.

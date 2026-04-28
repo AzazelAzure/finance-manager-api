@@ -273,3 +273,5 @@ SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=False)
 CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=False)
 _hsts = os.getenv("SECURE_HSTS_SECONDS", "").strip()
 SECURE_HSTS_SECONDS = int(_hsts) if _hsts.isdigit() else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", default=False)
