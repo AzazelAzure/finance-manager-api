@@ -83,7 +83,8 @@ CSRF_TRUSTED_ORIGINS = [
         "CSRF_TRUSTED_ORIGINS",
         "https://financemanager.local:8443,https://api.financemanager.local:8443,"
         "https://thehivemanager.com,https://www.thehivemanager.com,"
-        "https://api.thehivemanager.com,https://reflex-api.thehivemanager.com,"
+        "https://api.thehivemanager.com,https://api-jsdevtesting.thehivemanager.com,"
+        "https://reflex-api.thehivemanager.com,"
         "https://jsdevtesting.thehivemanager.com,https://jsdevprodtest.thehivemanager.com",
     ).split(",")
     if origin.strip()
