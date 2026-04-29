@@ -84,7 +84,7 @@ CSRF_TRUSTED_ORIGINS = [
         "https://financemanager.local:8443,https://api.financemanager.local:8443,"
         "https://thehivemanager.com,https://www.thehivemanager.com,"
         "https://api.thehivemanager.com,https://reflex-api.thehivemanager.com,"
-        "https://jsdevtesting.thehivemanager.com",
+        "https://jsdevtesting.thehivemanager.com,https://jsdevprodtest.thehivemanager.com",
     ).split(",")
     if origin.strip()
 ]
@@ -94,7 +94,8 @@ CORS_ALLOWED_ORIGINS = [
         "CORS_ALLOWED_ORIGINS",
         "http://localhost:4173,http://127.0.0.1:4173,"
         "http://localhost:5173,http://127.0.0.1:5173,"
-        "https://thehivemanager.com,https://jsdevtesting.thehivemanager.com",
+        "https://thehivemanager.com,https://jsdevtesting.thehivemanager.com,"
+        "https://jsdevprodtest.thehivemanager.com",
     ).split(",")
     if origin.strip()
 ]
