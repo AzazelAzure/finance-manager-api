@@ -167,11 +167,13 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
+# CorsMiddleware first so preflight/Origin handling runs before the rest of the stack
+# (django-cors-headers recommends placing it as high as possible).
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "finance.middleware.db_hit_counter.DBHitCounterMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

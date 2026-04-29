@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Security & Configuration
+- **CORS middleware order:** `CorsMiddleware` is now first in `MIDDLEWARE` (per django-cors-headers guidance). Added [docs/CORS_PRODUCTION_TROUBLESHOOTING.md](docs/CORS_PRODUCTION_TROUBLESHOOTING.md) for **ERR_NETWORK** / empty preflight when the public `api` hostname differs from direct-to-box tests (often **Cloudflare cache** on OPTIONS).
 - **CORS dependency**: Declared `django-cors-headers` in `pyproject.toml` / `uv.lock` so `corsheaders` installs in CI and container images (middleware was already wired in settings).
 - **Web beta CORS/CSRF defaults**: Default `CORS_ALLOWED_ORIGINS` now includes Vite dev (`http://localhost:5173`, `http://127.0.0.1:5173`) and `https://jsdevtesting.thehivemanager.com`; default `CSRF_TRUSTED_ORIGINS` includes the JS dev hostname. **2026-04-29:** Added `https://jsdevprodtest.thehivemanager.com` (Vite `preview` tunnel) alongside `jsdevtesting`. Deployments can still override via `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` env.
 - **Production settings parsing**: `DEBUG` and boolean deployment flags (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`) now use explicit environment boolean parsing so `DEBUG=False` is not misread as true.
