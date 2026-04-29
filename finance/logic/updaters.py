@@ -81,6 +81,26 @@ class Updater:
         self.fc = Calculator(self.profile)
         return
 
+    def _bills_unpaid_due_in_profile_current_month(self):
+        """Unpaid upcoming bills with due_date in the profile's current calendar month.
+
+        Must match the intended KPI semantics: *remaining* bills due this month (unpaid)
+        in base-currency form, and the same set must back *safe to spend* (spendable minus
+        those bills). Use profile timezone for month boundaries (not server UTC day).
+        """
+        now = datetime.now(self.timezone).date()
+        first_m = now.replace(day=1)
+        next_m = first_m + relativedelta(months=1)
+        if hasattr(self, "unpaid"):
+            return [b for b in self.unpaid if b.due_date and first_m <= b.due_date < next_m]
+        upcoming_qs = getattr(self, "upcoming", None) or UpcomingExpense.objects.for_user(self.uid)
+        return list(
+            upcoming_qs.filter(
+                paid_flag=False,
+                due_date__gte=first_m,
+                due_date__lt=next_m,
+            )
+        )
 
     # Data fixers
     def fix_tx_data(self, data):
@@ -157,7 +177,7 @@ class Updater:
             else:
                 txs.update(bill='unknown')
         accounts = [source for source in self.sources if source.source in self.spend_accounts]
-        debts = list(self.upcoming.get_current_month().filter(paid_flag=False))
+        debts = self._bills_unpaid_due_in_profile_current_month()
         self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.total_remaining_expenses = self.fc.calc_upcoming_bills_base_total(debts)
         self.snapshots.save()
@@ -193,11 +213,7 @@ class Updater:
         # calc_acc_types mutates balances in memory; use DB-fresh rows for STS / assets.
         fresh_sources = list(PaymentSource.objects.for_user(self.uid))
         accounts = [s for s in fresh_sources if s.source in self.spend_accounts]
-        debts = list(
-            UpcomingExpense.objects.for_user(self.uid)
-            .get_current_month()
-            .filter(paid_flag=False)
-        )
+        debts = self._bills_unpaid_due_in_profile_current_month()
         self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.total_assets = self.fc.calc_total_assets(fresh_sources)
         self.snapshots.total_remaining_expenses = self.fc.calc_upcoming_bills_base_total(debts)
@@ -218,11 +234,7 @@ class Updater:
                 setattr(self.snapshots, total, value)
 
         fresh_sources = list(PaymentSource.objects.for_user(self.uid))
-        debts = list(
-            UpcomingExpense.objects.for_user(self.uid)
-            .get_current_month()
-            .filter(paid_flag=False)
-        )
+        debts = self._bills_unpaid_due_in_profile_current_month()
         spend_accounts = [
             s for s in fresh_sources if s.source in self.spend_accounts
         ]
@@ -258,11 +270,6 @@ class Updater:
         self.upcoming.bulk_update(to_update, ['paid_flag', 'due_date', 'is_recurring'])
         return
     
-    def _in_current_month(self, date):
-        """Return True when a date falls within the user's current month."""
-        now = datetime.now(self.timezone).date()
-        return date.month == now.month and date.year == now.year
-    
     def _handle_tx_update(self, tx):
         """Reverse old transaction effects so the replacement payload can be applied cleanly."""
         append_change = False
@@ -286,13 +293,8 @@ class Updater:
     
     def _tx_snapshot_handler(self):
         """Rebuild snapshot totals from current source/transaction state."""
-        # calc_sts expects an iterable of debt rows (currency, amount), not a dict;
-        # iterating a dict would yield bill name strings and raise AttributeError.
-        debt_list = [
-            bill
-            for bill in self.unpaid
-            if bill.is_recurring and self._in_current_month(bill.due_date)
-        ]
+        # Same bill list for STS debt and total_remaining_expenses (unpaid, due this month).
+        bills = self._bills_unpaid_due_in_profile_current_month()
         # Leak metric must reflect full persisted transfer history, not only the
         # in-flight mutation batch.
         transfers = list(
@@ -306,19 +308,10 @@ class Updater:
         spend_names = self.profile.spend_accounts
         spend_accounts = [s for s in fresh_sources if s.source in spend_names]
         self.snapshots.total_assets = self.fc.calc_total_assets(fresh_sources)
-        self.snapshots.safe_to_spend = self.fc.calc_sts(spend_accounts, debt_list)
+        self.snapshots.safe_to_spend = self.fc.calc_sts(spend_accounts, bills)
         self.snapshots.total_leaks = self.fc.calc_leaks(transfers) if transfers else Decimal("0.00")
         self.snapshots.total_monthly_spending = self.fc.calc_current_month_expense_spending()
-        first_m = datetime.now(self.timezone).date().replace(day=1)
-        next_m = first_m + relativedelta(months=1)
-        month_due_unpaid = [
-            b
-            for b in self.unpaid
-            if b.due_date and first_m <= b.due_date < next_m
-        ]
-        self.snapshots.total_remaining_expenses = self.fc.calc_upcoming_bills_base_total(
-            month_due_unpaid
-        )
+        self.snapshots.total_remaining_expenses = self.fc.calc_upcoming_bills_base_total(bills)
         for total in type_totals:
             setattr(self.snapshots, total, type_totals[total])
         self.snapshots.save()

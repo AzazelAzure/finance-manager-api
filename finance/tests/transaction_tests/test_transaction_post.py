@@ -87,6 +87,38 @@ class TransactionPostTestCase(TransactionBase):
             Decimal("42.00"),
         )
 
+    def test_snapshot_safe_to_spend_includes_one_time_bills_due_this_month(self):
+        """STS must subtract the same unpaid-this-month bills as total_remaining (incl. one-time).
+
+        Regression: _tx_snapshot_handler used only is_recurring bills for calc_sts debt, so
+        one-time due bills inflated safe_to_spend relative to remaining.
+        """
+        uid = str(self.profile.user_id)
+        src = self.sources[0]
+        self.profile.spend_accounts = [src.source]
+        self.profile.save(update_fields=["spend_accounts"])
+        src.amount = Decimal("1000.00")
+        src.currency = str(self.profile.base_currency).upper()
+        src.save(update_fields=["amount", "currency"])
+        UpcomingExpense.objects.create(
+            uid=uid,
+            name="kpi-onetime-bill",
+            amount=Decimal("100.00"),
+            due_date=date.today(),
+            paid_flag=False,
+            currency=str(self.profile.base_currency).upper(),
+            is_recurring=False,
+        )
+        payload = self.expense_data.copy()
+        payload["date"] = str(date.today())
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        snap = response.data["snapshot"]
+        remaining = Decimal(str(snap["total_remaining_expenses"]))
+        sts = Decimal(str(snap["safe_to_spend"]))
+        self.assertEqual(remaining, Decimal("100.00"))
+        self.assertEqual(sts, Decimal("900.00"))
+
     def test_transaction_add_income(self):
         """
         Tests adding a transaction with tx_type INCOME

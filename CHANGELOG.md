@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Fixed
+- **Snapshot KPIs (safe to spend + remaining expenses):** `Updater._tx_snapshot_handler` used only **recurring** upcoming bills for `safe_to_spend` while `total_remaining_expenses` counted **all** unpaid bills due in the profile’s current month, which made the two KPIs inconsistent and could inflate safe-to-spend. Both fields now use the same bill set: unpaid with `due_date` in the profile timezone’s current month. `expense_handler` / `source_handler` / `user_handler` use the same month boundaries (profile TZ) instead of `get_current_month()` on server local date.
 - **App profile snapshot (no `FinancialSnapshot` row):** `GET /finance/appprofile/snapshot/` can return `snapshot: null` for users who have not yet got a stored snapshot. The snapshot response serializer now allows a null nested `snapshot` so the endpoint returns `200` with computed totals and empty series instead of failing during serialization (which surfaced to the Reflex dashboard as a failed API request after login).
 
 ### Security & Configuration
