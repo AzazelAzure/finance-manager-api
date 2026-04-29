@@ -3,6 +3,9 @@
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
 ## [Unreleased]
+### Fixed
+- **App profile snapshot (no `FinancialSnapshot` row):** `GET /finance/appprofile/snapshot/` can return `snapshot: null` for users who have not yet got a stored snapshot. The snapshot response serializer now allows a null nested `snapshot` so the endpoint returns `200` with computed totals and empty series instead of failing during serialization (which surfaced to the Reflex dashboard as a failed API request after login).
+
 ### Security & Configuration
 - **CORS middleware order:** `CorsMiddleware` is now first in `MIDDLEWARE` (per django-cors-headers guidance). Added [docs/CORS_PRODUCTION_TROUBLESHOOTING.md](docs/CORS_PRODUCTION_TROUBLESHOOTING.md) for **ERR_NETWORK** / empty preflight when the public `api` hostname differs from direct-to-box tests (often **Cloudflare cache** on OPTIONS).
 - **CORS dependency**: Declared `django-cors-headers` in `pyproject.toml` / `uv.lock` so `corsheaders` installs in CI and container images (middleware was already wired in settings).

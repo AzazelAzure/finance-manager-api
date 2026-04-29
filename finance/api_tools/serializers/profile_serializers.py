@@ -14,7 +14,8 @@ class AppProfileGetSerializer(serializers.Serializer):
     start_of_week = serializers.IntegerField()
 
 class SnapshotSerializer(serializers.Serializer):
-    snapshot = FinancialSnapshotSerializer()
+    # user_get_totals can return snapshot=None before onboarding/first snapshot row exists
+    snapshot = FinancialSnapshotSerializer(allow_null=True, required=False)
     transactions_for_month = TransactionAcceptedSerializer(many=True)
     flow_series = serializers.ListField(child=serializers.DictField(), required=False)
     expense_by_category = serializers.ListField(child=serializers.DictField(), required=False)
