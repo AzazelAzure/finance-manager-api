@@ -5,6 +5,20 @@ from finance.tests.source_tests.source_base import SourceBase
 
 
 class SourcePatchTestCase(SourceBase):
+    def test_patch_rename_source_to_new_unique_name(self):
+        expected = self.seed_source("patch-rename")
+        url = reverse("source_detail_update_delete", kwargs={"source": expected["source"]})
+        response = self.client.patch(url, {"source": "patch-rename-updated"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["updated"]["source"], "patch-rename-updated")
+
+    def test_patch_rename_source_to_existing_name_rejected(self):
+        original = self.seed_source("patch-rename-original")
+        self.seed_source("patch-rename-existing")
+        url = reverse("source_detail_update_delete", kwargs={"source": original["source"]})
+        response = self.client.patch(url, {"source": "patch-rename-existing"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_patch_partial_single_field(self):
         expected = self.seed_source("patch-source")
         url = reverse("source_detail_update_delete", kwargs={"source": expected["source"]})

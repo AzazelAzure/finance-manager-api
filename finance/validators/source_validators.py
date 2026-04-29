@@ -97,12 +97,8 @@ def _validate_source(uid, data: dict, source_check: set, patch: bool):
         if incoming_source == "unknown":
             raise ValidationError("Cannot add unknown source")
 
-        if not patch:
-            if incoming_source in source_check:
-                raise ValidationError("Source already exists")
-        else:
-            if incoming_source not in source_check:
-                raise ValidationError("Cannot update source to one that doesn't exist")
+        if not patch and incoming_source in source_check:
+            raise ValidationError("Source already exists")
 
         # Normalize in-place so later layers (Updater/source snapshots) stay consistent.
         data["source"] = incoming_source
