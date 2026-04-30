@@ -45,3 +45,25 @@ class ExpensePatchTestCase(ExpenseBase):
         expected_due = date.today() + relativedelta(months=1)
         self.assertEqual(original.due_date, expected_due)
         self.assertFalse(original.paid_flag)
+
+    def test_patch_can_disable_recurring_with_canonical_field(self):
+        self.create_expense()
+        response = self.client.patch(
+            self.detail_url("rent"),
+            {"is_recurring": False, "currency": self.profile.base_currency},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        updated = UpcomingExpense.objects.for_user(self.profile.user_id).get(name="rent")
+        self.assertFalse(updated.is_recurring)
+
+    def test_patch_accepts_recurring_flag_alias(self):
+        self.create_expense()
+        response = self.client.patch(
+            self.detail_url("rent"),
+            {"recurring_flag": False, "currency": self.profile.base_currency},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        updated = UpcomingExpense.objects.for_user(self.profile.user_id).get(name="rent")
+        self.assertFalse(updated.is_recurring)

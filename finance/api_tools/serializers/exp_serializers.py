@@ -32,11 +32,16 @@ class ExpensePutSerializer(serializers.Serializer):
 class ExpensePatchSerializer(ExpenseSerializer):
     # Compatibility alias for clients that send `paid` in partial updates.
     paid = serializers.BooleanField(required=False, write_only=True)
+    # Compatibility alias for clients that send `recurring_flag`.
+    recurring_flag = serializers.BooleanField(required=False, write_only=True)
 
     def validate(self, attrs):
         paid_alias = attrs.pop("paid", None)
         if paid_alias is not None:
             attrs["paid_flag"] = paid_alias
+        recurring_alias = attrs.pop("recurring_flag", None)
+        if recurring_alias is not None:
+            attrs["is_recurring"] = recurring_alias
         return attrs
 
 
