@@ -2,7 +2,7 @@
 
 ## Symptom
 
-- Vite/JS on **`https://jsdevtesting...`** or **`https://jsdevprodtest...`** shows **ERR_NETWORK** or generic login failure.
+- Vite/JS on **`https://jsdevtesting...`** or **`https://api-jsdevtesting...`** shows **ERR_NETWORK** or generic login failure.
 - `curl` from a laptop to **`https://api.thehivemanager.com/api/token/`** with an `Origin:` header may show **no** `access-control-*` headers, while the **same** OPTIONS to **`https://127.0.0.1:8443`** (or the container) on the VPS **does** return `access-control-allow-origin`.
 
 That means **Django + nginx for the app are not the weak link**; the path **Cloudflare (or another edge) → origin** is dropping CORS, caching a bad preflight, or a different service is responding on the public name.
