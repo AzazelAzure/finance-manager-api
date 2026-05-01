@@ -3,6 +3,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import BasePermission
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiTypes
@@ -74,16 +75,35 @@ class UserView(APIView):
         vd = serializer.validated_data
         username = vd["username"].strip()
         email = vd["user_email"].strip().lower()
-        if User.objects.filter(username__iexact=username).exists() or User.objects.filter(email__iexact=email).exists():
+        if User.objects.filter(username__iexact=username).exists():
             return Response(
-                {"detail": "username/email already exists"},
+                {"username": ["This username is already taken."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=vd["password"],
-        )
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {
+                    "user_email": [
+                        "This email is already registered. Sign in instead.",
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            User.objects.create_user(
+                username=username,
+                email=email,
+                password=vd["password"],
+            )
+        except IntegrityError:
+            return Response(
+                {
+                    "user_email": [
+                        "This email is already registered. Sign in instead.",
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response({'message': "User created successfully"}, status=status.HTTP_201_CREATED)
     
     def get(self, request):
