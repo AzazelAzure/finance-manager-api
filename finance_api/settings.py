@@ -160,6 +160,9 @@ REST_AUTH = {
     "JWT_AUTH_COOKIE": "finance-auth",
     "JWT_AUTH_REFRESH_COOKIE": "finance-refresh-token",
     "TOKEN_MODEL": None,
+    "REGISTER_SERIALIZER": (
+        "finance.api_tools.serializers.register_serializers.EmailUniqueRegisterSerializer"
+    ),
 }
 
 AUTHENTICATION_BACKENDS = [

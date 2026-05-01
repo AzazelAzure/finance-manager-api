@@ -56,7 +56,7 @@ class PermissionDefaultsTests(BaseTestCase):
             format="json",
         )
         self.assertEqual(duplicate_username.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(duplicate_username.data.get("detail"), "username/email already exists")
+        self.assertIn("username", duplicate_username.data)
 
         duplicate_email = self.client.post(
             reverse("user"),
@@ -68,4 +68,4 @@ class PermissionDefaultsTests(BaseTestCase):
             format="json",
         )
         self.assertEqual(duplicate_email.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(duplicate_email.data.get("detail"), "username/email already exists")
+        self.assertIn("user_email", duplicate_email.data)
