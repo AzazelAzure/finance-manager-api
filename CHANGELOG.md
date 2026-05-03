@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **AppProfile Completed Tours (F-007):** Added `completed_tours` JSON field to `AppProfile` model and exposed it in profile serializers to persist UI Guided Walkthrough state across devices.
 - **Offline PWA exchange matrix:** `GET /finance/exchange_rates/?currencies=USD,PHP,...` (auth required) returns pairwise factors `convert_currency(Decimal("1"), from, to)` for up to 24 codes so the web client can persist a **minimal** rate table (profile base + sources + cached tx currencies) for offline conversion aligned with transaction math.
 
 - **PWA D2 writes (idempotency + client build):** New `IdempotencyRecord` model and `PwaWriteContractMiddleware` for v1 allowlisted mutators (`POST/PATCH/DELETE` transactions; `POST/PATCH/PUT/DELETE` upcoming expenses). Optional `Idempotency-Key` enables duplicate-safe replay; keys on non-allowlisted `/finance/*` mutators return **400** (`IDEMPOTENCY_SCOPE`). Optional `CLIENT_BUILD_MIN_WRITE` enforces `X-Client-Build` on `/finance/*` mutations with standardized **409** JSON (`CLIENT_BUILD_UNSUPPORTED`). `GET /api/health/` now returns `api_server_build` and `min_client_build_write`. `DELETE` on a missing transaction with `Idempotency-Key` can return **200** `{"idempotent": true, "tx_id": "..."}` for outbox alignment.
