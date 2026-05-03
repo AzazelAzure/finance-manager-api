@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from finance.logic.fincalc import Calculator
+from finance.logic.convert_currency import convert_currency
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from finance.models import (
@@ -286,9 +287,11 @@ class Updater:
                 append_change = affected_bill
         affected_source = next((source for source in self.sources if source.source == tx.source), None)
         if affected_source:
-            # Flip prior transaction sign to unwind its contribution to source balance.
-            tx.amount = tx.amount * -1
-            affected_source.amount += tx.amount
+            # Undo the same delta calc_tx_sources applies when the row was added (per-source currency).
+            delta = Decimal(tx.amount).quantize(Decimal("0.01"))
+            if tx.currency != affected_source.currency:
+                delta = convert_currency(delta, tx.currency, affected_source.currency)
+            affected_source.amount -= delta
         return append_change
     
     def _tx_snapshot_handler(self):

@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from loguru import logger
 from rest_framework.exceptions import ValidationError
-from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot
+from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot, PaymentSource
 import copy
 from decimal import Decimal
 from datetime import timedelta
@@ -195,11 +195,18 @@ def delete_transaction(uid, tx_id: str, *args, **kwargs):
         upcoming=kwargs.get("upcoming"),
         sources=kwargs.get("sources"),
     )
-    # Update balances to reverse changes
-    snapshot = update.transaction_handler(update=tx)
+    # Update balances to reverse changes (bills / upcoming) before row removal
+    update.transaction_handler(update=tx)
 
     # Delete transaction
     tx.delete()
+    # Snapshot and KPI fields must not still reference the removed row (e.g. transfers / monthly spend).
+    fresh_sources = list(PaymentSource.objects.for_user(uid))
+    snapshot = Updater(
+        profile=profile,
+        sources=fresh_sources,
+        upcoming=kwargs.get("upcoming"),
+    ).source_handler()
     return {f'deleted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
