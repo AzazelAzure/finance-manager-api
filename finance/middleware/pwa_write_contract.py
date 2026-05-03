@@ -30,6 +30,7 @@ _UPCOMING_DETAIL_PATH = re.compile(r"^/finance/upcoming_expenses/[^/]+/?$")
 _CAT_DETAIL_PATH = re.compile(r"^/finance/categories/[^/]+/?$")
 _TAG_ENDPOINT_PATH = re.compile(r"^/finance/tags/?$")
 _SRC_DETAIL_PATH = re.compile(r"^/finance/sources/[^/]+/?$")
+_APP_PROFILE_PATH = re.compile(r"^/finance/appprofile/$")
 
 
 def _normalize_path(path: str) -> str:
@@ -65,6 +66,8 @@ def _method_path_allowlisted(method: str, path: str) -> bool:
     if m == "POST" and path_n == "/finance/sources/":
         return True
     if m in ("PATCH", "DELETE") and _SRC_DETAIL_PATH.match(path_n):
+        return True
+    if m == "PATCH" and _APP_PROFILE_PATH.match(path_n):
         return True
     return False
 
