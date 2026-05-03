@@ -3,6 +3,9 @@ D2 PWA contract: mutating /finance/* writes get optional Idempotency-Key replay,
 Idempotency-Key is rejected off-allowlist paths, X-Client-Build is enforced when
 CLIENT_BUILD_MIN_WRITE is set, and DELETE on missing transactions can return an
 idempotent success shape when Idempotency-Key is present.
+
+Allowlisted mutators include transactions, upcoming expenses, and lookup
+endpoints (categories, tags, sources) used by the web offline outbox.
 """
 
 from __future__ import annotations
@@ -24,6 +27,9 @@ from finance.models import IdempotencyRecord
 _MAX_IDEMPOTENCY_BODY = 32_768
 _TX_DETAIL_PATH = re.compile(r"^/finance/transactions/[^/]+/?$")
 _UPCOMING_DETAIL_PATH = re.compile(r"^/finance/upcoming_expenses/[^/]+/?$")
+_CAT_DETAIL_PATH = re.compile(r"^/finance/categories/[^/]+/?$")
+_TAG_ENDPOINT_PATH = re.compile(r"^/finance/tags/?$")
+_SRC_DETAIL_PATH = re.compile(r"^/finance/sources/[^/]+/?$")
 
 
 def _normalize_path(path: str) -> str:
@@ -49,6 +55,16 @@ def _method_path_allowlisted(method: str, path: str) -> bool:
     if m in ("PATCH", "DELETE") and _TX_DETAIL_PATH.match(path_n):
         return True
     if m in ("PATCH", "PUT", "DELETE") and _UPCOMING_DETAIL_PATH.match(path_n):
+        return True
+    if m == "POST" and path_n == "/finance/categories/":
+        return True
+    if m in ("PATCH", "DELETE") and _CAT_DETAIL_PATH.match(path_n):
+        return True
+    if m in ("POST", "PATCH", "DELETE") and _TAG_ENDPOINT_PATH.match(path_n):
+        return True
+    if m == "POST" and path_n == "/finance/sources/":
+        return True
+    if m in ("PATCH", "DELETE") and _SRC_DETAIL_PATH.match(path_n):
         return True
     return False
 
