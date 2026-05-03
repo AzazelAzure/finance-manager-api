@@ -15,7 +15,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ### Documentation
 
-- **PWA sprint CPPRD cross-link:** No additional API code in the web PWA UI batch; contract remains the **[Unreleased] PWA D2 writes** item above. D4-exec evidence and breakpoint status are tracked in the ecosystem parent workspace under `plans/cursor/s1b/pwa-implementation-branch/` (`evidence/`, `validation_gates.md`).
+- **PWA sprint CPPRD cross-link:** No additional API code in the web PWA UI batch; contract remains the **[Unreleased] PWA D2 writes** item above. D4-exec evidence and breakpoint status are tracked in the ecosystem parent workspace under `plans/S1/S1.B/pwa-implementation-branch/` (`evidence/`, `validation_gates.md`).
 
 ### Fixed
 - **CORS preflight for PWA custom headers:** `CORS_ALLOW_HEADERS` now extends `django-cors-headers` defaults with `x-client-build` and `idempotency-key` so browser preflight (`OPTIONS`) on cross-origin mutating requests succeeds. Without this, every `POST`/`PATCH`/`DELETE` from the SPA to `api.thehivemanager.com` was silently blocked because `X-Client-Build` (added in T03) is a non-simple header not in the library's default allowlist.
