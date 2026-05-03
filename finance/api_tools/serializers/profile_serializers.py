@@ -12,6 +12,7 @@ class AppProfileGetSerializer(serializers.Serializer):
     base_currency = serializers.CharField(max_length=3)
     timezone = serializers.CharField(max_length=64)
     start_of_week = serializers.IntegerField()
+    completed_tours = serializers.ListField(child=serializers.CharField(max_length=200), required=False, allow_null=True)
 
 class SnapshotSerializer(serializers.Serializer):
     # user_get_totals can return snapshot=None before onboarding/first snapshot row exists

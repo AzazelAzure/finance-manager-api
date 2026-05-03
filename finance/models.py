@@ -61,6 +61,7 @@ class AppProfile(models.Model):
     base_currency = models.CharField(max_length=3, default="USD")
     timezone = models.CharField(default='America/New_York')
     start_of_week = models.IntegerField(default=1)
+    completed_tours = models.JSONField(default=list, null=True, blank=True)
     
 
     def __str__(self):

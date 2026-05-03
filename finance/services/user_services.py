@@ -56,6 +56,9 @@ def user_update(uid: str, data: dict, *args, **kwargs):
         profile.timezone = str(data["timezone"]).strip()
     if data.get('start_week') is not None:
         profile.start_of_week = data['start_week']
+    if data.get('completed_tours') is not None:
+        if isinstance(data['completed_tours'], list):
+            profile.completed_tours = data['completed_tours']
     profile.save()
     update = Updater(profile=profile, sources=sources)
     snapshot = update.user_handler()
@@ -78,11 +81,13 @@ def user_get_info(uid: str, *args, **kwargs):
     base_currency = profile.base_currency
     timezone = profile.timezone
     start_week = profile.start_of_week
+    completed_tours = profile.completed_tours
     return {
         'spend_accounts': spend_accounts, 
         'base_currency': base_currency,
         'timezone': timezone,
-        'start_of_week': start_week
+        'start_of_week': start_week,
+        'completed_tours': completed_tours
         }
 
 
