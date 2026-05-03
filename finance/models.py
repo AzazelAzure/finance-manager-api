@@ -286,4 +286,27 @@ class FinancialSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.total_assets}, {self.safe_to_spend}, {self.total_savings}, {self.total_checking}, {self.total_investment}, {self.total_cash}, {self.total_ewallet}, {self.total_monthly_spending}, {self.total_remaining_expenses}, {self.total_leaks}"
+
+
+class IdempotencyRecord(models.Model):
+    """
+    Stores successful mutating API responses for PWA outbox replay (D2 contract).
+    Scoped by AppProfile uid (string user_id) and Idempotency-Key hash.
+    """
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["uid", "key_hash"], name="idempotency_uid_key_hash_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
+
+    uid = models.CharField(max_length=200, db_index=True)
+    key_hash = models.CharField(max_length=64, db_index=True)
+    method = models.CharField(max_length=8)
+    path = models.CharField(max_length=512)
+    status_code = models.PositiveSmallIntegerField()
+    response_body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
  
