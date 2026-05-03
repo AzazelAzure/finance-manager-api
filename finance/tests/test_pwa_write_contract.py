@@ -54,8 +54,8 @@ class PwaIdempotencyTransactionTests(JwtAuthTransactionBase):
 
     def test_idempotency_key_on_non_allowlisted_path_returns_400(self):
         key = str(uuid.uuid4())
-        url = reverse("appprofile")
-        r = self.client.patch(
+        url = reverse("transactions_calendar")
+        r = self.client.post(
             url,
             {},
             format="json",
@@ -64,6 +64,36 @@ class PwaIdempotencyTransactionTests(JwtAuthTransactionBase):
         )
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not supported", str(_resp_payload(r)).lower())
+
+    def test_patch_appprofile_with_idempotency_key_replays_same_response(self):
+        key = str(uuid.uuid4())
+        url = reverse("appprofile")
+        g = self.client.get(url)
+        self.assertEqual(g.status_code, status.HTTP_200_OK, msg=_resp_payload(g))
+        base = _resp_payload(g)
+        payload = {
+            "spend_accounts": base.get("spend_accounts") or [],
+            "base_currency": base.get("base_currency") or "USD",
+            "timezone": base.get("timezone") or "UTC",
+            "start_week": int(base.get("start_of_week", 0)),
+        }
+        r1 = self.client.patch(
+            url,
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+            HTTP_X_CLIENT_BUILD="9.9.9",
+        )
+        self.assertEqual(r1.status_code, status.HTTP_200_OK, msg=_resp_payload(r1))
+        r2 = self.client.patch(
+            url,
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+            HTTP_X_CLIENT_BUILD="9.9.9",
+        )
+        self.assertEqual(r2.status_code, status.HTTP_200_OK, msg=_resp_payload(r2))
+        self.assertEqual(r1.content, r2.content)
 
     def test_post_category_with_idempotency_key_replays_same_response(self):
         key = str(uuid.uuid4())
