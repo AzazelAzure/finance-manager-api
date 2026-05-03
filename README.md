@@ -45,6 +45,17 @@ Status legend: `GA` (production-ready), `Beta` (usable, actively changing), `Pla
 - SPDX policy and checklist: `docs/SPDX_COMPLIANCE.md`.
 - Local SPDX scan: `python scripts/check_spdx.py` (run from workspace root).
 
+## PWA / client compatibility (optional environment)
+
+These settings support the **Advanced PWA** write contract (idempotency + client build window). Leave unset in development unless you are explicitly testing force-upgrade behavior.
+
+| Variable | Purpose |
+| --- | --- |
+| `CLIENT_BUILD_MIN_WRITE` | When set (e.g. semver `1.3.0` or monotonic CI id), authenticated **mutating** requests under `/finance/` must send `X-Client-Build` at or above this value or receive **409** with `code: CLIENT_BUILD_UNSUPPORTED`. |
+| `API_SERVER_BUILD` | Shipped build label exposed on `GET /api/health/` as `api_server_build` (defaults to `dev`). |
+| `CLIENT_UPGRADE_DOCUMENTATION_URL` | URL included in **409** responses for operators to override the default. |
+| `IDEMPOTENCY_RETENTION_DAYS` | Retention window for stored idempotent replay rows (default `7`). |
+
 ## Runbook Commands
 
 ```bash

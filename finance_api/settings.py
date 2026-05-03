@@ -181,6 +181,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "finance.middleware.user_log_context.UserLogContextMiddleware",
+    "finance.middleware.pwa_write_contract.PwaWriteContractMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -291,6 +292,18 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_PATCH': True,
     'COMPONENT_SPLIT_REQUEST': True,
 }
+
+# PWA / D2: optional write compatibility window (null = off). Semver-like strings
+# (e.g. 1.2.0) compare segment-wise; otherwise lexicographic string compare.
+CLIENT_BUILD_MIN_WRITE = os.getenv("CLIENT_BUILD_MIN_WRITE", "").strip() or None
+API_SERVER_BUILD = os.getenv("API_SERVER_BUILD", "").strip() or "dev"
+CLIENT_UPGRADE_DOCUMENTATION_URL = os.getenv(
+    "CLIENT_UPGRADE_DOCUMENTATION_URL",
+    "https://thehivemanager.com",
+).strip()
+
+# Idempotency-Key retention for replay cache (days).
+IDEMPOTENCY_RETENTION_DAYS = int(os.getenv("IDEMPOTENCY_RETENTION_DAYS", "7") or "7")
 
 # HTTPS and cookie security (set explicitly in production / beta; deploy check uses these
 # when DEBUG is False and documents intentional proxy termination where applicable)

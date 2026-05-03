@@ -4,7 +4,12 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **PWA D2 writes (idempotency + client build):** New `IdempotencyRecord` model and `PwaWriteContractMiddleware` for v1 allowlisted mutators (`POST/PATCH/DELETE` transactions; `POST/PATCH/PUT/DELETE` upcoming expenses). Optional `Idempotency-Key` enables duplicate-safe replay; keys on non-allowlisted `/finance/*` mutators return **400** (`IDEMPOTENCY_SCOPE`). Optional `CLIENT_BUILD_MIN_WRITE` enforces `X-Client-Build` on `/finance/*` mutations with standardized **409** JSON (`CLIENT_BUILD_UNSUPPORTED`). `GET /api/health/` now returns `api_server_build` and `min_client_build_write`. `DELETE` on a missing transaction with `Idempotency-Key` can return **200** `{"idempotent": true, "tx_id": "..."}` for outbox alignment.
 - **Email uniqueness (S0):** PostgreSQL gets a case-insensitive unique index on `LOWER(auth_user.email)` (`finance.0005_auth_user_email_ci_unique`). `POST /finance/user/` returns field-level `400` errors for duplicate username or email; `dj-rest-auth` registration uses `EmailUniqueRegisterSerializer` so `POST /api/auth/registration/` rejects duplicate emails case-insensitively before insert.
+
+### Documentation
+
+- **PWA sprint CPPRD cross-link:** No additional API code in the web PWA UI batch; contract remains the **[Unreleased] PWA D2 writes** item above. D4-exec evidence and breakpoint status are tracked in the ecosystem parent workspace under `plans/cursor/s1b/pwa-implementation-branch/` (`evidence/`, `validation_gates.md`).
 
 ### Fixed
 - **PATCH transaction + source balances:** `update_transaction` now passes **`prior_for_reversal`** (bill, source, amount, currency, date captured **before** applying the patch) into `transaction_handler(update=...)`. Previously the ORM row was saved with new values first, so `_handle_tx_update` reversed the **new** row instead of the old one and `PaymentSource.amount` drifted on amount/source/currency/type edits.
