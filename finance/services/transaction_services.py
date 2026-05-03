@@ -8,9 +8,10 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from loguru import logger
 from rest_framework.exceptions import ValidationError
-from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot
+from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot, PaymentSource
 import copy
 from decimal import Decimal
+from types import SimpleNamespace
 from datetime import timedelta
 from finance.api_tools.query_utils import apply_transaction_filters
 
@@ -143,6 +144,15 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     # one field differs, e.g. tags).
     old_values = {field: getattr(tx, field, None) for field in data.keys()}
 
+    # _handle_tx_update must reverse the row **as it was before PATCH**; `tx` is mutated below.
+    prior_for_reversal = SimpleNamespace(
+        bill=tx.bill,
+        source=tx.source,
+        amount=tx.amount,
+        currency=tx.currency,
+        date=tx.date,
+    )
+
     for field, value in data.items():
         setattr(tx, field, value)
     tx.save(update_fields=list(data.keys()))
@@ -171,9 +181,8 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
         upcoming=kwargs.get("upcoming"),
         sources=kwargs.get("sources"),
     )
-    snapshot = update.transaction_handler(update=tx)
-    # _handle_tx_update mutates the passed-in instance's amount in memory for balance math;
-    # reload so the API returns persisted values (signed amounts, etc.).
+    snapshot = update.transaction_handler(update=prior_for_reversal)
+    # Reload so the API returns persisted values (signed amounts, etc.).
     tx.refresh_from_db()
     return {"updated": [tx], "snapshot": snapshot}
 
@@ -195,11 +204,18 @@ def delete_transaction(uid, tx_id: str, *args, **kwargs):
         upcoming=kwargs.get("upcoming"),
         sources=kwargs.get("sources"),
     )
-    # Update balances to reverse changes
-    snapshot = update.transaction_handler(update=tx)
+    # Update balances to reverse changes (bills / upcoming) before row removal
+    update.transaction_handler(update=tx)
 
     # Delete transaction
     tx.delete()
+    # Snapshot and KPI fields must not still reference the removed row (e.g. transfers / monthly spend).
+    fresh_sources = list(PaymentSource.objects.for_user(uid))
+    snapshot = Updater(
+        profile=profile,
+        sources=fresh_sources,
+        upcoming=kwargs.get("upcoming"),
+    ).source_handler()
     return {f'deleted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator

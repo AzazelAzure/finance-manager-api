@@ -592,7 +592,8 @@ class TransactionPatchBase(TransactionBase):
         # source of truth); tests still verify response + DB row via assert_tx assertions 2–3.
         self.update_currency_expected_amount = None
         self.update_source_expected_amount = None
-        self.update_amount_expected_amount = None
+        # Single expense on this source after PATCH: balance must match initial + new signed effect.
+        self.update_amount_expected_amount = self._calculated_expected_amount(self.update_by_amount)
         self.update_tx_type_expected_amount = None
         self.previous_amount = self._get_initial_source_amount(self.expense_data['source'])
         self.previous_expected_amount = self.previous_amount + Decimal(

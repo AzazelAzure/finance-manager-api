@@ -91,7 +91,7 @@ class TransactionUpdateSourceTestCase(TransactionPatchBase):
         logger.info("Beginning transaction update amount test")
         response = self.client.patch(self.url, self.update_amount_data, format='json')
         logger.info(f'Transaction Amount Updated: {response.data}')
-        self.assert_tx(response, self.update_amount_normalized_data, None, code=200)
+        self.assert_tx(response, self.update_amount_normalized_data, self.update_amount_expected_amount, code=200)
     
     def test_tx_update_tags(self):
         """
