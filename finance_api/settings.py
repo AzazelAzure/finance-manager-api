@@ -101,6 +101,18 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Extend default CORS headers to include custom PWA/D2 headers the SPA sends
+# on mutating requests (X-Client-Build for forced upgrade, Idempotency-Key
+# for offline outbox replay). Without these the browser preflight blocks all
+# cross-origin POST/PATCH/DELETE.
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "x-client-build",
+    "idempotency-key",
+)
+
 
 # Application definition
 
