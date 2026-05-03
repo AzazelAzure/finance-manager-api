@@ -54,16 +54,42 @@ class PwaIdempotencyTransactionTests(JwtAuthTransactionBase):
 
     def test_idempotency_key_on_non_allowlisted_path_returns_400(self):
         key = str(uuid.uuid4())
-        url = reverse("categories")
-        r = self.client.post(
+        url = reverse("appprofile")
+        r = self.client.patch(
             url,
-            {"name": "cat-from-pwa-test", "amount": "1.00"},
+            {},
             format="json",
             HTTP_IDEMPOTENCY_KEY=key,
             HTTP_X_CLIENT_BUILD="9.9.9",
         )
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not supported", str(_resp_payload(r)).lower())
+
+    def test_post_category_with_idempotency_key_replays_same_response(self):
+        key = str(uuid.uuid4())
+        url = reverse("categories")
+        name = f"pwa-cat-{uuid.uuid4().hex[:10]}"
+        r1 = self.client.post(
+            url,
+            {"name": name},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+            HTTP_X_CLIENT_BUILD="9.9.9",
+        )
+        self.assertIn(
+            r1.status_code,
+            (status.HTTP_200_OK, status.HTTP_201_CREATED),
+            msg=_resp_payload(r1),
+        )
+        r2 = self.client.post(
+            url,
+            {"name": name},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key,
+            HTTP_X_CLIENT_BUILD="9.9.9",
+        )
+        self.assertEqual(r2.status_code, r1.status_code)
+        self.assertEqual(r1.content, r2.content)
 
 
 @override_settings(CLIENT_BUILD_MIN_WRITE="5.0.0")
