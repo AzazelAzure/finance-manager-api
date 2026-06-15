@@ -74,3 +74,24 @@ class AppProfilePatchTests(ProfileBase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_patch_updates_completed_tours(self):
+        """T01.SL1: verify completed_tours PATCH acts as idempotent replace"""
+        response = self.client.patch(
+            self.profile_url,
+            {"completed_tours": ["tour1", "tour2"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, msg=response.data)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.completed_tours, ["tour1", "tour2"])
+        
+        # Test replace logic
+        response2 = self.client.patch(
+            self.profile_url,
+            {"completed_tours": ["tour1", "tour2", "tour3"]},
+            format="json",
+        )
+        self.assertEqual(response2.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.completed_tours, ["tour1", "tour2", "tour3"])

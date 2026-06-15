@@ -33,6 +33,9 @@ def user_update(uid: str, data: dict, *args, **kwargs):
     Updates the spend accounts for a user.
     Raises a ValidationError if any of the sources do not exist.
     
+    Merge rule for lists (e.g. `completed_tours`, `spend_accounts`):
+    - Replaces the existing array with the provided array. Unioning must be handled by the client.
+    
     :param uid: The user id.
     :type uid: str
     :param data: The data for the spend accounts.
