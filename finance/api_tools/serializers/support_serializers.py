@@ -4,7 +4,7 @@ from finance.models import SupportTicket
 
 class SupportTicketSerializer(serializers.ModelSerializer):
     nature = serializers.CharField(max_length=255)
-    comment = serializers.CharField(min_length=10)
+    comment = serializers.CharField(min_length=10, max_length=5000)
 
     class Meta:
         model = SupportTicket

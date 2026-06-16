@@ -59,12 +59,13 @@ class SupportDigestTaskTestCase(TestCase):
             comment="The dashboard page crashed on refresh.",
             created_at=timezone.now() - timedelta(days=1)
         )
-        # 4. Old feature request > 7 days ago (should be ignored)
+        # 4. Old feature request > 7 days ago (should be ignored because emailed=True)
         f_old = SupportTicket.objects.create(
             uid=str(self.profile.user_id),
             report_type=SupportTicket.ReportType.FEATURE,
             nature="Support PDF",
             comment="PDF support please.",
+            emailed=True
         )
         # Force created_at to be older
         SupportTicket.objects.filter(id=f_old.id).update(
@@ -90,3 +91,11 @@ class SupportDigestTaskTestCase(TestCase):
             self.assertIn("Export CSV", kwargs["html_message"])
             self.assertNotIn("Page crash", kwargs["html_message"])
             self.assertNotIn("Support PDF", kwargs["html_message"])
+
+            # Verify that processed tickets have been set to emailed=True, while others remain False
+            f1.refresh_from_db()
+            f2.refresh_from_db()
+            b1.refresh_from_db()
+            self.assertTrue(f1.emailed)
+            self.assertTrue(f2.emailed)
+            self.assertFalse(b1.emailed)

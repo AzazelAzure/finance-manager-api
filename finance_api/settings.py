@@ -341,6 +341,6 @@ from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     "send-weekly-support-digest": {
         "task": "finance.tasks.support_digest.send_weekly_feature_requests_email",
-        "schedule": crontab(hour=8, minute=0, day_of_week="monday"),
+        "schedule": crontab(hour=9, minute=0, day_of_week="monday"),
     },
 }
