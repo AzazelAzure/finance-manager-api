@@ -18,7 +18,7 @@ def drop_ci_email_unique_index(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("finance", "0004_alter_paymentsource_source"),
+        ("finance", "0001_initial"),
         ("auth", "0012_alter_user_first_name_max_length"),
     ]
 

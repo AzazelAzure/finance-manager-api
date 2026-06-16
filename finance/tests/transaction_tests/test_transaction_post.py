@@ -2,7 +2,8 @@
 This modules handles POST transaction tests.
 """
 
-from datetime import date
+from datetime import date, datetime
+import zoneinfo
 
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
@@ -54,7 +55,9 @@ class TransactionPostTestCase(TransactionBase):
     def test_snapshot_total_monthly_spending_current_month_expense(self):
         """Snapshot total_monthly_spending must reflect EXPENSE rows in the user's calendar month."""
         payload = self.expense_data.copy()
-        payload["date"] = str(date.today())
+        tz = zoneinfo.ZoneInfo(self.profile.timezone)
+        today = datetime.now(tz).date()
+        payload["date"] = str(today)
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         spent = response.data["snapshot"]["total_monthly_spending"]
@@ -67,18 +70,20 @@ class TransactionPostTestCase(TransactionBase):
     def test_snapshot_total_remaining_unpaid_bills_due_this_month(self):
         """total_remaining_expenses sums unpaid upcoming bills due in the profile calendar month."""
         uid = str(self.profile.user_id)
+        tz = zoneinfo.ZoneInfo(self.profile.timezone)
+        today = datetime.now(tz).date()
         UpcomingExpense.objects.create(
             uid=uid,
             name="snap-remaining-bill",
             amount=Decimal("42.00"),
-            due_date=date.today(),
-            start_date=date.today(),
+            due_date=today,
+            start_date=today,
             paid_flag=False,
             currency=self.profile.base_currency,
             is_recurring=False,
         )
         payload = self.expense_data.copy()
-        payload["date"] = str(date.today())
+        payload["date"] = str(today)
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         remaining = response.data["snapshot"]["total_remaining_expenses"]
@@ -100,17 +105,19 @@ class TransactionPostTestCase(TransactionBase):
         src.amount = Decimal("1000.00")
         src.currency = str(self.profile.base_currency).upper()
         src.save(update_fields=["amount", "currency"])
+        tz = zoneinfo.ZoneInfo(self.profile.timezone)
+        today = datetime.now(tz).date()
         UpcomingExpense.objects.create(
             uid=uid,
             name="kpi-onetime-bill",
             amount=Decimal("100.00"),
-            due_date=date.today(),
+            due_date=today,
             paid_flag=False,
             currency=str(self.profile.base_currency).upper(),
             is_recurring=False,
         )
         payload = self.expense_data.copy()
-        payload["date"] = str(date.today())
+        payload["date"] = str(today)
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         snap = response.data["snapshot"]

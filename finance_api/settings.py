@@ -64,6 +64,8 @@ DEBUG = _env_bool("DEBUG", default=False)
 DB_HIT_LOGGING_ENABLED = DEBUG
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@financemanager.local")
 BUG_REPORT_TO_EMAIL = os.getenv("BUG_REPORT_TO_EMAIL", "")
+SUPPORT_DIGEST_TO_EMAIL = os.getenv("SUPPORT_DIGEST_TO_EMAIL", BUG_REPORT_TO_EMAIL)
+BETA_FEATURE_REQUESTS_ENABLED = _env_bool("BETA_FEATURE_REQUESTS_ENABLED", default=False)
 
 # When False (default), request logs use uid + a non-identifying username label.
 # Set LOG_FULL_USERNAME=1 only for local debugging of auth-related issues.
@@ -326,3 +328,19 @@ _hsts = os.getenv("SECURE_HSTS_SECONDS", "").strip()
 SECURE_HSTS_SECONDS = int(_hsts) if _hsts.isdigit() else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
 SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", default=False)
+
+# Celery Configuration Options
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "send-weekly-support-digest": {
+        "task": "finance.tasks.support_digest.send_weekly_feature_requests_email",
+        "schedule": crontab(hour=8, minute=0, day_of_week="monday"),
+    },
+}

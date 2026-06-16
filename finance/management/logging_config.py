@@ -92,5 +92,60 @@ def logging_config():
         diagnose=True,
     )
 
+    class UserDiagnosticSink:
+        def __init__(self, logs_dir):
+            self.logs_dir = logs_dir
+
+        def __call__(self, message):
+            record = message.record
+            uid = record["extra"].get("uid")
+            if not uid or uid in ("n/a", "anonymous"):
+                return
+            import uuid
+            try:
+                uuid.UUID(str(uid))
+            except ValueError:
+                return
+            if record["level"].no < 20:
+                return
+            
+            log_dir = self.logs_dir / "diagnostic"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / f"{uid}.log"
+
+            # Check rotation: 10 MB
+            if log_path.exists() and log_path.stat().st_size >= 10 * 1024 * 1024:
+                try:
+                    rotated = log_path.with_suffix(".log.1")
+                    if rotated.exists():
+                        rotated.unlink()
+                    log_path.rename(rotated)
+                except Exception:
+                    pass
+
+            # Clean up old files (retention 30 days) - randomly 1% of the time to avoid overhead
+            import random
+            if random.random() < 0.01:
+                try:
+                    import time
+                    now = time.time()
+                    for f_path in log_dir.glob("*.log*"):
+                        if f_path.is_file() and (now - f_path.stat().st_mtime) > 30 * 86400:
+                            f_path.unlink()
+                except Exception:
+                    pass
+
+            try:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(message)
+            except Exception:
+                pass
+
+    logger.add(
+        UserDiagnosticSink(logs_dir),
+        level="INFO",
+        format=base_fmt,
+    )
+
     return logger
 
