@@ -34,7 +34,9 @@ class SupportTicketTestCase(BaseTestCase):
         self.assertEqual(response.data["report_type"], "BUG")
         self.assertEqual(response.data["nature"], payload["nature"])
         self.assertEqual(response.data["comment"], payload["comment"])
-        self.assertEqual(response.data["diagnostic_log_key"], payload["diagnostic_log_key"])
+        
+        expected_key = f"logs/incidents/incident_{response.data['id']}.log"
+        self.assertEqual(response.data["diagnostic_log_key"], expected_key)
 
         # Check DB
         ticket = SupportTicket.objects.get(id=response.data["id"])
@@ -42,7 +44,7 @@ class SupportTicketTestCase(BaseTestCase):
         self.assertEqual(ticket.report_type, "BUG")
         self.assertEqual(ticket.nature, payload["nature"])
         self.assertEqual(ticket.comment, payload["comment"])
-        self.assertEqual(ticket.diagnostic_log_key, payload["diagnostic_log_key"])
+        self.assertEqual(ticket.diagnostic_log_key, expected_key)
 
     @override_settings(BETA_FEATURE_REQUESTS_ENABLED=True)
     def test_create_feature_request_when_enabled(self):
