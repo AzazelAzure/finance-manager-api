@@ -4,6 +4,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
+from django.utils.html import escape
 from django.utils import timezone
 from loguru import logger
 from finance.models import SupportTicket
@@ -45,6 +46,10 @@ def send_weekly_feature_requests_email():
 
         for ticket in ticket_list:
             formatted_date = ticket.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            html_date = escape(formatted_date)
+            html_uid = escape(ticket.uid)
+            html_nature = escape(ticket.nature)
+            html_comment = escape(ticket.comment)
             text_lines.append(
                 f"- Date: {formatted_date}\n"
                 f"  User ID: {ticket.uid}\n"
@@ -53,10 +58,10 @@ def send_weekly_feature_requests_email():
             )
             html_lines.append(
                 f"<tr>"
-                f"<td>{formatted_date}</td>"
-                f"<td>{ticket.uid}</td>"
-                f"<td>{ticket.nature}</td>"
-                f"<td>{ticket.comment}</td>"
+                f"<td>{html_date}</td>"
+                f"<td>{html_uid}</td>"
+                f"<td>{html_nature}</td>"
+                f"<td>{html_comment}</td>"
                 f"</tr>"
             )
 

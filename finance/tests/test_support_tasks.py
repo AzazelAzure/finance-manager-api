@@ -111,3 +111,26 @@ class SupportDigestTaskTestCase(TestCase):
             self.assertTrue(f1.emailed)
             self.assertTrue(f2.emailed)
             self.assertFalse(b1.emailed)
+
+    @override_settings(SUPPORT_DIGEST_TO_EMAIL="operator@financemanager.local")
+    def test_digest_html_escapes_user_submitted_ticket_fields(self):
+        SupportTicket.objects.create(
+            uid=str(self.profile.user_id),
+            report_type=SupportTicket.ReportType.FEATURE,
+            nature='<img src=x onerror="alert(1)">',
+            comment='<a href="https://evil.example/phish">click</a><script>alert(2)</script>',
+            created_at=timezone.now() - timedelta(days=1),
+        )
+
+        with patch("finance.tasks.support_digest.send_mail") as mock_send_mail:
+            send_weekly_feature_requests_email()
+
+        _, kwargs = mock_send_mail.call_args
+        html_message = kwargs["html_message"]
+        self.assertNotIn("<img", html_message)
+        self.assertNotIn("<a href=", html_message)
+        self.assertNotIn("<script>", html_message)
+        self.assertIn("&lt;img src=x", html_message)
+        self.assertIn("onerror=&quot;alert(1)&quot;", html_message)
+        self.assertIn("&lt;a href=&quot;https://evil.example/phish&quot;&gt;click&lt;/a&gt;", html_message)
+        self.assertIn("&lt;script&gt;alert(2)&lt;/script&gt;", html_message)

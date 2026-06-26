@@ -9,6 +9,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ### Fixed
 - **Celery task autodiscovery (F-014):** Added `finance/tasks/__init__.py` so `autodiscover_tasks` imports the task submodules. Previously `finance.tasks` was a namespace package, so only `notify_operator` (imported by the support view) was registered; beat-scheduled `rollup_daily_usage` and `send_weekly_feature_requests_email` were never registered and would be discarded by the worker as unregistered tasks. Adds a regression test asserting every `CELERY_BEAT_SCHEDULE` task is registered.
+- **Weekly feature digest HTML escaping:** Escapes user-submitted support ticket fields before building the operator HTML digest, preventing stored HTML/phishing markup from FEATURE tickets from rendering in the operator email client.
 
 ### Changed
 - **F-012 bug notify path:** `SupportTicketView` incident dump extracted to `finance.services.support_incident`; operator email moved to F-014 `notify_operator.delay()` (submission no longer fails on SMTP errors in request thread).
