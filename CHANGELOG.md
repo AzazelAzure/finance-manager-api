@@ -7,6 +7,9 @@ All notable changes to the API codebase must be documented in this file by the e
 - **F-014 usage monitoring + operator notify:** `notify_operator` Celery task with `[FM-NOTIFY]` email contract (UUID-only, no PII). Proton/SMTP settings via `EMAIL_*` env vars. `DailyUsageSnapshot`, `InviteChainEvent`, and `OperatorAlertState` models. Daily usage rollup beat task (UTC 00:05) with DAU threshold alerts (configurable via `DAU_ALERT_THRESHOLDS`). Bug reports now enqueue async operator notify instead of synchronous email with username/email in body.
 - **F-012/F-013 verification hardening:** Support text secret redaction (`Bearer`, `password=` patterns). Weekly feature digest filters last **7 days** + `emailed=False`. F-013 verification tests (anonymous/forged uid, feature ticket skips incident dump).
 
+### Fixed
+- **Celery task autodiscovery (F-014):** Added `finance/tasks/__init__.py` so `autodiscover_tasks` imports the task submodules. Previously `finance.tasks` was a namespace package, so only `notify_operator` (imported by the support view) was registered; beat-scheduled `rollup_daily_usage` and `send_weekly_feature_requests_email` were never registered and would be discarded by the worker as unregistered tasks. Adds a regression test asserting every `CELERY_BEAT_SCHEDULE` task is registered.
+
 ### Changed
 - **F-012 bug notify path:** `SupportTicketView` incident dump extracted to `finance.services.support_incident`; operator email moved to F-014 `notify_operator.delay()` (submission no longer fails on SMTP errors in request thread).
 
