@@ -4,6 +4,13 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **F-014 usage monitoring + operator notify:** `notify_operator` Celery task with `[FM-NOTIFY]` email contract (UUID-only, no PII). Proton/SMTP settings via `EMAIL_*` env vars. `DailyUsageSnapshot`, `InviteChainEvent`, and `OperatorAlertState` models. Daily usage rollup beat task (UTC 00:05) with DAU threshold alerts (configurable via `DAU_ALERT_THRESHOLDS`). Bug reports now enqueue async operator notify instead of synchronous email with username/email in body.
+- **F-012/F-013 verification hardening:** Support text secret redaction (`Bearer`, `password=` patterns). Weekly feature digest filters last **7 days** + `emailed=False`. F-013 verification tests (anonymous/forged uid, feature ticket skips incident dump).
+
+### Changed
+- **F-012 bug notify path:** `SupportTicketView` incident dump extracted to `finance.services.support_incident`; operator email moved to F-014 `notify_operator.delay()` (submission no longer fails on SMTP errors in request thread).
+
+### Added
 - **Security hardening:** django-axes lockout, Argon2 default password hasher, 12-char minimum + complexity validator on password change.
 - **Security hardening follow-up:** Password complexity is now enforced on public `POST /finance/user/` signup, missing finance migration nodes `0002`–`0004` are tracked so fresh test/deploy databases can replay the `0009_merge_20260626` dependency graph, and auth-security tests cover axes lockout state, signup weak-password rejection, and Argon2 hashing.
 - **Migration merge `0009_merge_20260626`:** Resolves parallel finance leaves (`0004` paymentsource alter vs `0005`→`0008` F-012/F-013 chain) so `migrate` runs cleanly on deploy.

@@ -3,11 +3,15 @@ from django.conf import settings
 from django.test import override_settings
 from rest_framework import status
 from finance.tests.basetest import BaseTestCase
+from finance.tests.support_test_helpers import patch_support_notify_delay
 from finance.models import SupportTicket
 
 class SupportTicketTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
+        self._notify_patcher = patch_support_notify_delay()
+        self._notify_patcher.start()
+        self.addCleanup(self._notify_patcher.stop)
         from django.core.cache import cache
         cache.clear()
         self.url = reverse("support_tickets")
@@ -97,3 +101,18 @@ class SupportTicketTestCase(BaseTestCase):
                 throttled = True
                 break
         self.assertTrue(throttled, "Request burst should have triggered 429 Too Many Requests")
+
+    def test_redacts_secrets_in_support_text(self):
+        payload = {
+            "report_type": "BUG",
+            "nature": "Bearer leak in title",
+            "comment": "Please fix; my token is Bearer abc123secret and password=hidden",
+            "severity": "LOW",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        from finance.models import SupportTicket
+
+        ticket = SupportTicket.objects.get(id=response.data["id"])
+        self.assertIn("[REDACTED]", ticket.comment)
+        self.assertNotIn("abc123secret", ticket.comment)

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 from finance.models import SupportTicket
+from finance.utils.redaction import redact_support_text
 
 class SupportTicketSerializer(serializers.ModelSerializer):
     nature = serializers.CharField(max_length=255)
@@ -27,4 +28,8 @@ class SupportTicketSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"report_type": "Feature requests are currently disabled."}
                 )
+        if "nature" in attrs:
+            attrs["nature"] = redact_support_text(attrs["nature"])
+        if "comment" in attrs:
+            attrs["comment"] = redact_support_text(attrs["comment"])
         return attrs

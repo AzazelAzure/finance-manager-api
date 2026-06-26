@@ -338,4 +338,48 @@ class SupportTicket(models.Model):
     def __str__(self):
         return f"{self.report_type} - {self.nature[:30]}"
 
+
+class DailyUsageSnapshot(models.Model):
+    """Operator-only daily usage rollup (F-014)."""
+
+    date = models.DateField(unique=True)
+    dau_count = models.PositiveIntegerField(default=0)
+    mau_count = models.PositiveIntegerField(default=0)
+    active_accounts = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"usage:{self.date} dau={self.dau_count}"
+
+
+class InviteChainEvent(models.Model):
+    """Invite chain edge for growth analytics (F-014). Populated when invite flow ships."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    inviter_uuid = models.UUIDField(db_index=True)
+    invitee_uuid = models.UUIDField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"invite:{self.inviter_uuid}->{self.invitee_uuid}"
+
+
+class OperatorAlertState(models.Model):
+    """Dedupes operator threshold alerts (24h window per alert_key)."""
+
+    alert_key = models.CharField(max_length=64, unique=True)
+    last_sent_at = models.DateTimeField()
+
+    def __str__(self):
+        return self.alert_key
+
  

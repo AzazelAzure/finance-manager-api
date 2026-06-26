@@ -65,7 +65,22 @@ DB_HIT_LOGGING_ENABLED = DEBUG
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@financemanager.local")
 BUG_REPORT_TO_EMAIL = os.getenv("BUG_REPORT_TO_EMAIL", "")
 SUPPORT_DIGEST_TO_EMAIL = os.getenv("SUPPORT_DIGEST_TO_EMAIL", BUG_REPORT_TO_EMAIL)
+OPERATOR_NOTIFY_EMAIL = os.getenv("OPERATOR_NOTIFY_EMAIL", BUG_REPORT_TO_EMAIL)
 BETA_FEATURE_REQUESTS_ENABLED = _env_bool("BETA_FEATURE_REQUESTS_ENABLED", default=False)
+
+# Email (Proton Bridge SMTP on VPS — see deploy/server.env.example)
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=True)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+
+# F-014 DAU threshold alerts (comma-separated integers)
+DAU_ALERT_THRESHOLDS = os.getenv("DAU_ALERT_THRESHOLDS", "10,50,100")
 
 # When False (default), request logs use uid + a non-identifying username label.
 # Set LOG_FULL_USERNAME=1 only for local debugging of auth-related issues.
@@ -385,5 +400,9 @@ CELERY_BEAT_SCHEDULE = {
     "send-weekly-support-digest": {
         "task": "finance.tasks.support_digest.send_weekly_feature_requests_email",
         "schedule": crontab(hour=9, minute=0, day_of_week="monday"),
+    },
+    "rollup-daily-usage": {
+        "task": "finance.tasks.usage_rollup.rollup_daily_usage",
+        "schedule": crontab(hour=0, minute=5),
     },
 }
