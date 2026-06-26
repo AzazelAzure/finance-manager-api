@@ -4,6 +4,11 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **Security hardening:** django-axes lockout, Argon2 default password hasher, 12-char minimum + complexity validator on password change.
+- **Migration merge `0009_merge_20260626`:** Resolves parallel finance leaves (`0004` paymentsource alter vs `0005`→`0008` F-012/F-013 chain) so `migrate` runs cleanly on deploy.
+
+### Added (prior)
+- **Support Ticket Comment Length & Digest Task Alignment (F-012):** Restricted support ticket serializer comment field to a maximum length of 5000 characters to prevent memory exhaustion/DoS. Re-aligned the Celery `send_weekly_feature_requests_email` task to query only features where `emailed=False`, limit to 100 tickets, and update them atomically in a transaction after email delivery. Configured Celery beat schedule to run every Monday at 9:00 AM.
 - **AppProfile Completed Tours (F-007):** Added `completed_tours` JSON field to `AppProfile` model and exposed it in profile serializers to persist UI Guided Walkthrough state across devices.
 - **Offline PWA exchange matrix:** `GET /finance/exchange_rates/?currencies=USD,PHP,...` (auth required) returns pairwise factors `convert_currency(Decimal("1"), from, to)` for up to 24 codes so the web client can persist a **minimal** rate table (profile base + sources + cached tx currencies) for offline conversion aligned with transaction math.
 
@@ -28,6 +33,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **App profile snapshot (no `FinancialSnapshot` row):** `GET /finance/appprofile/snapshot/` can return `snapshot: null` for users who have not yet got a stored snapshot. The snapshot response serializer now allows a null nested `snapshot` so the endpoint returns `200` with computed totals and empty series instead of failing during serialization (which surfaced to the Reflex dashboard as a failed API request after login).
 
 ### Security & Configuration
+- **Auth hardening (S1.B):** Argon2 is the default password hasher; minimum password length is 12 with a custom complexity validator (mixed case, number, special character). `PATCH /finance/user/` password changes now run Django `validate_password` before `set_password`. **django-axes** adds login lockout after repeated failures (`migrate axes` required on deploy). HSTS sub-domain/preload flags follow `SECURE_HSTS_SECONDS` (env override or auto when `SECURE_SSL_REDIRECT` is on). Nginx client IP for axes uses `AXES_IPWARE_PROXY_COUNT` (default `1`).
 - **CORS middleware order:** `CorsMiddleware` is now first in `MIDDLEWARE` (per django-cors-headers guidance). Added [docs/CORS_PRODUCTION_TROUBLESHOOTING.md](docs/CORS_PRODUCTION_TROUBLESHOOTING.md) for **ERR_NETWORK** / empty preflight when the public `api` hostname differs from direct-to-box tests (often **Cloudflare cache** on OPTIONS).
 - **CORS dependency**: Declared `django-cors-headers` in `pyproject.toml` / `uv.lock` so `corsheaders` installs in CI and container images (middleware was already wired in settings).
 - **Web beta CORS/CSRF defaults**: Default `CORS_ALLOWED_ORIGINS` now includes Vite dev (`http://localhost:5173`, `http://127.0.0.1:5173`), `https://jsdevtesting.thehivemanager.com`, and `https://api-jsdevtesting.thehivemanager.com` (aligned with Nginx staging API hostname and tunnel naming). Default `CSRF_TRUSTED_ORIGINS` includes those origins plus the production hive hosts; staging API is `https://api-jsdevtesting.thehivemanager.com` (inactive `api-*` behind Nginx). Deployments can still override via `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` env; ensure `ALLOWED_HOSTS` includes the staging API hostname.

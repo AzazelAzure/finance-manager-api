@@ -16,6 +16,7 @@ from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
 from finance.api_tools.query_utils import apply_transaction_filters
 from django.db import transaction
+from django.conf import settings
 from django.db.models import Sum
 from decimal import Decimal
 from loguru import logger
@@ -90,7 +91,8 @@ def user_get_info(uid: str, *args, **kwargs):
         'base_currency': base_currency,
         'timezone': timezone,
         'start_of_week': start_week,
-        'completed_tours': completed_tours
+        'completed_tours': completed_tours,
+        'feature_requests_enabled': getattr(settings, "BETA_FEATURE_REQUESTS_ENABLED", False),
         }
 
 

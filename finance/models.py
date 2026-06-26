@@ -310,4 +310,32 @@ class IdempotencyRecord(models.Model):
     status_code = models.PositiveSmallIntegerField()
     response_body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class SupportTicket(models.Model):
+    """
+    Model for support tickets, including bug reports and feature requests.
+    """
+    class ReportType(models.TextChoices):
+        BUG = "BUG", "Bug"
+        FEATURE = "FEATURE", "Feature Request"
+
+    class Severity(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    uid = models.CharField(db_index=True, max_length=200)
+    report_type = models.CharField(max_length=10, choices=ReportType.choices)
+    severity = models.CharField(max_length=10, choices=Severity.choices, blank=True, null=True)
+    nature = models.CharField(max_length=255)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    diagnostic_log_key = models.CharField(max_length=255, blank=True, null=True)
+    emailed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.report_type} - {self.nature[:30]}"
+
  

@@ -33,6 +33,7 @@ from finance.views.tx_views import (
 from finance.views.usr_views import UserView
 from finance.views.auth_views import GoogleLogin, GitHubLogin
 from finance.views.report_views import BugReportView
+from finance.views.support_views import SupportTicketView
 from finance.views.exchange_views import ExchangeRatesMatrixView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -121,4 +122,5 @@ urlpatterns = [
     path("finance/tags/", TagView.as_view(), name="tags"), 
     path("finance/user/", UserView.as_view(), name="user"), 
     path("finance/bug-report/", BugReportView.as_view(), name="bug_report"),
+    path("finance/support/tickets/", SupportTicketView.as_view(), name="support_tickets"),
 ]

@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 class FinancialSnapshotSerializer(serializers.Serializer):
@@ -25,6 +26,11 @@ class PasswordChangeSerializer(serializers.Serializer):
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError("Incorrect current password.")
+        return value
+
+    def validate_new_password(self, value):
+        user = self.context['request'].user
+        validate_password(value, user=user)
         return value
 
 
