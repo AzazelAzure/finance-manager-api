@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
@@ -17,9 +19,11 @@ def send_weekly_feature_requests_email():
         logger.warning("support_digest_config_missing recipient email is not configured")
         return "No recipient email configured. Skipping digest email."
 
+    cutoff = timezone.now() - timedelta(days=7)
     tickets_qs = SupportTicket.objects.filter(
         report_type=SupportTicket.ReportType.FEATURE,
-        emailed=False
+        emailed=False,
+        created_at__gte=cutoff,
     ).order_by("created_at")[:100]
 
     ticket_list = list(tickets_qs)

@@ -7,12 +7,16 @@ from django.core import mail
 from django.test import override_settings
 from rest_framework import status
 from finance.tests.basetest import BaseTestCase
+from finance.tests.support_test_helpers import patch_support_notify_delay
 from finance.models import SupportTicket
 from loguru import logger
 
 class SupportLogsTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
+        self._notify_patcher = patch_support_notify_delay()
+        self._notify_patcher.start()
+        self.addCleanup(self._notify_patcher.stop)
         from django.core.cache import cache
         cache.clear()
         self.url = reverse("support_tickets")
@@ -135,10 +139,10 @@ class SupportLogsTestCase(BaseTestCase):
                 break
         self.assertTrue(found_incident, f"Incident log file not found in locations: {incident_paths}")
 
-    @override_settings(BUG_REPORT_TO_EMAIL="operator@financemanager.local")
-    def test_bug_ticket_triggers_email(self):
+    @override_settings(OPERATOR_NOTIFY_EMAIL="operator@financemanager.local")
+    def test_bug_ticket_triggers_notify_email(self):
         """
-        Verify that bug ticket submission triggers immediate email notifications.
+        Bug ticket submission enqueues F-014 notify_operator (eager) with UUID-only body.
         """
         mail.outbox.clear()
         payload = {
@@ -150,12 +154,12 @@ class SupportLogsTestCase(BaseTestCase):
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Verify email was sent
         self.assertEqual(len(mail.outbox), 1)
         sent_email = mail.outbox[0]
         self.assertEqual(sent_email.to, ["operator@financemanager.local"])
-        self.assertIn("[Support Bug Ticket]", sent_email.subject)
-        self.assertIn("Database down", sent_email.subject)
-        self.assertIn("The database is not responding to queries.", sent_email.body)
-        self.assertIn("Severity: HIGH", sent_email.body)
+        self.assertIn("[FM-NOTIFY]", sent_email.subject)
+        self.assertIn("BUG_REPORT", sent_email.subject)
+        self.assertIn("Database down", sent_email.body)
         self.assertIn(str(self.profile.user_id), sent_email.body)
+        self.assertNotIn("Username:", sent_email.body)
+        self.assertNotIn("@", sent_email.body.split("User-Ref:")[0])
