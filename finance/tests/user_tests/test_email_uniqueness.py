@@ -18,7 +18,7 @@ class EmailUniquenessTests(APITestCase):
             {
                 "username": "newuser",
                 "user_email": "Same@Example.com",
-                "password": "testpassword",
+                "password": "StrongPass1!",
             },
             format="json",
         )
@@ -33,7 +33,7 @@ class EmailUniquenessTests(APITestCase):
             {
                 "username": "Taken",
                 "user_email": "b@example.com",
-                "password": "testpassword",
+                "password": "StrongPass1!",
             },
             format="json",
         )
@@ -52,8 +52,8 @@ class EmailUniquenessTests(APITestCase):
             {
                 "username": "second",
                 "email": "DUP@example.com",
-                "password1": "strong-pass-1",
-                "password2": "strong-pass-1",
+                "password1": "StrongPass1!",
+                "password2": "StrongPass1!",
             },
             format="json",
         )
