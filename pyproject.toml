@@ -38,6 +38,8 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "celery>=5.4.0",
     "redis>=5.0.3",
+    "argon2-cffi>=25.1.0",
+    "django-axes>=8.3.1",
 ]
 
 [dependency-groups]

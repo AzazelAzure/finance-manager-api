@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
     "corsheaders",
+    "axes",
 ]
 
 SITE_ID = 1
@@ -180,6 +181,7 @@ REST_AUTH = {
 }
 
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
@@ -199,6 +201,7 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "finance_api.urls"
@@ -269,6 +272,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 12,
+        }
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -276,7 +282,29 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
+    {
+        "NAME": "finance.validators.password_complexity.ComplexPasswordValidator",
+    },
 ]
+
+# Password Hashers (Argon2 as default)
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Django-Axes (rate limiting / lockouts behind nginx proxy)
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
+AXES_IPWARE_PROXY_COUNT = int(os.getenv("AXES_IPWARE_PROXY_COUNT", "1") or "1")
+AXES_IPWARE_META_PRECEDENCE_ORDER = (
+    "HTTP_X_FORWARDED_FOR",
+    "REMOTE_ADDR",
+)
 
 
 # Internationalization
@@ -325,9 +353,24 @@ SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", default=False)
 SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=False)
 CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=False)
 _hsts = os.getenv("SECURE_HSTS_SECONDS", "").strip()
-SECURE_HSTS_SECONDS = int(_hsts) if _hsts.isdigit() else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
-SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", default=False)
+if _hsts.isdigit():
+    SECURE_HSTS_SECONDS = int(_hsts)
+elif SECURE_SSL_REDIRECT:
+    SECURE_HSTS_SECONDS = 31536000
+else:
+    SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=SECURE_HSTS_SECONDS > 0,
+)
+SECURE_HSTS_PRELOAD = _env_bool(
+    "SECURE_HSTS_PRELOAD",
+    default=SECURE_HSTS_SECONDS > 0,
+)
+
+# Strict HTTP headers
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
 # Celery Configuration Options
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
