@@ -4,6 +4,10 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **Security hardening:** django-axes lockout, Argon2 default password hasher, 12-char minimum + complexity validator on password change.
+- **Migration merge `0009_merge_20260626`:** Resolves parallel finance leaves (`0004` paymentsource alter vs `0005`→`0008` F-012/F-013 chain) so `migrate` runs cleanly on deploy.
+
+### Added (prior)
 - **Support Ticket Comment Length & Digest Task Alignment (F-012):** Restricted support ticket serializer comment field to a maximum length of 5000 characters to prevent memory exhaustion/DoS. Re-aligned the Celery `send_weekly_feature_requests_email` task to query only features where `emailed=False`, limit to 100 tickets, and update them atomically in a transaction after email delivery. Configured Celery beat schedule to run every Monday at 9:00 AM.
 - **AppProfile Completed Tours (F-007):** Added `completed_tours` JSON field to `AppProfile` model and exposed it in profile serializers to persist UI Guided Walkthrough state across devices.
 - **Offline PWA exchange matrix:** `GET /finance/exchange_rates/?currencies=USD,PHP,...` (auth required) returns pairwise factors `convert_currency(Decimal("1"), from, to)` for up to 24 codes so the web client can persist a **minimal** rate table (profile base + sources + cached tx currencies) for offline conversion aligned with transaction math.
