@@ -18,6 +18,10 @@ class UserSerializer(serializers.Serializer):
     user_email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
 class PasswordChangeSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)

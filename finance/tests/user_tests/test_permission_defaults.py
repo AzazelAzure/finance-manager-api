@@ -36,7 +36,7 @@ class PermissionDefaultsTests(BaseTestCase):
             {
                 "username": f"public-signup-{uuid4().hex[:8]}",
                 "user_email": f"public-signup-{uuid4().hex[:8]}@example.com",
-                "password": "passphrase-1234",
+                "password": "StrongPass1!",
             },
             format="json",
         )
@@ -51,7 +51,7 @@ class PermissionDefaultsTests(BaseTestCase):
             {
                 "username": self.user.username,
                 "user_email": f"new-{uuid4().hex[:8]}@example.com",
-                "password": "passphrase-1234",
+                "password": "StrongPass1!",
             },
             format="json",
         )
@@ -63,7 +63,7 @@ class PermissionDefaultsTests(BaseTestCase):
             {
                 "username": f"new-user-{uuid4().hex[:8]}",
                 "user_email": self.user.email,
-                "password": "passphrase-1234",
+                "password": "StrongPass1!",
             },
             format="json",
         )

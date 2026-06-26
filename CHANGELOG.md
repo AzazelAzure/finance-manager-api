@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 ### Added
 - **Security hardening:** django-axes lockout, Argon2 default password hasher, 12-char minimum + complexity validator on password change.
+- **Security hardening follow-up:** Password complexity is now enforced on public `POST /finance/user/` signup, missing finance migration nodes `0002`–`0004` are tracked so fresh test/deploy databases can replay the `0009_merge_20260626` dependency graph, and auth-security tests cover axes lockout state, signup weak-password rejection, and Argon2 hashing.
 - **Migration merge `0009_merge_20260626`:** Resolves parallel finance leaves (`0004` paymentsource alter vs `0005`→`0008` F-012/F-013 chain) so `migrate` runs cleanly on deploy.
 
 ### Added (prior)
