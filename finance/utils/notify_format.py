@@ -4,6 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+FROM_ADDRESS_MAP: dict[str, str] = {
+    "BUG_REPORT": "bugreport@thehivemanager.com",
+    "FEATURE_REQUEST": "featurerequest@thehivemanager.com",
+}
+DEFAULT_NOTIFY_FROM = "noreply@thehivemanager.com"
+
+
+def get_notify_from_address(event_type: str) -> str:
+    """Map event type to Proton Bridge FROM alias (celery-observability T01)."""
+    return FROM_ADDRESS_MAP.get(event_type, DEFAULT_NOTIFY_FROM)
+
 
 def _iso_timestamp(when: datetime | None = None) -> str:
     ts = when or datetime.now(timezone.utc)

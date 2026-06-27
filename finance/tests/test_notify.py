@@ -7,10 +7,28 @@ from django.test import TestCase, override_settings
 from loguru import logger
 
 from finance.tasks.notify import notify_operator
-from finance.utils.notify_format import build_notify_body, build_notify_subject
+from finance.utils.notify_format import (
+    build_notify_body,
+    build_notify_subject,
+    get_notify_from_address,
+)
 
 
 class NotifyFormatTestCase(TestCase):
+    def test_from_address_routing(self):
+        self.assertEqual(
+            get_notify_from_address("BUG_REPORT"),
+            "bugreport@thehivemanager.com",
+        )
+        self.assertEqual(
+            get_notify_from_address("FEATURE_REQUEST"),
+            "featurerequest@thehivemanager.com",
+        )
+        self.assertEqual(
+            get_notify_from_address("DAU_THRESHOLD_CROSSED"),
+            "noreply@thehivemanager.com",
+        )
+
     def test_subject_and_body_contract(self):
         subject = build_notify_subject("BUG_REPORT", "high")
         self.assertIn("[FM-NOTIFY]", subject)
@@ -40,3 +58,7 @@ class NotifyOperatorTaskTestCase(TestCase):
         self.assertEqual(result, "sent:BUG_REPORT")
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("[FM-NOTIFY]", mail.outbox[0].subject)
+        self.assertEqual(
+            mail.outbox[0].from_email,
+            "bugreport@thehivemanager.com",
+        )

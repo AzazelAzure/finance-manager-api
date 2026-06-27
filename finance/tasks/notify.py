@@ -6,7 +6,11 @@ from django.core.mail import send_mail
 from django.utils import timezone
 from loguru import logger
 
-from finance.utils.notify_format import build_notify_body, build_notify_subject
+from finance.utils.notify_format import (
+    build_notify_body,
+    build_notify_subject,
+    get_notify_from_address,
+)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
@@ -43,7 +47,7 @@ def notify_operator(
         send_mail(
             subject=subject,
             message=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=get_notify_from_address(event_type),
             recipient_list=[recipient],
             fail_silently=False,
         )

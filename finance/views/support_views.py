@@ -40,20 +40,30 @@ class SupportTicketView(APIView):
         if serializer.is_valid():
             ticket = serializer.save(uid=str(request.user.appprofile.user_id))
 
+            user_id = str(request.user.appprofile.user_id)
+            diagnostic_paths = [f"logs/diagnostic/{user_id}.log"]
+
             if ticket.report_type == "BUG":
-                user_id = str(request.user.appprofile.user_id)
                 ticket.diagnostic_log_key = dump_bug_incident(ticket, user_id)
                 ticket.save(update_fields=["diagnostic_log_key"])
-
-                file_paths = [f"logs/diagnostic/{user_id}.log"]
                 if ticket.diagnostic_log_key:
-                    file_paths.append(ticket.diagnostic_log_key)
+                    diagnostic_paths.append(ticket.diagnostic_log_key)
 
                 notify_operator.delay(
                     event_type="BUG_REPORT",
                     severity=bug_severity_label(ticket.severity),
                     user_ref=ticket.uid,
-                    file_paths=file_paths,
+                    file_paths=diagnostic_paths,
+                    notes=ticket.nature,
+                )
+                ticket.emailed = True
+                ticket.save(update_fields=["emailed"])
+            elif ticket.report_type == "FEATURE":
+                notify_operator.delay(
+                    event_type="FEATURE_REQUEST",
+                    severity="info",
+                    user_ref=ticket.uid,
+                    file_paths=diagnostic_paths,
                     notes=ticket.nature,
                 )
                 ticket.emailed = True
