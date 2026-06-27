@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from finance.management.logging_config import logging_config
 from dotenv import load_dotenv
 
@@ -81,6 +82,17 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
 # F-014 DAU threshold alerts (comma-separated integers)
 DAU_ALERT_THRESHOLDS = os.getenv("DAU_ALERT_THRESHOLDS", "10,50,100")
+
+# Celery observability (T02–T04)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+LOG_IP_HASH_SALT = os.getenv("LOG_IP_HASH_SALT", "")
+ANALYTICS_LOG_DIR = os.getenv("ANALYTICS_LOG_DIR", "/var/log/fm_api/analytics")
+SECURITY_ALERT_THRESHOLDS = {
+    "auth_failure": int(os.getenv("SEC_THRESHOLD_AUTH_FAILURE", "10") or "10"),
+    "invalid_endpoint": int(os.getenv("SEC_THRESHOLD_INVALID_ENDPOINT", "20") or "20"),
+    "5xx_rate_pct": int(os.getenv("SEC_THRESHOLD_5XX_RATE_PCT", "5") or "5"),
+}
+SECURITY_ALERT_DEDUP_TTL = int(os.getenv("SECURITY_ALERT_DEDUP_TTL", "7200") or "7200")
 
 # When False (default), request logs use uid + a non-identifying username label.
 # Set LOG_FULL_USERNAME=1 only for local debugging of auth-related issues.
@@ -217,7 +229,20 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
+    "finance.middleware.observability.ObservabilityMiddleware",
 ]
+
+_running_tests = "pytest" in sys.argv[0] or any("pytest" in arg for arg in sys.argv)
+CACHES = {
+    "default": {
+        "BACKEND": (
+            "django.core.cache.backends.locmem.LocMemCache"
+            if _running_tests
+            else "django.core.cache.backends.redis.RedisCache"
+        ),
+        "LOCATION": REDIS_URL,
+    }
+}
 
 ROOT_URLCONF = "finance_api.urls"
 
@@ -404,5 +429,21 @@ CELERY_BEAT_SCHEDULE = {
     "rollup-daily-usage": {
         "task": "finance.tasks.usage_rollup.rollup_daily_usage",
         "schedule": crontab(hour=0, minute=5),
+    },
+    "rollup-metrics-hourly": {
+        "task": "finance.tasks.analytics.rollup_metrics_hourly",
+        "schedule": crontab(minute=5),
+    },
+    "rollup-daily-analytics": {
+        "task": "finance.tasks.analytics.rollup_daily",
+        "schedule": crontab(hour=0, minute=10),
+    },
+    "rollup-weekly-analytics": {
+        "task": "finance.tasks.analytics.rollup_weekly",
+        "schedule": crontab(day_of_week=1, hour=0, minute=10),
+    },
+    "check-security-thresholds": {
+        "task": "finance.tasks.security_alerts.check_security_thresholds",
+        "schedule": crontab(minute="*/15"),
     },
 }

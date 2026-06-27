@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **Celery observability (T02–T04):** PII-safe `ObservabilityMiddleware` increments Redis traffic (`fm_metrics:*`) and security (`fm_security:*`) counters with normalized endpoints, salted IP hashes, and UA classification. Hourly `rollup_metrics_hourly`, daily `rollup_daily`, and weekly `rollup_weekly` Celery tasks write flat JSON analytics under `ANALYTICS_LOG_DIR` (default `/var/log/fm_api/analytics/`). `check_security_thresholds` beat task (every 15 min) fires `SECURITY_PROBE_DETECTED` operator alerts with cache dedup. Settings: `LOG_IP_HASH_SALT`, `ANALYTICS_LOG_DIR`, `SECURITY_ALERT_THRESHOLDS`, Redis-backed `CACHES`.
 - **F-014 usage monitoring + operator notify:** `notify_operator` Celery task with `[FM-NOTIFY]` email contract (UUID-only, no PII). Proton/SMTP settings via `EMAIL_*` env vars. `DailyUsageSnapshot`, `InviteChainEvent`, and `OperatorAlertState` models. Daily usage rollup beat task (UTC 00:05) with DAU threshold alerts (configurable via `DAU_ALERT_THRESHOLDS`). Bug reports now enqueue async operator notify instead of synchronous email with username/email in body.
 - **F-012/F-013 verification hardening:** Support text secret redaction (`Bearer`, `password=` patterns). Weekly feature digest filters last **7 days** + `emailed=False`. F-013 verification tests (anonymous/forged uid, feature ticket skips incident dump).
 
@@ -13,13 +14,10 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ### Changed
 - **F-012 bug notify path:** `SupportTicketView` incident dump extracted to `finance.services.support_incident`; operator email moved to F-014 `notify_operator.delay()` (submission no longer fails on SMTP errors in request thread).
+- **F-014 feature-request notify:** FEATURE tickets now enqueue `notify_operator` with `FEATURE_REQUEST` event type (real-time, same as bugs).
+- **Celery observability T01 (FROM routing):** `notify_operator` sends FROM `bugreport@`, `featurerequest@`, or `noreply@thehivemanager.com` per event type via `get_notify_from_address()`.
 
-### Added
-- **Security hardening:** django-axes lockout, Argon2 default password hasher, 12-char minimum + complexity validator on password change.
-- **Security hardening follow-up:** Password complexity is now enforced on public `POST /finance/user/` signup, missing finance migration nodes `0002`–`0004` are tracked so fresh test/deploy databases can replay the `0009_merge_20260626` dependency graph, and auth-security tests cover axes lockout state, signup weak-password rejection, and Argon2 hashing.
-- **Migration merge `0009_merge_20260626`:** Resolves parallel finance leaves (`0004` paymentsource alter vs `0005`→`0008` F-012/F-013 chain) so `migrate` runs cleanly on deploy.
-
-### Added (prior)
+### Added (security — merged PR #35/#36)
 - **Support Ticket Comment Length & Digest Task Alignment (F-012):** Restricted support ticket serializer comment field to a maximum length of 5000 characters to prevent memory exhaustion/DoS. Re-aligned the Celery `send_weekly_feature_requests_email` task to query only features where `emailed=False`, limit to 100 tickets, and update them atomically in a transaction after email delivery. Configured Celery beat schedule to run every Monday at 9:00 AM.
 - **AppProfile Completed Tours (F-007):** Added `completed_tours` JSON field to `AppProfile` model and exposed it in profile serializers to persist UI Guided Walkthrough state across devices.
 - **Offline PWA exchange matrix:** `GET /finance/exchange_rates/?currencies=USD,PHP,...` (auth required) returns pairwise factors `convert_currency(Decimal("1"), from, to)` for up to 24 codes so the web client can persist a **minimal** rate table (profile base + sources + cached tx currencies) for offline conversion aligned with transaction math.

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -17,7 +17,10 @@ class UsageRollupTestCase(TestCase):
             email="rollup@example.com",
             password="password123",
         )
-        self.user.last_login = timezone.now() - timedelta(days=1, hours=2)
+        yesterday = timezone.now().date() - timedelta(days=1)
+        self.user.last_login = timezone.make_aware(
+            datetime.combine(yesterday, datetime.min.time().replace(hour=12))
+        )
         self.user.save(update_fields=["last_login"])
         self.profile = AppProfile.objects.get(username=self.user)
 

@@ -163,3 +163,25 @@ class SupportLogsTestCase(BaseTestCase):
         self.assertIn(str(self.profile.user_id), sent_email.body)
         self.assertNotIn("Username:", sent_email.body)
         self.assertNotIn("@", sent_email.body.split("User-Ref:")[0])
+
+    @override_settings(
+        OPERATOR_NOTIFY_EMAIL="operator@financemanager.local",
+        BETA_FEATURE_REQUESTS_ENABLED=True,
+    )
+    def test_feature_ticket_triggers_notify_email(self):
+        """Feature request submission enqueues F-014 notify with FEATURE_REQUEST event."""
+        mail.outbox.clear()
+        payload = {
+            "report_type": "FEATURE",
+            "nature": "Dark mode toggle",
+            "comment": "Please add a dark mode option in settings.",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertIn("[FM-NOTIFY]", sent_email.subject)
+        self.assertIn("FEATURE_REQUEST", sent_email.subject)
+        self.assertEqual(sent_email.from_email, "featurerequest@thehivemanager.com")
+        self.assertIn(str(self.profile.user_id), sent_email.body)
