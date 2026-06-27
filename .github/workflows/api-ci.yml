@@ -41,6 +41,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      # finance/data/ is gitignored, so exchange_rates.zip is absent on a fresh
+      # checkout. Without it the currency converter has no currencies and test
+      # setup fails with "Cannot choose from an empty sequence". Download the ECB
+      # dataset before running tests; fail loudly if it did not materialize.
+      - name: Fetch exchange-rate data
+        run: |
+          uv run python manage.py update_conversion_file
+          test -f finance/data/exchange_rates.zip
+
       - name: Run tests
         run: uv run pytest
 
