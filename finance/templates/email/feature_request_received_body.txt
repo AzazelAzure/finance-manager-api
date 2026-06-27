@@ -1,0 +1,8 @@
+Hi {{ username }},
+
+We received your feature request: "{{ nature }}". Thank you — user feedback is how we decide what to build next.
+
+We review all requests and prioritize based on impact. We can't respond to every request individually, but we do read them all.
+
+— The Hive Team
+support@thehivemanager.com
