@@ -72,6 +72,11 @@ class Command(BaseCommand):
         reset = options["reset"]
 
         user = User.objects.filter(username=username).first()
+        if user and reset:
+            if username != "ux_demo" and not str(email).endswith("@internal.test"):
+                raise CommandError(
+                    "Refusing --reset for non-test accounts. Use default ux_demo or an @internal.test email."
+                )
         if user and not reset:
             self.stdout.write(
                 self.style.WARNING(
