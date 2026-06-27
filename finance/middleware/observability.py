@@ -39,11 +39,15 @@ class ObservabilityMiddleware:
         date_str = now.strftime("%Y-%m-%d")
         hour_str = now.strftime("%Y-%m-%d-%H")
 
-        # Unresolved paths collapse into a single bucket so unauthenticated
-        # callers cannot spray unique 404 paths and grow fm_metrics:* without
-        # bound (the rollup/alert jobs enumerate this keyspace with KEYS).
-        is_known_endpoint = self._is_known_endpoint(request)
-        endpoint = normalize_endpoint(request.path) if is_known_endpoint else "{unmatched}"
+        # Key metrics on the resolved URL *route pattern* (e.g.
+        # "/finance/transactions/<str:tx_id>/") rather than the request path, and
+        # collapse unresolved paths into a single "{unmatched}" bucket. This
+        # bounds the fm_metrics:* keyspace to the number of routes so a caller
+        # cannot spray unique path/param values (numeric, uuid, or arbitrary
+        # strings on <str:...> routes) to grow the keyspace the rollup/alert jobs
+        # enumerate with Redis KEYS.
+        match = self._resolve(request)
+        endpoint = self._endpoint_label(request, match)
         method = request.method or "UNKNOWN"
         response_class = response_class_for_status(response.status_code)
         ua_class = classify_ua(request.META.get("HTTP_USER_AGENT", ""))
@@ -53,7 +57,7 @@ class ObservabilityMiddleware:
         incr_with_expire(metric_key, _METRICS_TTL)
 
         is_auth_failure = response.status_code in (401, 403)
-        is_invalid_endpoint = response.status_code == 404 and not is_known_endpoint
+        is_invalid_endpoint = response.status_code == 404 and match is None
 
         if is_auth_failure:
             sec_key = f"fm_security:{hour_str}:{ip_hash}:auth_failure"
@@ -64,9 +68,17 @@ class ObservabilityMiddleware:
             incr_with_expire(sec_key, _SECURITY_TTL)
 
     @staticmethod
-    def _is_known_endpoint(request) -> bool:
+    def _resolve(request):
         try:
-            resolve(request.path)
-            return True
+            return resolve(request.path)
         except Resolver404:
-            return False
+            return None
+
+    @staticmethod
+    def _endpoint_label(request, match) -> str:
+        if match is None:
+            return "{unmatched}"
+        route = (match.route or "").strip()
+        if not route:
+            return normalize_endpoint(request.path)
+        return route if route.startswith("/") else "/" + route

@@ -49,6 +49,31 @@ class ObservabilityMiddlewareTests(SimpleTestCase):
 
     @override_settings(LOG_IP_HASH_SALT="test-salt")
     @patch("finance.middleware.observability.incr_with_expire")
+    def test_string_param_routes_collapse_to_pattern(self, mock_incr):
+        # Different <str:...> values on the same route must share one metric key
+        # so attacker-chosen strings cannot grow the keyspace without bound.
+        middleware = ObservabilityMiddleware(lambda req: HttpResponse("ok", status=200))
+        keys = []
+        for cat in ("Food", "Drinks", "attacker-chosen-9f8e7d"):
+            request = self.factory.get(
+                f"/finance/categories/{cat}/",
+                HTTP_USER_AGENT="Mozilla/5.0",
+                REMOTE_ADDR="203.0.113.7",
+            )
+            mock_incr.reset_mock()
+            middleware(request)
+            metric_calls = [
+                c.args[0] for c in mock_incr.call_args_list if c.args[0].startswith("fm_metrics:")
+            ]
+            self.assertEqual(len(metric_calls), 1)
+            keys.append(metric_calls[0])
+
+        self.assertEqual(len(set(keys)), 1)
+        self.assertIn("<str:cat_name>", keys[0])
+        self.assertNotIn("attacker-chosen-9f8e7d", keys[0])
+
+    @override_settings(LOG_IP_HASH_SALT="test-salt")
+    @patch("finance.middleware.observability.incr_with_expire")
     def test_records_invalid_endpoint_security_counter(self, mock_incr):
         request = self.factory.get(
             "/api/does-not-exist/",
