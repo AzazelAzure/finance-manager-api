@@ -90,7 +90,7 @@ class UserView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            User.objects.create_user(
+            user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=vd["password"],
@@ -104,6 +104,10 @@ class UserView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        profile = user.appprofile
+        profile.tos_version = vd["tos_version"]
+        profile.tos_accepted_at = vd["tos_accepted_at"]
+        profile.save(update_fields=["tos_version", "tos_accepted_at"])
         return Response({'message': "User created successfully"}, status=status.HTTP_201_CREATED)
     
     def get(self, request):

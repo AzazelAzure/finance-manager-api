@@ -17,9 +17,16 @@ class UserSerializer(serializers.Serializer):
     username = serializers.CharField()
     user_email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+    tos_version = serializers.CharField(max_length=20, required=True)
+    tos_accepted_at = serializers.DateTimeField(required=True)
 
     def validate_password(self, value):
         validate_password(value)
+        return value
+
+    def validate_tos_accepted_at(self, value):
+        if value is None:
+            raise serializers.ValidationError("Terms of Service acceptance timestamp is required.")
         return value
 
 class PasswordChangeSerializer(serializers.Serializer):

@@ -1,4 +1,5 @@
 import factory
+import django.utils.timezone
 from django.contrib.auth.models import User
 from django.conf import settings
 from finance.models import *
@@ -23,6 +24,8 @@ class AppProfileFactory(factory.django.DjangoModelFactory):
         model = AppProfile 
     
     user = factory.SubFactory(UserFactory)
+    tos_version = factory.LazyAttribute(lambda o: "1.0")
+    tos_accepted_at = factory.LazyAttribute(lambda o: django.utils.timezone.now())
 
 
 class PaymentSourceFactory(factory.django.DjangoModelFactory):

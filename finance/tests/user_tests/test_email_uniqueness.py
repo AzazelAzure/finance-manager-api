@@ -1,9 +1,22 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from finance.factories import UserFactory
+
+
+def _signup_payload(**overrides):
+    payload = {
+        "username": "newuser",
+        "user_email": "same@example.com",
+        "password": "StrongPass1!",
+        "tos_version": "1.0",
+        "tos_accepted_at": timezone.now().isoformat(),
+    }
+    payload.update(overrides)
+    return payload
 
 
 class EmailUniquenessTests(APITestCase):
@@ -15,11 +28,7 @@ class EmailUniquenessTests(APITestCase):
         UserFactory(username="existing", email="same@example.com")
         response = self.client.post(
             self.user_url,
-            {
-                "username": "newuser",
-                "user_email": "Same@Example.com",
-                "password": "StrongPass1!",
-            },
+            _signup_payload(username="newuser", user_email="Same@Example.com"),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -30,11 +39,7 @@ class EmailUniquenessTests(APITestCase):
         UserFactory(username="taken", email="a@example.com")
         response = self.client.post(
             self.user_url,
-            {
-                "username": "Taken",
-                "user_email": "b@example.com",
-                "password": "StrongPass1!",
-            },
+            _signup_payload(username="Taken", user_email="b@example.com"),
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
