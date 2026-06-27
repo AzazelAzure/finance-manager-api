@@ -3,15 +3,15 @@ from django.conf import settings
 from django.test import override_settings
 from rest_framework import status
 from finance.tests.basetest import BaseTestCase
-from finance.tests.support_test_helpers import patch_support_notify_delay
+from finance.tests.support_test_helpers import patch_all_support_delays
 from finance.models import SupportTicket
 
 class SupportTicketTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self._notify_patcher = patch_support_notify_delay()
-        self._notify_patcher.start()
+        self._notify_patcher, self._confirm_patcher, self._confirm_mock = patch_all_support_delays()
         self.addCleanup(self._notify_patcher.stop)
+        self.addCleanup(self._confirm_patcher.stop)
         from django.core.cache import cache
         cache.clear()
         self.url = reverse("support_tickets")

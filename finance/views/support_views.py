@@ -10,7 +10,7 @@ from finance.services.support_incident import (
     diagnostic_log_candidates,
     dump_bug_incident,
 )
-from finance.tasks.notify import notify_operator
+from finance.tasks.notify import notify_operator, send_user_support_confirmation, should_send_support_confirmation
 
 from finance.models import SupportTicket
 
@@ -70,5 +70,12 @@ class SupportTicketView(APIView):
                 ticket.save(update_fields=["emailed"])
 
             response_serializer = SupportTicketSerializer(ticket)
+            user_uuid = str(request.user.appprofile.user_id)
+            if should_send_support_confirmation(user_uuid, ticket.report_type):
+                send_user_support_confirmation.delay(
+                    user_id=request.user.id,
+                    ticket_type=ticket.report_type,
+                    nature=ticket.nature,
+                )
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,0 +1,8 @@
+Hi {{ username }},
+
+We received your bug report about "{{ nature }}". Thank you for taking the time to let us know.
+
+Our team will review it and follow up if we need more information. We appreciate your help making The Hive better.
+
+— The Hive Team
+support@thehivemanager.com
