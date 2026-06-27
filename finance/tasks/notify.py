@@ -67,3 +67,62 @@ def notify_operator(
         user_ref,
     )
     return f"sent:{event_type}"
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def send_user_support_confirmation(self, user_id: int, ticket_type: str, nature: str) -> str:
+    """Send a confirmation email to the user after a support ticket is created."""
+    from django.contrib.auth import get_user_model
+    from django.template.loader import render_to_string
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return "skipped:no_user"
+
+    if not user.email:
+        return "skipped:no_email"
+
+    template_prefix = "bug_report_received" if ticket_type == "BUG" else "feature_request_received"
+    context = {"username": user.username, "nature": nature}
+    subject = render_to_string(f"email/{template_prefix}_subject.txt", context).strip()
+    body = render_to_string(f"email/{template_prefix}_body.txt", context)
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email="support@thehivemanager.com",
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.exception(
+            "send_user_support_confirmation_failed user_id={} ticket_type={}",
+            user_id,
+            ticket_type,
+        )
+        raise self.retry(exc=exc)
+
+    logger.info(
+        "send_user_support_confirmation_sent user_id={} ticket_type={}",
+        user_id,
+        ticket_type,
+    )
+    return f"sent:{ticket_type}"
+
+
+def should_send_support_confirmation(user_uuid: str, ticket_type: str) -> bool:
+    """Return True if no other ticket of this type exists in the last 5 minutes."""
+    from datetime import timedelta
+
+    from finance.models import SupportTicket
+
+    cutoff = timezone.now() - timedelta(minutes=5)
+    recent_count = SupportTicket.objects.filter(
+        uid=user_uuid,
+        report_type=ticket_type,
+        created_at__gte=cutoff,
+    ).count()
+    return recent_count <= 1
