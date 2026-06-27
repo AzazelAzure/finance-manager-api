@@ -1,4 +1,5 @@
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from uuid import uuid4
 
@@ -37,6 +38,8 @@ class PermissionDefaultsTests(BaseTestCase):
                 "username": f"public-signup-{uuid4().hex[:8]}",
                 "user_email": f"public-signup-{uuid4().hex[:8]}@example.com",
                 "password": "StrongPass1!",
+                "tos_version": "1.0",
+                "tos_accepted_at": timezone.now().isoformat(),
             },
             format="json",
         )
@@ -52,6 +55,8 @@ class PermissionDefaultsTests(BaseTestCase):
                 "username": self.user.username,
                 "user_email": f"new-{uuid4().hex[:8]}@example.com",
                 "password": "StrongPass1!",
+                "tos_version": "1.0",
+                "tos_accepted_at": timezone.now().isoformat(),
             },
             format="json",
         )
@@ -64,6 +69,8 @@ class PermissionDefaultsTests(BaseTestCase):
                 "username": f"new-user-{uuid4().hex[:8]}",
                 "user_email": self.user.email,
                 "password": "StrongPass1!",
+                "tos_version": "1.0",
+                "tos_accepted_at": timezone.now().isoformat(),
             },
             format="json",
         )

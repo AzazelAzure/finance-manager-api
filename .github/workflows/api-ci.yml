@@ -1,0 +1,64 @@
+name: API CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Redis is required: ObservabilityMiddleware and DRF throttling use the
+    # Redis-backed cache, so without it many request-level tests fail with
+    # connection-refused. DB falls back to SQLite (no DB_* env vars), so no
+    # Postgres service container is needed for the CI baseline.
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DJANGO_SETTINGS_MODULE: finance_api.settings
+      SECRET_KEY: ci-test-secret-key-not-real
+      DEBUG: 'True'
+      REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # finance/data/ is gitignored, so exchange_rates.zip is absent on a fresh
+      # checkout. Without it the currency converter has no currencies and test
+      # setup fails with "Cannot choose from an empty sequence". Download the ECB
+      # dataset before running tests; fail loudly if it did not materialize.
+      - name: Fetch exchange-rate data
+        run: |
+          uv run python manage.py update_conversion_file
+          test -f finance/data/exchange_rates.zip
+
+      - name: Run tests
+        run: uv run pytest
+
+      # makemigrations --check --dry-run exits non-zero when a model change has
+      # no matching migration file (the "forgot to run makemigrations" case).
+      # We use this rather than `migrate --check`, which would always fail on a
+      # fresh CI database because every migration is unapplied.
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run

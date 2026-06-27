@@ -28,8 +28,15 @@ class TransactionCalendarTestCase(TransactionBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
 
     def test_calendar_aggregates_include_month_boundaries(self):
-        source = self.sources[0].source
-        currency = self.sources[0].currency
+        # Force the source onto the profile base currency so the calendar's
+        # display-currency conversion is an identity. Otherwise a randomly
+        # assigned weak currency can round a -100 expense to 0.00 and flake the
+        # `assertLess(..., 0)` below.
+        src_obj = self.sources[0]
+        src_obj.currency = str(self.profile.base_currency).upper()
+        src_obj.save(update_fields=["currency"])
+        source = src_obj.source
+        currency = src_obj.currency
         category = self.categories[0].name
         self._create_tx(
             tx_date="2026-03-31",

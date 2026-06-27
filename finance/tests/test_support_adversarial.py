@@ -50,8 +50,11 @@ class SupportTicketAdversarialTestCase(BaseTestCase):
         # The ticket ID must be auto-generated, NOT the spoofed one
         self.assertNotEqual(str(ticket.id), "11111111-1111-1111-1111-111111111111")
 
-        # The emailed status must default to False
-        self.assertFalse(ticket.emailed)
+        # `emailed` is read-only on the serializer, so the client-supplied value
+        # is ignored. For BUG tickets the server sets it True after dispatching
+        # the operator notification, so the persisted value reflects server
+        # logic (not the spoofed input).
+        self.assertTrue(ticket.emailed)
 
     def test_unauthenticated_request_handling(self):
         """

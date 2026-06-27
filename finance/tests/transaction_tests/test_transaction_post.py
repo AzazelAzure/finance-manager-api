@@ -116,8 +116,15 @@ class TransactionPostTestCase(TransactionBase):
             currency=str(self.profile.base_currency).upper(),
             is_recurring=False,
         )
+        # Post the trigger expense to a NON-spend source in the base currency so
+        # it cannot perturb the spend account balance (self.expense_data uses a
+        # random source/currency/amount, which otherwise flakes the STS check).
+        non_spend = next(s for s in self.sources if s.source != src.source)
         payload = self.expense_data.copy()
         payload["date"] = str(today)
+        payload["source"] = non_spend.source
+        payload["currency"] = str(self.profile.base_currency).upper()
+        payload["amount"] = "10.00"
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         snap = response.data["snapshot"]
