@@ -39,7 +39,11 @@ class ObservabilityMiddleware:
         date_str = now.strftime("%Y-%m-%d")
         hour_str = now.strftime("%Y-%m-%d-%H")
 
-        endpoint = normalize_endpoint(request.path)
+        # Unresolved paths collapse into a single bucket so unauthenticated
+        # callers cannot spray unique 404 paths and grow fm_metrics:* without
+        # bound (the rollup/alert jobs enumerate this keyspace with KEYS).
+        is_known_endpoint = self._is_known_endpoint(request)
+        endpoint = normalize_endpoint(request.path) if is_known_endpoint else "{unmatched}"
         method = request.method or "UNKNOWN"
         response_class = response_class_for_status(response.status_code)
         ua_class = classify_ua(request.META.get("HTTP_USER_AGENT", ""))
@@ -49,7 +53,7 @@ class ObservabilityMiddleware:
         incr_with_expire(metric_key, _METRICS_TTL)
 
         is_auth_failure = response.status_code in (401, 403)
-        is_invalid_endpoint = response.status_code == 404 and not self._is_known_endpoint(request)
+        is_invalid_endpoint = response.status_code == 404 and not is_known_endpoint
 
         if is_auth_failure:
             sec_key = f"fm_security:{hour_str}:{ip_hash}:auth_failure"

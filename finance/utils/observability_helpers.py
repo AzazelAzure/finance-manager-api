@@ -62,12 +62,22 @@ def classify_ua(ua: str) -> str:
 
 
 def client_ip_from_request(request) -> str:
-    """Prefer Cloudflare client IP when present."""
-    return (
-        request.META.get("HTTP_CF_CONNECTING_IP")
-        or request.META.get("REMOTE_ADDR")
-        or ""
-    )
+    """Resolve client IP for per-IP security correlation keys.
+
+    Spoofable forwarded headers (``CF-Connecting-IP`` / ``X-Forwarded-For``) are
+    only honored when ``OBSERVABILITY_TRUST_PROXY_IP`` is enabled, i.e. the API
+    sits behind a trusted Cloudflare/Nginx proxy that overwrites them. Otherwise
+    they are ignored and ``REMOTE_ADDR`` is used, so an attacker cannot rotate
+    forged client IPs to keep auth-failure/probe counters below threshold.
+    """
+    remote_addr = request.META.get("REMOTE_ADDR") or ""
+    if not getattr(settings, "OBSERVABILITY_TRUST_PROXY_IP", False):
+        return remote_addr
+    forwarded = request.META.get("HTTP_CF_CONNECTING_IP")
+    if not forwarded:
+        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        forwarded = xff.split(",")[0].strip() if xff else ""
+    return forwarded or remote_addr
 
 
 def response_class_for_status(status_code: int) -> str:

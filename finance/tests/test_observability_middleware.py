@@ -30,6 +30,25 @@ class ObservabilityMiddlewareTests(SimpleTestCase):
 
     @override_settings(LOG_IP_HASH_SALT="test-salt")
     @patch("finance.middleware.observability.incr_with_expire")
+    def test_unmatched_path_buckets_metric_key(self, mock_incr):
+        # Unauthenticated 404 spray must not create unbounded fm_metrics:* keys.
+        request = self.factory.get(
+            "/totally/made/up/4f3c2b1a/",
+            HTTP_USER_AGENT="curl/8.0",
+            REMOTE_ADDR="203.0.113.9",
+        )
+        middleware = ObservabilityMiddleware(lambda req: HttpResponse("missing", status=404))
+        middleware(request)
+
+        metric_calls = [
+            call.args[0] for call in mock_incr.call_args_list if call.args[0].startswith("fm_metrics:")
+        ]
+        self.assertEqual(len(metric_calls), 1)
+        self.assertIn("{unmatched}", metric_calls[0])
+        self.assertNotIn("/totally/made/up/", metric_calls[0])
+
+    @override_settings(LOG_IP_HASH_SALT="test-salt")
+    @patch("finance.middleware.observability.incr_with_expire")
     def test_records_invalid_endpoint_security_counter(self, mock_incr):
         request = self.factory.get(
             "/api/does-not-exist/",

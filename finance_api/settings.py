@@ -93,6 +93,10 @@ SECURITY_ALERT_THRESHOLDS = {
     "5xx_rate_pct": int(os.getenv("SEC_THRESHOLD_5XX_RATE_PCT", "5") or "5"),
 }
 SECURITY_ALERT_DEDUP_TTL = int(os.getenv("SECURITY_ALERT_DEDUP_TTL", "7200") or "7200")
+# Only trust forwarded client-IP headers (CF-Connecting-IP / X-Forwarded-For)
+# for observability when the API runs behind a trusted proxy that overwrites
+# them; otherwise REMOTE_ADDR is used so per-IP counters cannot be spoofed.
+OBSERVABILITY_TRUST_PROXY_IP = _env_bool("OBSERVABILITY_TRUST_PROXY_IP", default=False)
 
 # When False (default), request logs use uid + a non-identifying username label.
 # Set LOG_FULL_USERNAME=1 only for local debugging of auth-related issues.

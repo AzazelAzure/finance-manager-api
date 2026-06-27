@@ -1,7 +1,8 @@
-from django.test import SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from finance.utils.observability_helpers import (
     classify_ua,
+    client_ip_from_request,
     hash_ip,
     normalize_endpoint,
     response_class_for_status,
@@ -41,3 +42,21 @@ class ObservabilityHelpersTests(SimpleTestCase):
         self.assertEqual(response_class_for_status(200), "2xx")
         self.assertEqual(response_class_for_status(404), "4xx")
         self.assertEqual(response_class_for_status(503), "5xx")
+
+    def test_client_ip_ignores_forwarded_header_by_default(self):
+        # Spoofable CF-Connecting-IP must be ignored unless behind a trusted proxy.
+        request = RequestFactory().get(
+            "/finance/transactions/",
+            HTTP_CF_CONNECTING_IP="1.2.3.4",
+            REMOTE_ADDR="203.0.113.5",
+        )
+        self.assertEqual(client_ip_from_request(request), "203.0.113.5")
+
+    @override_settings(OBSERVABILITY_TRUST_PROXY_IP=True)
+    def test_client_ip_trusts_forwarded_header_when_enabled(self):
+        request = RequestFactory().get(
+            "/finance/transactions/",
+            HTTP_CF_CONNECTING_IP="1.2.3.4",
+            REMOTE_ADDR="203.0.113.5",
+        )
+        self.assertEqual(client_ip_from_request(request), "1.2.3.4")
