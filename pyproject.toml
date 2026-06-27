@@ -24,7 +24,7 @@ dependencies = [
     "PyJWT==2.11.0",
     "psycopg==3.2.4",
     "python-dateutil==2.9.0.post0",
-    "python-dotenv==1.2.1",
+    "python-dotenv==1.2.2",
     "PyYAML==6.0.3",
     "setuptools==80.9.0",
     "six==1.17.0",
