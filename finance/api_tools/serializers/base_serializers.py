@@ -2,6 +2,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 
+from finance.api_tools.tos import is_allowed_tos_version
+
 class FinancialSnapshotSerializer(serializers.Serializer):
     safe_to_spend = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_assets = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -26,8 +28,7 @@ class UserSerializer(serializers.Serializer):
         return value
 
     def validate_tos_version(self, value):
-        allowed = {"1.0"}
-        if value not in allowed:
+        if not is_allowed_tos_version(value):
             raise serializers.ValidationError("Unsupported Terms of Service version.")
         return value
 

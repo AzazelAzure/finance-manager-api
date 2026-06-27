@@ -59,6 +59,8 @@ class EmailUniquenessTests(APITestCase):
                 "email": "DUP@example.com",
                 "password1": "StrongPass1!",
                 "password2": "StrongPass1!",
+                "tos_version": "1.0",
+                "tos_accepted_at": timezone.now().isoformat(),
             },
             format="json",
         )

@@ -4,7 +4,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import BasePermission
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiTypes
@@ -13,6 +12,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiType
 
 # Serializer Imports
 from finance.api_tools.serializers.base_serializers import UserSerializer, PasswordChangeSerializer
+from finance.api_tools.tos import record_tos_acceptance
 
 
 class IsAuthenticatedOrCreateOnly(BasePermission):
@@ -97,10 +97,7 @@ class UserView(APIView):
                     email=email,
                     password=vd["password"],
                 )
-                profile = user.appprofile
-                profile.tos_version = vd["tos_version"]
-                profile.tos_accepted_at = timezone.now()
-                profile.save(update_fields=["tos_version", "tos_accepted_at"])
+                record_tos_acceptance(user.appprofile, vd["tos_version"])
         except IntegrityError:
             return Response(
                 {
