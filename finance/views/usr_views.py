@@ -3,7 +3,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.permissions import BasePermission
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiTypes
@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiType
 
 # Serializer Imports
 from finance.api_tools.serializers.base_serializers import UserSerializer, PasswordChangeSerializer
+from finance.api_tools.tos import record_tos_acceptance
 
 
 class IsAuthenticatedOrCreateOnly(BasePermission):
@@ -90,11 +91,13 @@ class UserView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            User.objects.create_user(
-                username=username,
-                email=email,
-                password=vd["password"],
-            )
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=vd["password"],
+                )
+                record_tos_acceptance(user.appprofile, vd["tos_version"])
         except IntegrityError:
             return Response(
                 {

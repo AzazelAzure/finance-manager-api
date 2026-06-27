@@ -62,6 +62,8 @@ class AppProfile(models.Model):
     timezone = models.CharField(default='America/New_York')
     start_of_week = models.IntegerField(default=1)
     completed_tours = models.JSONField(default=list, null=True, blank=True)
+    tos_version = models.CharField(max_length=20, blank=True, null=True)
+    tos_accepted_at = models.DateTimeField(null=True, blank=True)
     
 
     def __str__(self):
