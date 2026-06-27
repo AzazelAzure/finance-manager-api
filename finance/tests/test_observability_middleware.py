@@ -74,6 +74,26 @@ class ObservabilityMiddlewareTests(SimpleTestCase):
 
     @override_settings(LOG_IP_HASH_SALT="test-salt")
     @patch("finance.middleware.observability.incr_with_expire")
+    def test_unknown_method_buckets_to_other(self, mock_incr):
+        # Arbitrary HTTP verbs must not grow the metric keyspace.
+        request = self.factory.generic(
+            "FOOBAR",
+            "/api/health/",
+            HTTP_USER_AGENT="Mozilla/5.0",
+            REMOTE_ADDR="203.0.113.8",
+        )
+        middleware = ObservabilityMiddleware(lambda req: HttpResponse("ok", status=200))
+        middleware(request)
+
+        metric_calls = [
+            c.args[0] for c in mock_incr.call_args_list if c.args[0].startswith("fm_metrics:")
+        ]
+        self.assertEqual(len(metric_calls), 1)
+        self.assertIn(":OTHER:", metric_calls[0])
+        self.assertNotIn("FOOBAR", metric_calls[0])
+
+    @override_settings(LOG_IP_HASH_SALT="test-salt")
+    @patch("finance.middleware.observability.incr_with_expire")
     def test_records_invalid_endpoint_security_counter(self, mock_incr):
         request = self.factory.get(
             "/api/does-not-exist/",

@@ -5,6 +5,7 @@ from finance.utils.observability_helpers import (
     client_ip_from_request,
     hash_ip,
     normalize_endpoint,
+    normalize_method,
     response_class_for_status,
 )
 
@@ -37,6 +38,12 @@ class ObservabilityHelpersTests(SimpleTestCase):
         self.assertEqual(classify_ua("Googlebot/2.1"), "crawler")
         self.assertEqual(classify_ua("curl/8.0"), "bot")
         self.assertEqual(classify_ua(""), "unknown")
+
+    def test_normalize_method_allowlist(self):
+        self.assertEqual(normalize_method("get"), "GET")
+        self.assertEqual(normalize_method("POST"), "POST")
+        self.assertEqual(normalize_method("FOOBAR"), "OTHER")
+        self.assertEqual(normalize_method(""), "OTHER")
 
     def test_response_class_for_status(self):
         self.assertEqual(response_class_for_status(200), "2xx")

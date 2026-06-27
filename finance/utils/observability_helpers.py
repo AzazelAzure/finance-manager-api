@@ -80,5 +80,21 @@ def client_ip_from_request(request) -> str:
     return forwarded or remote_addr
 
 
+_KNOWN_METHODS = frozenset(
+    {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
+)
+
+
+def normalize_method(method: str) -> str:
+    """Bucket HTTP method against a fixed allowlist.
+
+    ``request.method`` is attacker-controlled (arbitrary verbs can be sent on
+    the request line), so unknown methods collapse to ``OTHER`` to keep the
+    ``fm_metrics:*`` keyspace bounded.
+    """
+    upper = (method or "").upper()
+    return upper if upper in _KNOWN_METHODS else "OTHER"
+
+
 def response_class_for_status(status_code: int) -> str:
     return f"{max(status_code, 0) // 100}xx"

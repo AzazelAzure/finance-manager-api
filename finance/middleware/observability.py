@@ -12,6 +12,7 @@ from finance.utils.observability_helpers import (
     client_ip_from_request,
     hash_ip,
     normalize_endpoint,
+    normalize_method,
     response_class_for_status,
 )
 from finance.utils.observability_store import incr_with_expire
@@ -48,7 +49,7 @@ class ObservabilityMiddleware:
         # enumerate with Redis KEYS.
         match = self._resolve(request)
         endpoint = self._endpoint_label(request, match)
-        method = request.method or "UNKNOWN"
+        method = normalize_method(request.method)
         response_class = response_class_for_status(response.status_code)
         ua_class = classify_ua(request.META.get("HTTP_USER_AGENT", ""))
         ip_hash = hash_ip(client_ip_from_request(request))
