@@ -9,12 +9,26 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # Test DB: settings.py falls back to SQLite when no DB_* env vars are set,
-    # so no Postgres service container is needed for the CI baseline.
+    # Redis is required: ObservabilityMiddleware and DRF throttling use the
+    # Redis-backed cache, so without it many request-level tests fail with
+    # connection-refused. DB falls back to SQLite (no DB_* env vars), so no
+    # Postgres service container is needed for the CI baseline.
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     env:
       DJANGO_SETTINGS_MODULE: finance_api.settings
       SECRET_KEY: ci-test-secret-key-not-real
       DEBUG: 'True'
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - uses: actions/checkout@v4
