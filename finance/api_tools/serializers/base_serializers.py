@@ -1,4 +1,5 @@
 from django.contrib.auth.password_validation import validate_password
+from django.utils import timezone
 from rest_framework import serializers
 
 class FinancialSnapshotSerializer(serializers.Serializer):
@@ -18,16 +19,24 @@ class UserSerializer(serializers.Serializer):
     user_email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     tos_version = serializers.CharField(max_length=20, required=True)
-    tos_accepted_at = serializers.DateTimeField(required=True)
+    tos_accepted_at = serializers.DateTimeField(required=False, write_only=True)
 
     def validate_password(self, value):
         validate_password(value)
         return value
 
-    def validate_tos_accepted_at(self, value):
-        if value is None:
-            raise serializers.ValidationError("Terms of Service acceptance timestamp is required.")
+    def validate_tos_version(self, value):
+        allowed = {"1.0"}
+        if value not in allowed:
+            raise serializers.ValidationError("Unsupported Terms of Service version.")
         return value
+
+    def validate(self, attrs):
+        if not attrs.get("tos_accepted_at"):
+            raise serializers.ValidationError(
+                {"tos_accepted_at": "Terms of Service acceptance timestamp is required."}
+            )
+        return attrs
 
 class PasswordChangeSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)

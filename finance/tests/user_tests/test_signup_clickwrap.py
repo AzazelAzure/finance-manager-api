@@ -8,13 +8,30 @@ class SignupClickwrapTests(APITestCase):
     def setUp(self):
         self.user_url = reverse("user")
 
-    def test_registration_requires_tos_accepted_at(self):
+    def test_registration_requires_tos_acceptance(self):
         response = self.client.post(
             self.user_url,
             {
                 "username": "newclickwrap",
                 "user_email": "clickwrap@example.com",
                 "password": "StrongPass1!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(
+            "tos_accepted_at" in response.data or "tos_version" in response.data,
+            msg=response.data,
+        )
+
+    def test_registration_rejects_missing_tos_accepted_at_when_version_present(self):
+        response = self.client.post(
+            self.user_url,
+            {
+                "username": "newclickwrap2",
+                "user_email": "clickwrap2@example.com",
+                "password": "StrongPass1!",
+                "tos_version": "1.0",
             },
             format="json",
         )
