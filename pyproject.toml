@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 dependencies = [
-    "asgiref==3.11.0",
+    "asgiref==3.11.1",
     "Babel==2.14.0",
     "currency.converter==0.5.5",
     "CurrencyConverter==0.18.14",
