@@ -1,0 +1,38 @@
+name: API CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Test DB: settings.py falls back to SQLite when no DB_* env vars are set,
+    # so no Postgres service container is needed for the CI baseline.
+    env:
+      DJANGO_SETTINGS_MODULE: finance_api.settings
+      SECRET_KEY: ci-test-secret-key-not-real
+      DEBUG: 'True'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run tests
+        run: uv run pytest
+
+      # makemigrations --check --dry-run exits non-zero when a model change has
+      # no matching migration file (the "forgot to run makemigrations" case).
+      # We use this rather than `migrate --check`, which would always fail on a
+      # fresh CI database because every migration is unapplied.
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run

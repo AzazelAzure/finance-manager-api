@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **CI pipeline (PLAN_CROSS_CI_CD):** `.github/workflows/api-ci.yml` runs `pytest` and a `makemigrations --check --dry-run` migration drift gate on every push and PR to `main`. Tests use the SQLite fallback (no DB env vars), dependencies are installed via `uv sync --frozen` on Python 3.12. Added `.github/dependabot.yml` for weekly `uv` + `github-actions` update PRs.
 - **Signup clickwrap (PLAN_CROSS_SIGNUP_CLICKWRAP):** `AppProfile.tos_version` and `tos_accepted_at` fields; registration requires both on account creation.
 - **Support confirmation emails (PLAN_CROSS_EMAIL_COMMS):** `send_user_support_confirmation` Celery task sends user-facing confirmation after bug report or feature request submission. Five-minute per-user per-type cooldown skips duplicate confirmations; operator notify unchanged.
 - **`create_ux_testuser` management command (PLAN_CROSS_UI_UX_TEST_SEED):** Seeds deterministic `ux_demo` user with 12 months of rolling PHP transaction history, categories, payment sources, tags, and upcoming expenses. Supports `--reset`, `--confirm-not-prod` (required when `DEBUG=False`), and configurable username/email/password.
