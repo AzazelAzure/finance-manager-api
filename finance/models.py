@@ -53,7 +53,21 @@ class AppProfile(models.Model):
         user_id (UUIDField): Unique identifier for the user.
         spend_accounts (ManyToManyField): Many-to-many relationship with the PaymentSource model.
         base_currency (ForeignKey): Foreign key to the Currency model.
+        sts_window_mode (CharField): Calendar month vs user pay-cycle window for STS.
+        pay_cycle_frequency (CharField): Pay cadence when sts_window_mode is pay_cycle.
+        pay_cycle_anchor_date (DateField): Next pay date anchor for pay-cycle STS.
     """
+
+    class StsWindowMode(models.TextChoices):
+        CALENDAR_MONTH = "calendar_month", "Calendar month"
+        PAY_CYCLE = "pay_cycle", "Pay cycle"
+
+    class PayCycleFrequency(models.TextChoices):
+        WEEKLY = "weekly", "Weekly"
+        BIWEEKLY = "biweekly", "Biweekly"
+        SEMIMONTHLY = "semimonthly", "Semi-monthly"
+        MONTHLY = "monthly", "Monthly"
+
     objects = AppProfileManager.as_manager()
     username = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -64,6 +78,18 @@ class AppProfile(models.Model):
     completed_tours = models.JSONField(default=list, null=True, blank=True)
     tos_version = models.CharField(max_length=20, blank=True, null=True)
     tos_accepted_at = models.DateTimeField(null=True, blank=True)
+    sts_window_mode = models.CharField(
+        max_length=20,
+        choices=StsWindowMode.choices,
+        default=StsWindowMode.CALENDAR_MONTH,
+    )
+    pay_cycle_frequency = models.CharField(
+        max_length=20,
+        choices=PayCycleFrequency.choices,
+        null=True,
+        blank=True,
+    )
+    pay_cycle_anchor_date = models.DateField(null=True, blank=True)
     
 
     def __str__(self):
