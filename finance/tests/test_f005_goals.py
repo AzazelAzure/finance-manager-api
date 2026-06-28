@@ -123,3 +123,37 @@ class SavingsGoalApiTests(UserBase):
         )
         resp = self._create_goal(source="other-savings")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_rejects_negative_amounts(self):
+        neg_target = self._create_goal(target_amount="-100.00")
+        self.assertEqual(neg_target.status_code, status.HTTP_400_BAD_REQUEST)
+        neg_current = self._create_goal(current_amount="-5.00")
+        self.assertEqual(neg_current.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_rejects_null_or_blank_name(self):
+        null_name = self.client.post(
+            self.list_url,
+            {"name": None, "target_amount": "100.00", "target_date": (date.today() + timedelta(days=30)).isoformat()},
+            format="json",
+        )
+        self.assertEqual(null_name.status_code, status.HTTP_400_BAD_REQUEST)
+        blank_name = self._create_goal(name="   ")
+        self.assertEqual(blank_name.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_rejects_negative_amount(self):
+        goal_id = self._create_goal().data["id"]
+        detail_url = reverse("savings_goal_detail", kwargs={"pk": goal_id})
+        resp = self.client.patch(detail_url, {"current_amount": "-1.00"}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_per_cycle_rounds_up_small_remainder(self):
+        goal = SavingsGoal.objects.create(
+            uid=self.profile,
+            name="Tiny remainder",
+            target_amount=Decimal("100.001"),
+            currency="USD",
+            target_date=date.today() + timedelta(days=3650),
+            current_amount=Decimal("100.00"),
+        )
+        per_cycle = compute_per_cycle_required(goal, self.profile)
+        self.assertEqual(per_cycle, Decimal("0.01"))

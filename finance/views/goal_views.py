@@ -1,5 +1,5 @@
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_UP, Decimal, InvalidOperation
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -26,7 +26,8 @@ def compute_per_cycle_required(goal, profile) -> Decimal:
     freq = profile.pay_cycle_frequency or "monthly"
     days_per_cycle = round(365 / CYCLES_PER_YEAR.get(freq, 12))
     periods = max(days_remaining // days_per_cycle, 1)
-    return (remaining / periods).quantize(Decimal("0.01"))
+    # Round up so a positive remaining never reports 0.00 per cycle (under-saving guidance).
+    return (remaining / periods).quantize(Decimal("0.01"), rounding=ROUND_UP)
 
 
 def _goal_payload(goal, profile) -> dict:
@@ -44,9 +45,20 @@ def _goal_payload(goal, profile) -> dict:
 
 def _parse_decimal(value, field_name: str) -> Decimal:
     try:
-        return Decimal(str(value))
+        parsed = Decimal(str(value))
     except (InvalidOperation, TypeError) as exc:
         raise ValueError(f"{field_name} must be a valid decimal") from exc
+    if not parsed.is_finite():
+        raise ValueError(f"{field_name} must be a finite number")
+    if parsed < 0:
+        raise ValueError(f"{field_name} must not be negative")
+    return parsed
+
+
+def _parse_name(value) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("name must be a non-empty string")
+    return value.strip()
 
 
 def _parse_date(value, field_name: str) -> date:
@@ -87,6 +99,7 @@ class SavingsGoalListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
+            name = _parse_name(data["name"])
             target_amount = _parse_decimal(data["target_amount"], "target_amount")
             target_date = _parse_date(data["target_date"], "target_date")
             current_amount = _parse_decimal(data.get("current_amount", "0"), "current_amount")
@@ -97,7 +110,7 @@ class SavingsGoalListCreateView(APIView):
         currency = data.get("currency") or profile.base_currency
         goal = SavingsGoal.objects.create(
             uid=profile,
-            name=data["name"],
+            name=name,
             target_amount=target_amount,
             currency=currency,
             target_date=target_date,
@@ -137,7 +150,7 @@ class SavingsGoalDetailView(APIView):
 
         try:
             if "name" in data:
-                goal.name = data["name"]
+                goal.name = _parse_name(data["name"])
             if "target_amount" in data:
                 goal.target_amount = _parse_decimal(data["target_amount"], "target_amount")
             if "target_date" in data:
