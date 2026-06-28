@@ -7,6 +7,7 @@ Attributes:
     Tag: Model for tags.
     PaymentSource: Model for payment sources.
     UpcomingExpense: Model for upcoming expenses.
+    SavingsGoal: Model for savings goals with target amount and date.
     Transaction: Model for transactions.
     CurrentAsset: Model for current assets.
     FinancialSnapshot: Model for financial snapshots.
@@ -214,6 +215,27 @@ class UpcomingExpense(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
+
+
+class SavingsGoal(models.Model):
+    uid = models.ForeignKey(AppProfile, on_delete=models.CASCADE, related_name="savings_goals")
+    name = models.CharField(max_length=255)
+    target_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.CharField(max_length=10, default="USD")
+    target_date = models.DateField()
+    current_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    source = models.ForeignKey(
+        PaymentSource, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="savings_goals"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["target_date"]
+
+    def __str__(self):
+        return f"{self.name} ({self.uid_id})"
 
 
 class Category(models.Model):
