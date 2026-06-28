@@ -300,6 +300,22 @@ class Transaction(models.Model):
         return self.tx_id
 
 
+class ExportShareToken(models.Model):
+    """Time-limited read-only share token for transaction export (F-010 T04)."""
+
+    uid = models.ForeignKey(AppProfile, on_delete=models.CASCADE, related_name="share_tokens")
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    revoked = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [models.Index(fields=["token"])]
+
+    def __str__(self):
+        return str(self.token)
+
+
 class FinancialSnapshot(models.Model):
     """
     Model for financial snapshots. Allows users to view their financial data.

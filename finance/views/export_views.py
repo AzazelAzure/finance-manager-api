@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
-from django.http import StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
+from django.utils import timezone
 from loguru import logger
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from finance.models import Transaction
+from finance.models import Category, ExportShareToken, PaymentSource, Tag, Transaction, UpcomingExpense
 
 CSV_HEADERS = [
     "Date",
@@ -112,3 +114,164 @@ class TransactionCsvExportView(APIView):
             date_to_raw or "",
         )
         return response
+
+
+def _profile_backup_dict(profile) -> dict:
+    return {
+        "user_id": str(profile.user_id),
+        "base_currency": profile.base_currency,
+        "timezone": profile.timezone,
+        "start_of_week": profile.start_of_week,
+        "sts_window_mode": profile.sts_window_mode,
+        "pay_cycle_frequency": profile.pay_cycle_frequency,
+        "pay_cycle_anchor_date": profile.pay_cycle_anchor_date,
+        "spend_accounts": profile.spend_accounts,
+    }
+
+
+class FullBackupExportView(APIView):
+    """Export the authenticated user's full finance dataset as JSON (F-010 T02)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = request.user.appprofile
+        uid = str(profile.user_id)
+
+        transactions = list(Transaction.objects.for_user(uid).order_by("date", "tx_id").values())
+        sources = list(PaymentSource.objects.filter(uid=uid).values())
+        categories = list(Category.objects.filter(uid=uid).values())
+        tags = list(Tag.objects.filter(uid=uid).values())
+        upcoming_expenses = list(UpcomingExpense.objects.filter(uid=uid).order_by("due_date").values())
+
+        payload = {
+            "export_version": "1",
+            "exported_at": timezone.now().isoformat(),
+            "profile": _profile_backup_dict(profile),
+            "sources": sources,
+            "categories": categories,
+            "tags": tags,
+            "transactions": transactions,
+            "upcoming_expenses": upcoming_expenses,
+        }
+
+        today = datetime.now().strftime("%Y%m%d")
+        filename = f"hfm_backup_{today}.json"
+        body = json.dumps(payload, default=str)
+        response = HttpResponse(body, content_type="application/json")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        logger.info(
+            "export_full_backup user={} tx_count={} src_count={} ue_count={}",
+            uid,
+            len(transactions),
+            len(sources),
+            len(upcoming_expenses),
+        )
+        return response
+
+
+def _clamp_expires_in_days(raw) -> int:
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return 7
+    return max(1, min(30, days))
+
+
+def _token_audit_label(token) -> str:
+    return f"{str(token)[:8]}..."
+
+
+def _get_active_share_token(token_uuid) -> ExportShareToken | None:
+    try:
+        share = ExportShareToken.objects.select_related("uid").get(token=token_uuid)
+    except ExportShareToken.DoesNotExist:
+        return None
+    if share.revoked or share.expires_at < timezone.now():
+        return None
+    return share
+
+
+class ShareTokenCreateView(APIView):
+    """Create a time-limited share token (F-010 T04)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile = request.user.appprofile
+        expires_in_days = _clamp_expires_in_days(request.data.get("expires_in_days"))
+        expires_at = timezone.now() + timedelta(days=expires_in_days)
+        share = ExportShareToken.objects.create(uid=profile, expires_at=expires_at)
+        logger.info(
+            "share_token_created user={} token_prefix={} expires_at={}",
+            profile.user_id,
+            _token_audit_label(share.token),
+            share.expires_at.isoformat(),
+        )
+        return Response(
+            {"token": str(share.token), "expires_at": share.expires_at.isoformat()},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ShareTokenAccessView(APIView):
+    """Public read-only access to shared transaction snapshot (F-010 T04)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        share = _get_active_share_token(token)
+        if share is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        owner_uid = str(share.uid.user_id)
+        transactions = list(
+            Transaction.objects.for_user(owner_uid)
+            .order_by("date", "tx_id")
+            .values(
+                "date",
+                "description",
+                "amount",
+                "created_on",
+                "category",
+                "source",
+                "currency",
+                "tags",
+                "tx_id",
+                "bill",
+                "tx_type",
+            )
+        )
+        logger.info(
+            "share_token_accessed token_prefix={} tx_count={}",
+            _token_audit_label(token),
+            len(transactions),
+        )
+        return Response(
+            {
+                "shared_by": None,
+                "exported_at": timezone.now().isoformat(),
+                "transactions": transactions,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ShareTokenRevokeView(APIView):
+    """Revoke a share token owned by the authenticated user (F-010 T04)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, token):
+        profile = request.user.appprofile
+        try:
+            share = ExportShareToken.objects.get(token=token)
+        except ExportShareToken.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if share.uid_id != profile.user_id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        share.revoked = True
+        share.save(update_fields=["revoked"])
+        return Response(status=status.HTTP_204_NO_CONTENT)

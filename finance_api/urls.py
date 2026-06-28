@@ -40,7 +40,13 @@ from finance.views.report_views import BugReportView
 from finance.views.support_views import SupportTicketView
 from finance.views.balance_views import BalanceHistoryView
 from finance.views.exchange_views import ExchangeRatesMatrixView
-from finance.views.export_views import TransactionCsvExportView
+from finance.views.export_views import (
+    FullBackupExportView,
+    ShareTokenAccessView,
+    ShareTokenCreateView,
+    ShareTokenRevokeView,
+    TransactionCsvExportView,
+)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -123,6 +129,22 @@ urlpatterns = [
         "finance/export/transactions/csv/",
         TransactionCsvExportView.as_view(),
         name="export_tx_csv",
+    ),
+    path(
+        "finance/export/full/",
+        FullBackupExportView.as_view(),
+        name="export_full_backup",
+    ),
+    path("finance/export/share/", ShareTokenCreateView.as_view(), name="share_token_create"),
+    path(
+        "finance/export/share/<uuid:token>/",
+        ShareTokenAccessView.as_view(),
+        name="share_token_access",
+    ),
+    path(
+        "finance/export/share/<uuid:token>/revoke/",
+        ShareTokenRevokeView.as_view(),
+        name="share_token_revoke",
     ),
     path("finance/exchange_rates/", ExchangeRatesMatrixView.as_view(), name="finance_exchange_rates"),
     path("finance/sources/", SourceListCreateView.as_view(), name="sources_list_create"),
