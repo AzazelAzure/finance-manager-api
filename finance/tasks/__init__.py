@@ -7,6 +7,6 @@ imports the package is a namespace package and beat-scheduled tasks such as
 registered, so beat would dispatch tasks the worker discards as unregistered.
 """
 
-from finance.tasks import analytics, notify, security_alerts, support_digest, usage_rollup  # noqa: F401
+from finance.tasks import analytics, balance_snapshots, notify, security_alerts, support_digest, usage_rollup  # noqa: F401
 
-__all__ = ["analytics", "notify", "security_alerts", "support_digest", "usage_rollup"]
+__all__ = ["analytics", "balance_snapshots", "notify", "security_alerts", "support_digest", "usage_rollup"]

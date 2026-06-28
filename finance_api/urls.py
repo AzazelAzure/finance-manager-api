@@ -38,6 +38,7 @@ from finance.views.usr_views import UserView
 from finance.views.auth_views import GoogleLogin, GitHubLogin
 from finance.views.report_views import BugReportView
 from finance.views.support_views import SupportTicketView
+from finance.views.balance_views import BalanceHistoryView
 from finance.views.exchange_views import ExchangeRatesMatrixView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -116,6 +117,7 @@ urlpatterns = [
     path("finance/transactions/<str:tx_id>/", TransactionDetailView.as_view(), name="transaction_detail"),
     path("finance/appprofile/", AppProfileView.as_view(), name="appprofile"),
     path("finance/appprofile/snapshot/", AppProfileSnapshotView.as_view(), name="appprofile_snapshot"),
+    path("finance/balance-history/", BalanceHistoryView.as_view(), name="balance_history"),
     path("finance/exchange_rates/", ExchangeRatesMatrixView.as_view(), name="finance_exchange_rates"),
     path("finance/sources/", SourceListCreateView.as_view(), name="sources_list_create"),
     path("finance/sources/<str:source>/", SourceDetailView.as_view(), name="source_detail_update_delete"),

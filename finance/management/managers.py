@@ -257,3 +257,15 @@ class FinancialSnapshotManager(models.QuerySet):
         field_name = f"total_{acc_type.lower()}"
         self.update(**{field_name: total})
 
+
+class BalanceSnapshotManager(models.QuerySet):
+    """Manager for BalanceSnapshot model (F-001 day-end balances)."""
+
+    def for_user(self, uid):
+        """Return snapshots for a single user."""
+        return self.filter(uid=uid)
+
+    def in_date_range(self, start_date, end_date):
+        """Filter snapshots to an inclusive calendar-date range."""
+        return self.filter(snapshot_date__range=[start_date, end_date])
+
