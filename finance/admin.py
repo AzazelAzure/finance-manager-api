@@ -6,6 +6,7 @@ from .models import (
     Transaction,
     Category,
     AppProfile,
+    BalanceSnapshot,
     DailyUsageSnapshot,
     InviteChainEvent,
     SupportTicket,
@@ -20,4 +21,5 @@ admin.site.register(AppProfile)
 admin.site.register(Category)
 admin.site.register(SupportTicket)
 admin.site.register(DailyUsageSnapshot)
+admin.site.register(BalanceSnapshot)
 admin.site.register(InviteChainEvent)

@@ -450,4 +450,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "finance.tasks.security_alerts.check_security_thresholds",
         "schedule": crontab(minute="*/15"),
     },
+    "capture-balance-snapshots": {
+        "task": "finance.tasks.balance_snapshots.capture_balance_snapshots",
+        "schedule": crontab(hour=0, minute=15),
+    },
 }

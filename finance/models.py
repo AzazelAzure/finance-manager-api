@@ -404,6 +404,34 @@ class DailyUsageSnapshot(models.Model):
         return f"usage:{self.date} dau={self.dau_count}"
 
 
+class BalanceSnapshot(models.Model):
+    """Day-end closing balance per payment source (F-001)."""
+
+    objects = BalanceSnapshotManager.as_manager()
+
+    class Meta:
+        ordering = ["-snapshot_date", "source"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uid", "source", "snapshot_date"],
+                name="unique_balance_snapshot_per_source_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["uid", "snapshot_date"], name="balance_snap_uid_date_idx"),
+        ]
+
+    uid = models.CharField(max_length=200, db_index=True)
+    source = models.CharField(max_length=50)
+    snapshot_date = models.DateField()
+    closing_balance = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.CharField(max_length=3, default="USD")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.source}@{self.snapshot_date}: {self.closing_balance} {self.currency}"
+
+
 class InviteChainEvent(models.Model):
     """Invite chain edge for growth analytics (F-014). Populated when invite flow ships."""
 
