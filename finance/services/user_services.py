@@ -26,6 +26,7 @@ from finance.models import (
     FinancialSnapshot,
     PaymentSource,
 )
+from rest_framework.exceptions import ValidationError
 
 @transaction.atomic
 @validator.UserValidator
@@ -63,6 +64,20 @@ def user_update(uid: str, data: dict, *args, **kwargs):
     if data.get('completed_tours') is not None:
         if isinstance(data['completed_tours'], list):
             profile.completed_tours = data['completed_tours']
+    if data.get("sts_window_mode") is not None:
+        profile.sts_window_mode = data["sts_window_mode"]
+    if "pay_cycle_frequency" in data:
+        profile.pay_cycle_frequency = data.get("pay_cycle_frequency")
+    if "pay_cycle_anchor_date" in data:
+        profile.pay_cycle_anchor_date = data.get("pay_cycle_anchor_date")
+    if profile.sts_window_mode == AppProfile.StsWindowMode.PAY_CYCLE:
+        if not profile.pay_cycle_frequency or not profile.pay_cycle_anchor_date:
+            raise ValidationError(
+                "pay_cycle_frequency and pay_cycle_anchor_date are required when sts_window_mode is pay_cycle"
+            )
+    elif profile.sts_window_mode == AppProfile.StsWindowMode.CALENDAR_MONTH:
+        profile.pay_cycle_frequency = None
+        profile.pay_cycle_anchor_date = None
     profile.save()
     update = Updater(profile=profile, sources=sources)
     snapshot = update.user_handler()
@@ -92,6 +107,9 @@ def user_get_info(uid: str, *args, **kwargs):
         'timezone': timezone,
         'start_of_week': start_week,
         'completed_tours': completed_tours,
+        'sts_window_mode': profile.sts_window_mode,
+        'pay_cycle_frequency': profile.pay_cycle_frequency,
+        'pay_cycle_anchor_date': profile.pay_cycle_anchor_date,
         'feature_requests_enabled': getattr(settings, "BETA_FEATURE_REQUESTS_ENABLED", False),
         }
 

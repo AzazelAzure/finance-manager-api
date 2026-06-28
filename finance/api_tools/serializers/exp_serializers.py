@@ -11,6 +11,14 @@ class ExpenseSerializer(serializers.Serializer):
     paid_flag = serializers.BooleanField(required=False)
     currency = serializers.CharField(max_length=3, required=False)
     is_recurring = serializers.BooleanField(required=False)
+    bill_class = serializers.ChoiceField(choices=["rigid", "volatile"], required=False)
+    planned_partial_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    cycle_residual_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    remainder_due_date = serializers.DateField(required=False, allow_null=True)
 
 class ExpensePostSerializer(ExpenseSerializer):
     name = serializers.CharField(max_length=200)
@@ -27,6 +35,14 @@ class ExpensePutSerializer(serializers.Serializer):
     paid_flag = serializers.BooleanField()
     currency = serializers.CharField(max_length=3)
     is_recurring = serializers.BooleanField()
+    bill_class = serializers.ChoiceField(choices=["rigid", "volatile"], required=False)
+    planned_partial_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    cycle_residual_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    remainder_due_date = serializers.DateField(required=False, allow_null=True)
 
 
 class ExpensePatchSerializer(ExpenseSerializer):

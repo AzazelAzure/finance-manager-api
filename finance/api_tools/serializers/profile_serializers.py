@@ -3,10 +3,6 @@ from finance.api_tools.serializers.base_serializers import FinancialSnapshotSeri
 from .tx_serializers import TransactionAcceptedSerializer
 
 
-class AppProfileUpdateSerializer(serializers.Serializer):
-    message = serializers.CharField()
-    snapshot = FinancialSnapshotSerializer()
-
 class AppProfileGetSerializer(serializers.Serializer):
     spend_accounts = serializers.ListField(child=serializers.CharField(max_length=50))
     base_currency = serializers.CharField(max_length=3)
@@ -14,6 +10,19 @@ class AppProfileGetSerializer(serializers.Serializer):
     start_of_week = serializers.IntegerField()
     completed_tours = serializers.ListField(child=serializers.CharField(max_length=200), required=False, allow_null=True)
     feature_requests_enabled = serializers.BooleanField(read_only=True)
+    sts_window_mode = serializers.ChoiceField(choices=["calendar_month", "pay_cycle"])
+    pay_cycle_frequency = serializers.ChoiceField(
+        choices=["weekly", "biweekly", "semimonthly", "monthly"],
+        required=False,
+        allow_null=True,
+    )
+    pay_cycle_anchor_date = serializers.DateField(required=False, allow_null=True)
+
+
+class AppProfileUpdateSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    snapshot = FinancialSnapshotSerializer()
+
 
 class SnapshotSerializer(serializers.Serializer):
     # user_get_totals can return snapshot=None before onboarding/first snapshot row exists
