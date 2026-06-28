@@ -1,3 +1,5 @@
+import json
+
 from datetime import date
 from decimal import Decimal
 
@@ -98,3 +100,40 @@ class TransactionCsvExportTests(UserBase):
     def test_csv_invalid_date_from(self):
         resp = self.client.get(self.url, {"date_from": "not-a-date"})
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class FullBackupExportTests(UserBase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("export_full_backup")
+
+    def test_full_backup_structure(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn("application/json", resp["Content-Type"])
+        self.assertIn("attachment", resp["Content-Disposition"])
+        payload = json.loads(resp.content)
+        self.assertEqual(payload["export_version"], "1")
+        self.assertIn("exported_at", payload)
+        for key in ("profile", "sources", "categories", "tags", "transactions", "upcoming_expenses"):
+            self.assertIn(key, payload)
+        self.assertEqual(str(self.profile.user_id), payload["profile"]["user_id"])
+        self.assertNotIn("password", payload["profile"])
+        self.assertNotIn("email", payload["profile"])
+
+    def test_full_backup_cross_user_isolation(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        payload = json.loads(resp.content)
+        body = json.dumps(payload)
+        self.assertNotIn(self.other_uid, body.replace(str(self.profile.user_id), ""))
+        self.assertNotIn("OTHERTX1", body)
+        self.assertNotIn("other-bill", body)
+        self.assertNotIn("other-cat", body)
+        self.assertNotIn("other-tag", body)
+        self.assertNotIn("other-wallet", body)
+
+    def test_full_backup_unauthenticated(self):
+        self.client.force_authenticate(user=None)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
