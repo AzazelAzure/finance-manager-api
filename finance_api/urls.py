@@ -47,6 +47,7 @@ from finance.views.export_views import (
     ShareTokenRevokeView,
     TransactionCsvExportView,
 )
+from finance.views.goal_views import SavingsGoalDetailView, SavingsGoalListCreateView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -162,4 +163,10 @@ urlpatterns = [
     path("finance/user/", UserView.as_view(), name="user"), 
     path("finance/bug-report/", BugReportView.as_view(), name="bug_report"),
     path("finance/support/tickets/", SupportTicketView.as_view(), name="support_tickets"),
+    path("finance/savings-goals/", SavingsGoalListCreateView.as_view(), name="savings_goals"),
+    path(
+        "finance/savings-goals/<int:pk>/",
+        SavingsGoalDetailView.as_view(),
+        name="savings_goal_detail",
+    ),
 ]
