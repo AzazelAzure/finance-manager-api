@@ -35,10 +35,11 @@ class Calculator:
 
         debt_by_currency = {}
         for item in debts:
+            amount = self._effective_bill_amount(item)
             if item.currency not in debt_by_currency:
-                debt_by_currency[item.currency] = item.amount
+                debt_by_currency[item.currency] = amount
             else:
-                debt_by_currency[item.currency] += item.amount
+                debt_by_currency[item.currency] += amount
 
         # Convert spendable accounts/debts into base currency if necessary
         spend = sum(self._calc_totals(currency, self.base_currency, amount) for currency, amount in spend_by_currency.items())
@@ -46,6 +47,16 @@ class Calculator:
 
         # Return decimal converted spendable accounts minus converted debts
         return Decimal((spend - debt)).quantize(Decimal("0.01"))
+
+    def _effective_bill_amount(self, bill):
+        """Return the obligation amount that should count in the current STS window."""
+        partial = getattr(bill, "planned_partial_amount", None)
+        if partial is not None:
+            return Decimal(partial)
+        residual = getattr(bill, "cycle_residual_amount", None)
+        if residual is not None:
+            return Decimal(residual)
+        return Decimal(getattr(bill, "amount", Decimal("0")))
 
     def calc_leaks(self, tx_list):
         """Absolute transfer imbalance in base currency (fees, rounding, drift).
@@ -86,7 +97,7 @@ class Calculator:
         """
         total = Decimal("0")
         for bill in bills:
-            amt = getattr(bill, "amount", None)
+            amt = self._effective_bill_amount(bill)
             if amt is None:
                 continue
             cur = getattr(bill, "currency", None) or self.base_currency

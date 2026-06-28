@@ -4,6 +4,7 @@ from datetime import datetime
 
 from finance.logic.fincalc import Calculator
 from finance.logic.convert_currency import convert_currency
+from finance.logic.pay_cycle import current_pay_cycle_window
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from finance.models import (
@@ -83,23 +84,30 @@ class Updater:
         return
 
     def _bills_unpaid_due_in_profile_current_month(self):
-        """Unpaid upcoming bills with due_date in the profile's current calendar month.
+        """Unpaid upcoming bills with due_date in the profile's active STS window.
 
-        Must match the intended KPI semantics: *remaining* bills due this month (unpaid)
+        Must match the intended KPI semantics: *remaining* bills due in the STS window (unpaid)
         in base-currency form, and the same set must back *safe to spend* (spendable minus
-        those bills). Use profile timezone for month boundaries (not server UTC day).
+        those bills). Use profile timezone for calendar-month windows (not server UTC day).
         """
         now = datetime.now(self.timezone).date()
-        first_m = now.replace(day=1)
-        next_m = first_m + relativedelta(months=1)
+        if self.profile.sts_window_mode == "pay_cycle":
+            window_start, window_end = current_pay_cycle_window(self.profile, today=now)
+        else:
+            window_start = now.replace(day=1)
+            window_end = window_start + relativedelta(months=1)
         if hasattr(self, "unpaid"):
-            return [b for b in self.unpaid if b.due_date and first_m <= b.due_date < next_m]
+            return [
+                b
+                for b in self.unpaid
+                if b.due_date and window_start <= b.due_date < window_end
+            ]
         upcoming_qs = getattr(self, "upcoming", None) or UpcomingExpense.objects.for_user(self.uid)
         return list(
             upcoming_qs.filter(
                 paid_flag=False,
-                due_date__gte=first_m,
-                due_date__lt=next_m,
+                due_date__gte=window_start,
+                due_date__lt=window_end,
             )
         )
 
