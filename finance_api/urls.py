@@ -40,6 +40,7 @@ from finance.views.report_views import BugReportView
 from finance.views.support_views import SupportTicketView
 from finance.views.balance_views import BalanceHistoryView
 from finance.views.exchange_views import ExchangeRatesMatrixView
+from finance.views.export_views import TransactionCsvExportView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -118,6 +119,11 @@ urlpatterns = [
     path("finance/appprofile/", AppProfileView.as_view(), name="appprofile"),
     path("finance/appprofile/snapshot/", AppProfileSnapshotView.as_view(), name="appprofile_snapshot"),
     path("finance/balance-history/", BalanceHistoryView.as_view(), name="balance_history"),
+    path(
+        "finance/export/transactions/csv/",
+        TransactionCsvExportView.as_view(),
+        name="export_tx_csv",
+    ),
     path("finance/exchange_rates/", ExchangeRatesMatrixView.as_view(), name="finance_exchange_rates"),
     path("finance/sources/", SourceListCreateView.as_view(), name="sources_list_create"),
     path("finance/sources/<str:source>/", SourceDetailView.as_view(), name="source_detail_update_delete"),

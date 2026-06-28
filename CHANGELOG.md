@@ -4,6 +4,7 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 ### Added
+- **F-010 CSV export (T01):** `GET /finance/export/transactions/csv/` returns an authenticated, uid-scoped transaction CSV download with optional `date_from`/`date_to` filters, streaming response, and loguru audit line per export.
 - **F-001 balance history (T01–T03):** `BalanceSnapshot` model (migration `0014`) stores day-end closing balance per payment source. Nightly Celery `capture_balance_snapshots` (UTC 00:15) and `backfill_balance_snapshots` management command populate rows from transaction history. `GET /finance/balance-history/` returns date-range series in the user's base currency (`range`: 7d/30d/90d/all or explicit dates).
 - **F-004 pay-cycle profile schema (T01):** `AppProfile.sts_window_mode` (`calendar_month` default | `pay_cycle`), `pay_cycle_frequency`, and `pay_cycle_anchor_date` for configurable STS windows. Migration `0012_appprofile_pay_cycle_fields`. Legacy users unchanged until they opt into pay-cycle mode.
 - **F-004 bill realism schema (T02):** `UpcomingExpense.bill_class` (`rigid` default | `volatile`), `planned_partial_amount`, `cycle_residual_amount`, `remainder_due_date`, and check constraint `planned_partial_amount <= amount`. Migration `0013_upcomingexpense_bill_realism_fields`.
