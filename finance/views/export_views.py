@@ -1,15 +1,17 @@
 import csv
 import io
+import json
 from datetime import datetime
 
-from django.http import StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
+from django.utils import timezone
 from loguru import logger
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from finance.models import Transaction
+from finance.models import Category, PaymentSource, Tag, Transaction, UpcomingExpense
 
 CSV_HEADERS = [
     "Date",
@@ -108,5 +110,60 @@ class TransactionCsvExportView(APIView):
             row_count,
             date_from_raw or "",
             date_to_raw or "",
+        )
+        return response
+
+
+def _profile_backup_dict(profile) -> dict:
+    return {
+        "user_id": str(profile.user_id),
+        "base_currency": profile.base_currency,
+        "timezone": profile.timezone,
+        "start_of_week": profile.start_of_week,
+        "sts_window_mode": profile.sts_window_mode,
+        "pay_cycle_frequency": profile.pay_cycle_frequency,
+        "pay_cycle_anchor_date": profile.pay_cycle_anchor_date,
+        "spend_accounts": profile.spend_accounts,
+    }
+
+
+class FullBackupExportView(APIView):
+    """Export the authenticated user's full finance dataset as JSON (F-010 T02)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = request.user.appprofile
+        uid = str(profile.user_id)
+
+        transactions = list(Transaction.objects.for_user(uid).order_by("date", "tx_id").values())
+        sources = list(PaymentSource.objects.filter(uid=uid).values())
+        categories = list(Category.objects.filter(uid=uid).values())
+        tags = list(Tag.objects.filter(uid=uid).values())
+        upcoming_expenses = list(UpcomingExpense.objects.filter(uid=uid).order_by("due_date").values())
+
+        payload = {
+            "export_version": "1",
+            "exported_at": timezone.now().isoformat(),
+            "profile": _profile_backup_dict(profile),
+            "sources": sources,
+            "categories": categories,
+            "tags": tags,
+            "transactions": transactions,
+            "upcoming_expenses": upcoming_expenses,
+        }
+
+        today = datetime.now().strftime("%Y%m%d")
+        filename = f"hfm_backup_{today}.json"
+        body = json.dumps(payload, default=str)
+        response = HttpResponse(body, content_type="application/json")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        logger.info(
+            "export_full_backup user={} tx_count={} src_count={} ue_count={}",
+            uid,
+            len(transactions),
+            len(sources),
+            len(upcoming_expenses),
         )
         return response
