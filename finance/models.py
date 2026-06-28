@@ -174,9 +174,17 @@ class UpcomingExpense(models.Model):
     class Meta:
         ordering = ["due_date"]
         constraints = [
-            models.UniqueConstraint(fields=['name', 'uid'], name='unique_upcoming_expense_per_user')
+            models.UniqueConstraint(fields=['name', 'uid'], name='unique_upcoming_expense_per_user'),
+            models.CheckConstraint(
+                condition=models.Q(planned_partial_amount__isnull=True)
+                | models.Q(planned_partial_amount__lte=models.F("amount")),
+                name="upcoming_partial_lte_amount",
+            ),
         ]
 
+    class BillClass(models.TextChoices):
+        RIGID = "rigid", "Rigid"
+        VOLATILE = "volatile", "Volatile"
 
     name = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -191,6 +199,18 @@ class UpcomingExpense(models.Model):
 
     # Boolean for recurring logic
     is_recurring = models.BooleanField(default=False)
+    bill_class = models.CharField(
+        max_length=10,
+        choices=BillClass.choices,
+        default=BillClass.RIGID,
+    )
+    planned_partial_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    cycle_residual_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    remainder_due_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
