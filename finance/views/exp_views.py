@@ -12,7 +12,8 @@ from finance.api_tools.serializers.exp_serializers import(
     ExpensePostSerializer,
     ExpensePutSerializer,
     ExpensePatchSerializer,
-    ExpenseSetReturnSerializer
+    ExpenseSetReturnSerializer,
+    ExpenseCatchUpSerializer,
 )
 from finance.api_tools.serializers.spectactular_serializers import SpectacularExpenseSerializer
 
@@ -146,5 +147,34 @@ class UpcomingExpenseDetailView(APIView):
         result = exp_svc.delete_expense(
             request.user.appprofile.user_id,
             name,
+        )
+        return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        operation_id="finance_upcoming_expenses_catch_up",
+        summary="Catch up an overdue bill",
+        description=(
+            "Advance an overdue upcoming expense by its bill interval. "
+            "Omit ``periods`` to catch up all missed periods (max 24). "
+            "Pass ``periods: 1`` for a single mark-paid-and-advance step."
+        ),
+        request=ExpenseCatchUpSerializer,
+        responses={status.HTTP_200_OK: ExpenseSetReturnSerializer},
+        tags=["Upcoming Expenses"],
+    )
+)
+class UpcomingExpenseCatchUpView(APIView):
+    serializer_class = ExpenseCatchUpSerializer
+
+    def post(self, request, name: str):
+        serializer = ExpenseCatchUpSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        periods = serializer.validated_data.get("periods")
+        result = exp_svc.catch_up_expense(
+            request.user.appprofile.user_id,
+            name,
+            periods=periods,
         )
         return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)

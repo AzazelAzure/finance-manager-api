@@ -20,7 +20,11 @@ from django.contrib.auth import get_user_model
 from django.urls import path, include
 from finance.views.health_views import api_health
 from finance.views.cat_views import CategoryListCreateView, CategoryDetailView
-from finance.views.exp_views import UpcomingExpenseListCreateView, UpcomingExpenseDetailView
+from finance.views.exp_views import (
+    UpcomingExpenseListCreateView,
+    UpcomingExpenseDetailView,
+    UpcomingExpenseCatchUpView,
+)
 from finance.views.profile_views import AppProfileView, AppProfileSnapshotView
 from finance.views.src_views import SourceListCreateView, SourceDetailView
 from finance.views.tag_views import TagView
@@ -116,6 +120,11 @@ urlpatterns = [
     path("finance/sources/", SourceListCreateView.as_view(), name="sources_list_create"),
     path("finance/sources/<str:source>/", SourceDetailView.as_view(), name="source_detail_update_delete"),
     path("finance/upcoming_expenses/", UpcomingExpenseListCreateView.as_view(), name="upcoming_expenses"),
+    path(
+        "finance/upcoming_expenses/<str:name>/catch-up/",
+        UpcomingExpenseCatchUpView.as_view(),
+        name="upcoming_expense_catch_up",
+    ),
     path("finance/upcoming_expenses/<str:name>/", UpcomingExpenseDetailView.as_view(), name="upcoming_expense_detail_update_delete"),
     path("finance/categories/", CategoryListCreateView.as_view(), name="categories"),
     path("finance/categories/<str:cat_name>/", CategoryDetailView.as_view(), name="category_detail_update_delete"),
