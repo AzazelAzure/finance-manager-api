@@ -179,6 +179,10 @@ def _clamp_expires_in_days(raw) -> int:
     return max(1, min(30, days))
 
 
+def _token_audit_label(token) -> str:
+    return f"{str(token)[:8]}..."
+
+
 def _get_active_share_token(token_uuid) -> ExportShareToken | None:
     try:
         share = ExportShareToken.objects.select_related("uid").get(token=token_uuid)
@@ -200,9 +204,9 @@ class ShareTokenCreateView(APIView):
         expires_at = timezone.now() + timedelta(days=expires_in_days)
         share = ExportShareToken.objects.create(uid=profile, expires_at=expires_at)
         logger.info(
-            "share_token_created user={} token={} expires_at={}",
+            "share_token_created user={} token_prefix={} expires_at={}",
             profile.user_id,
-            share.token,
+            _token_audit_label(share.token),
             share.expires_at.isoformat(),
         )
         return Response(
@@ -241,8 +245,8 @@ class ShareTokenAccessView(APIView):
             )
         )
         logger.info(
-            "share_token_accessed token={} tx_count={}",
-            token,
+            "share_token_accessed token_prefix={} tx_count={}",
+            _token_audit_label(token),
             len(transactions),
         )
         return Response(
