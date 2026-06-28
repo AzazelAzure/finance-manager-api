@@ -4,9 +4,12 @@ Profile payload validation helpers.
 
 from rest_framework.exceptions import ValidationError
 
-from finance.models import PaymentSource
+from finance.models import AppProfile, PaymentSource
 from finance.validators.validation_core import _validate_currency, _validate_timezone
 from loguru import logger
+
+_PAY_CYCLE_FREQUENCIES = {c.value for c in AppProfile.PayCycleFrequency}
+_STS_WINDOW_MODES = {c.value for c in AppProfile.StsWindowMode}
 
 
 def validate_profile_update_payload(uid, data):
@@ -44,5 +47,17 @@ def validate_profile_update_payload(uid, data):
     if normalized.get("start_week") is not None:
         if normalized["start_week"] < 0 or normalized["start_week"] > 6:
             raise ValidationError("Start week must be between 0 and 6")
+
+    if normalized.get("sts_window_mode") is not None:
+        mode = str(normalized["sts_window_mode"]).strip().lower()
+        if mode not in _STS_WINDOW_MODES:
+            raise ValidationError("Invalid sts_window_mode")
+        normalized["sts_window_mode"] = mode
+
+    if normalized.get("pay_cycle_frequency") is not None:
+        freq = str(normalized["pay_cycle_frequency"]).strip().lower()
+        if freq not in _PAY_CYCLE_FREQUENCIES:
+            raise ValidationError("Invalid pay_cycle_frequency")
+        normalized["pay_cycle_frequency"] = freq
 
     return normalized, None

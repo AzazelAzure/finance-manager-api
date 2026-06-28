@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from functools import wraps
 
 import zoneinfo
@@ -8,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from finance.logic.updaters import Updater
 from finance.models import UpcomingExpense
 from finance.validators.validation_core import _validate_currency
+
+_BILL_CLASSES = {c.value for c in UpcomingExpense.BillClass}
 
 
 def UpcomingExpenseSetValidator(func):
@@ -149,4 +152,20 @@ def _validate_expense(
         if end_date < today:
             logger.error("End date cannot be in the past (value omitted from logs)")
             raise ValidationError("End date cannot be in the past")
+
+    if data.get("bill_class") is not None:
+        bill_class = str(data["bill_class"]).strip().lower()
+        if bill_class not in _BILL_CLASSES:
+            raise ValidationError("Invalid bill_class")
+        data["bill_class"] = bill_class
+
+    amount = data.get("amount")
+    partial = data.get("planned_partial_amount")
+    if partial is not None:
+        partial_dec = Decimal(str(partial))
+        if partial_dec <= 0:
+            raise ValidationError("planned_partial_amount must be positive")
+        if amount is not None and partial_dec > Decimal(str(amount)):
+            raise ValidationError("planned_partial_amount cannot exceed bill amount")
+
     return data
