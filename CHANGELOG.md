@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 ### Added
 - **F-005 savings goal model (T01):** `SavingsGoal` model (migration `0016`) stores named goals with target amount/date, current amount, optional linked `PaymentSource`, and currency defaulting to USD at the model layer.
+- **F-005 savings goal API (T02):** CRUD at `/finance/savings-goals/` and `/finance/savings-goals/{id}/` with computed `per_cycle_required` based on profile pay-cycle frequency; cross-user access returns 404; `source` validated against the requesting user's payment sources. Bugbot follow-up: reject negative/non-finite `target_amount`/`current_amount`, reject null/blank `name` with 400 (was 500), and round `per_cycle_required` up so a positive remaining balance never reports 0.00.
 - **F-010 CSV export (T01):** `GET /finance/export/transactions/csv/` returns an authenticated, uid-scoped transaction CSV download with optional `date_from`/`date_to` filters, streaming response, and loguru audit line per export.
 - **F-010 full backup export (T02):** `GET /finance/export/full/` returns an authenticated JSON backup (`export_version: "1"`) of profile, sources, categories, tags, transactions, and upcoming expenses scoped to the requesting user.
 - **F-010 share token API (T04):** `ExportShareToken` model (migration `0015`) plus create/access/revoke endpoints for time-limited public transaction JSON snapshots; expired/revoked/unknown tokens return 404.
