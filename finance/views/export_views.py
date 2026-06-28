@@ -3,17 +3,17 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from loguru import logger
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from finance.models import Category, PaymentSource, Tag, Transaction, UpcomingExpense
+from finance.models import Category, ExportShareToken, PaymentSource, Tag, Transaction, UpcomingExpense
 
 CSV_HEADERS = [
     "Date",
@@ -169,3 +169,105 @@ class FullBackupExportView(APIView):
             len(upcoming_expenses),
         )
         return response
+
+
+def _clamp_expires_in_days(raw) -> int:
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return 7
+    return max(1, min(30, days))
+
+
+def _get_active_share_token(token_uuid) -> ExportShareToken | None:
+    try:
+        share = ExportShareToken.objects.select_related("uid").get(token=token_uuid)
+    except ExportShareToken.DoesNotExist:
+        return None
+    if share.revoked or share.expires_at < timezone.now():
+        return None
+    return share
+
+
+class ShareTokenCreateView(APIView):
+    """Create a time-limited share token (F-010 T04)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile = request.user.appprofile
+        expires_in_days = _clamp_expires_in_days(request.data.get("expires_in_days"))
+        expires_at = timezone.now() + timedelta(days=expires_in_days)
+        share = ExportShareToken.objects.create(uid=profile, expires_at=expires_at)
+        logger.info(
+            "share_token_created user={} token={} expires_at={}",
+            profile.user_id,
+            share.token,
+            share.expires_at.isoformat(),
+        )
+        return Response(
+            {"token": str(share.token), "expires_at": share.expires_at.isoformat()},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ShareTokenAccessView(APIView):
+    """Public read-only access to shared transaction snapshot (F-010 T04)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        share = _get_active_share_token(token)
+        if share is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        owner_uid = str(share.uid.user_id)
+        transactions = list(
+            Transaction.objects.for_user(owner_uid)
+            .order_by("date", "tx_id")
+            .values(
+                "date",
+                "description",
+                "amount",
+                "created_on",
+                "category",
+                "source",
+                "currency",
+                "tags",
+                "tx_id",
+                "bill",
+                "tx_type",
+            )
+        )
+        logger.info(
+            "share_token_accessed token={} tx_count={}",
+            token,
+            len(transactions),
+        )
+        return Response(
+            {
+                "shared_by": None,
+                "exported_at": timezone.now().isoformat(),
+                "transactions": transactions,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ShareTokenRevokeView(APIView):
+    """Revoke a share token owned by the authenticated user (F-010 T04)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, token):
+        profile = request.user.appprofile
+        try:
+            share = ExportShareToken.objects.get(token=token)
+        except ExportShareToken.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if share.uid_id != profile.user_id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        share.revoked = True
+        share.save(update_fields=["revoked"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
