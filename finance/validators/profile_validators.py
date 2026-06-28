@@ -2,6 +2,8 @@
 Profile payload validation helpers.
 """
 
+from datetime import date
+
 from rest_framework.exceptions import ValidationError
 
 from finance.models import AppProfile, PaymentSource
@@ -59,5 +61,13 @@ def validate_profile_update_payload(uid, data):
         if freq not in _PAY_CYCLE_FREQUENCIES:
             raise ValidationError("Invalid pay_cycle_frequency")
         normalized["pay_cycle_frequency"] = freq
+
+    if normalized.get("pay_cycle_anchor_date") is not None:
+        try:
+            normalized["pay_cycle_anchor_date"] = date.fromisoformat(
+                str(normalized["pay_cycle_anchor_date"])
+            )
+        except ValueError as exc:
+            raise ValidationError("Invalid pay_cycle_anchor_date") from exc
 
     return normalized, None
