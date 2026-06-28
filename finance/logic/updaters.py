@@ -262,10 +262,13 @@ class Updater:
                 if bill.end_date and datetime.now(self.timezone).date() >= bill.end_date:
                     bill.is_recurring = False
                     bill.paid_flag = True
-                
-                # Recurring expenses roll forward after payment is recorded.
-                if bill.is_recurring:
-                    bill.due_date = bill.due_date + relativedelta(months=1)
+                elif bill.is_recurring:
+                    from finance.logic.bill_recurrence import advance_bill_due_date
+
+                    advance_bill_due_date(bill, periods=1)
+                    bill.paid_flag = False
+                else:
+                    bill.paid_flag = True
 
         # Update whatever was changed
         self.upcoming.bulk_update(to_update, ['paid_flag', 'due_date', 'is_recurring'])

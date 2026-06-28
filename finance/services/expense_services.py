@@ -22,6 +22,12 @@ from loguru import logger
 from finance.api_tools.redaction import payload_keys_preview
 from finance.models import UpcomingExpense, AppProfile
 from datetime import datetime, timedelta # Added for month filtering
+import zoneinfo
+from finance.logic.bill_recurrence import (
+    MAX_CATCH_UP_PERIODS,
+    advance_bill_due_date,
+    periods_behind,
+)
 
 @validator.UserValidator
 @UpcomingExpenseSetValidator
@@ -206,3 +212,45 @@ def get_expense(uid, expense_name: str, *args, **kwargs):
     logger.debug(f"Getting expense: {expense_name} for {uid}")
     expense = kwargs.get("checked")
     return {"expense": expense, "amount": expense.amount}
+
+
+@validator.UserValidator
+@UpcomingExpenseGetValidator
+@transaction.atomic
+def catch_up_expense(uid, expense_name: str, periods: int | None = None, *args, **kwargs):
+    """Mark an overdue bill caught up and advance ``due_date`` by bill interval."""
+    expense = kwargs.get("checked")
+    profile = kwargs.get("profile")
+    upcoming = kwargs.get("upcoming")
+    today = datetime.now(zoneinfo.ZoneInfo(profile.timezone)).date()
+
+    if expense.paid_flag:
+        return {"updated": [expense], "snapshot": None, "periods_advanced": 0}
+
+    if not expense.due_date or expense.due_date >= today:
+        return {"updated": [expense], "snapshot": None, "periods_advanced": 0}
+
+    missed = periods_behind(expense, today, MAX_CATCH_UP_PERIODS)
+    if missed <= 0:
+        return {"updated": [expense], "snapshot": None, "periods_advanced": 0}
+
+    if periods is None:
+        advance_by = missed
+    else:
+        advance_by = min(max(int(periods), 1), MAX_CATCH_UP_PERIODS, missed)
+
+    advance_bill_due_date(expense, periods=advance_by)
+    if expense.is_recurring:
+        expense.paid_flag = False
+    else:
+        expense.paid_flag = True
+
+    expense.save(update_fields=["due_date", "paid_flag", "is_recurring"])
+    update = Updater(profile=profile, upcoming=upcoming)
+    snapshot = update.expense_handler()
+    return {
+        "updated": [expense],
+        "snapshot": snapshot,
+        "periods_advanced": advance_by,
+        "periods_missed": missed,
+    }

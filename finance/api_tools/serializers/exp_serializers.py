@@ -51,6 +51,12 @@ class ExpenseSetReturnSerializer(ExpenseSerializer):
     updated = ExpenseSerializer(many=True, required=False)
     deleted = ExpenseSerializer(many=True, required=False)
     snapshot = FinancialSnapshotSerializer(required=False)
+    periods_advanced = serializers.IntegerField(required=False)
+    periods_missed = serializers.IntegerField(required=False)
+
+
+class ExpenseCatchUpSerializer(serializers.Serializer):
+    periods = serializers.IntegerField(required=False, min_value=1, max_value=24)
 
 
 class ExpenseGetReturnSerializer(serializers.Serializer):
