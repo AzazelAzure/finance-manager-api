@@ -3,6 +3,9 @@
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
 ## [Unreleased]
+### Removed
+- **F-010 share token API (disabled 2026-06-29):** Removed public `POST/GET/DELETE /finance/export/share/` endpoints after privacy review (bearer URL exposed holder's full transaction history). Migration `0018` revokes all outstanding `ExportShareToken` rows. Model retained for audit; CSV and full JSON backup exports unchanged.
+
 ### Added
 - **Bill recurrence engine (T01):** `UpcomingExpense.cadence` (`weekly` | `biweekly` | `semimonthly` | `monthly` | `quarterly` | `annual` | `custom`, default `monthly`) and optional `custom_interval_days` with check constraint requiring positive days when cadence is `custom`. Migration `0017` backfills existing rows from `start_date`/`due_date` deltas.
 - **Bill recurrence engine (T02):** `bill_recurrence.py` advances due dates from explicit `cadence` (semimonthly uses 1st/15th anchors; monthly/quarterly/annual use `relativedelta`). Unit tests in `test_bill_recurrence.py`.

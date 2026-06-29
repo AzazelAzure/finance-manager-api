@@ -140,85 +140,34 @@ class FullBackupExportTests(UserBase):
 
 
 class ShareTokenExportTests(UserBase):
+    """Share endpoints removed 2026-06-29 (privacy exposure); all routes return 404."""
+
     def setUp(self):
         super().setUp()
-        self.create_url = reverse("share_token_create")
         PaymentSource.objects.filter(uid=str(self.profile.user_id), source="cash").update(
             source=f"cash-{self.profile.user_id}"
         )
         PaymentSource.objects.filter(uid=str(self.profile.user_id), source="unknown").update(
             source=f"unknown-{self.profile.user_id}"
         )
-        own_source = PaymentSource.objects.filter(uid=str(self.profile.user_id)).first()
-        TransactionFactory.create(
-            uid=str(self.profile.user_id),
-            date=date(2025, 6, 15),
-            created_on=date(2025, 6, 15),
-            tx_id="2025-06-15-SHARETX1",
-            source=own_source.source if own_source else "wallet",
-            currency="USD",
-            tx_type="EXPENSE",
-            amount=Decimal("12.00"),
-            tags=[],
+
+    def test_share_token_create_disabled(self):
+        resp = self.client.post(
+            "/finance/export/share/",
+            {"expires_in_days": 7},
+            format="json",
         )
-
-    def _create_token(self, expires_in_days=7):
-        resp = self.client.post(self.create_url, {"expires_in_days": expires_in_days}, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        return resp.data
-
-    def test_share_token_create(self):
-        data = self._create_token()
-        self.assertIn("token", data)
-        self.assertIn("expires_at", data)
-
-    def test_share_token_access_valid(self):
-        token = self._create_token()["token"]
-        self.client.force_authenticate(user=None)
-        access_url = reverse("share_token_access", kwargs={"token": token})
-        resp = self.client.get(access_url)
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertIsNone(resp.data["shared_by"])
-        tx_ids = [row["tx_id"] for row in resp.data["transactions"]]
-        self.assertIn("2025-06-15-SHARETX1", tx_ids)
-        self.assertNotIn("OTHERTX1", tx_ids)
-
-    def test_share_token_access_expired(self):
-        from django.utils import timezone
-
-        from finance.models import ExportShareToken
-
-        share = ExportShareToken.objects.create(
-            uid=self.profile,
-            expires_at=timezone.now() - timezone.timedelta(days=1),
-        )
-        self.client.force_authenticate(user=None)
-        access_url = reverse("share_token_access", kwargs={"token": str(share.token)})
-        resp = self.client.get(access_url)
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_share_token_access_revoked(self):
-        token = self._create_token()["token"]
-        revoke_url = reverse("share_token_revoke", kwargs={"token": token})
-        revoke_resp = self.client.delete(revoke_url)
-        self.assertEqual(revoke_resp.status_code, status.HTTP_204_NO_CONTENT)
+    def test_share_token_access_disabled(self):
         self.client.force_authenticate(user=None)
-        access_url = reverse("share_token_access", kwargs={"token": token})
-        resp = self.client.get(access_url)
+        resp = self.client.get(
+            "/finance/export/share/00000000-0000-4000-8000-000000000001/",
+        )
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_share_token_cross_user(self):
-        token = self._create_token()["token"]
-        self.client.force_authenticate(user=None)
-        access_url = reverse("share_token_access", kwargs={"token": token})
-        resp = self.client.get(access_url)
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        tx_ids = [row["tx_id"] for row in resp.data["transactions"]]
-        self.assertNotIn("OTHERTX1", tx_ids)
-
-    def test_share_token_revoke_wrong_owner(self):
-        token = self._create_token()["token"]
-        self.client.force_authenticate(user=self.other_user)
-        revoke_url = reverse("share_token_revoke", kwargs={"token": token})
-        resp = self.client.delete(revoke_url)
+    def test_share_token_revoke_disabled(self):
+        resp = self.client.delete(
+            "/finance/export/share/00000000-0000-4000-8000-000000000001/revoke/",
+        )
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
