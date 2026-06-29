@@ -1,5 +1,25 @@
 from rest_framework import serializers
+
 from finance.api_tools.serializers.base_serializers import FinancialSnapshotSerializer
+from finance.models import UpcomingExpense
+
+_CADENCE_CHOICES = [choice.value for choice in UpcomingExpense.Cadence]
+
+
+def _validate_cadence_fields(attrs, existing_cadence="monthly", existing_days=None):
+    """Validate cadence/custom_interval_days; mutates attrs to clear days when non-custom."""
+    cadence = attrs.get("cadence", existing_cadence)
+    if "custom_interval_days" in attrs:
+        days = attrs.get("custom_interval_days")
+    else:
+        days = existing_days
+    if cadence == "custom" and not (days and days > 0):
+        raise serializers.ValidationError(
+            {"custom_interval_days": "Required and must be > 0 when cadence is 'custom'."}
+        )
+    if cadence != "custom":
+        attrs["custom_interval_days"] = None
+    return attrs
 
 
 class ExpenseSerializer(serializers.Serializer):
@@ -19,6 +39,17 @@ class ExpenseSerializer(serializers.Serializer):
         max_digits=10, decimal_places=2, required=False, allow_null=True
     )
     remainder_due_date = serializers.DateField(required=False, allow_null=True)
+    cadence = serializers.ChoiceField(choices=_CADENCE_CHOICES, required=False)
+    custom_interval_days = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+
+    def validate(self, attrs):
+        existing = self.context.get("existing")
+        existing_cadence = getattr(existing, "cadence", "monthly") if existing else "monthly"
+        existing_days = getattr(existing, "custom_interval_days", None) if existing else None
+        return _validate_cadence_fields(attrs, existing_cadence, existing_days)
+
 
 class ExpensePostSerializer(ExpenseSerializer):
     name = serializers.CharField(max_length=200)
@@ -43,6 +74,16 @@ class ExpensePutSerializer(serializers.Serializer):
         max_digits=10, decimal_places=2, required=False, allow_null=True
     )
     remainder_due_date = serializers.DateField(required=False, allow_null=True)
+    cadence = serializers.ChoiceField(choices=_CADENCE_CHOICES, required=False)
+    custom_interval_days = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+
+    def validate(self, attrs):
+        existing = self.context.get("existing")
+        existing_cadence = getattr(existing, "cadence", "monthly") if existing else "monthly"
+        existing_days = getattr(existing, "custom_interval_days", None) if existing else None
+        return _validate_cadence_fields(attrs, existing_cadence, existing_days)
 
 
 class ExpensePatchSerializer(ExpenseSerializer):
@@ -58,7 +99,7 @@ class ExpensePatchSerializer(ExpenseSerializer):
         recurring_alias = attrs.pop("recurring_flag", None)
         if recurring_alias is not None:
             attrs["is_recurring"] = recurring_alias
-        return attrs
+        return super().validate(attrs)
 
 
 class ExpenseSetReturnSerializer(ExpenseSerializer):
