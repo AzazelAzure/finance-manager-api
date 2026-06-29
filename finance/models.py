@@ -181,11 +181,24 @@ class UpcomingExpense(models.Model):
                 | models.Q(planned_partial_amount__lte=models.F("amount")),
                 name="upcoming_partial_lte_amount",
             ),
+            models.CheckConstraint(
+                condition=~models.Q(cadence="custom") | models.Q(custom_interval_days__gt=0),
+                name="upcoming_custom_requires_interval_days",
+            ),
         ]
 
     class BillClass(models.TextChoices):
         RIGID = "rigid", "Rigid"
         VOLATILE = "volatile", "Volatile"
+
+    class Cadence(models.TextChoices):
+        WEEKLY = "weekly", "Weekly"
+        BIWEEKLY = "biweekly", "Biweekly"
+        SEMIMONTHLY = "semimonthly", "Semi-monthly"
+        MONTHLY = "monthly", "Monthly"
+        QUARTERLY = "quarterly", "Quarterly"
+        ANNUAL = "annual", "Annual"
+        CUSTOM = "custom", "Custom interval"
 
     name = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -212,6 +225,10 @@ class UpcomingExpense(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     remainder_due_date = models.DateField(null=True, blank=True)
+    cadence = models.CharField(
+        max_length=12, choices=Cadence.choices, default=Cadence.MONTHLY
+    )
+    custom_interval_days = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
