@@ -64,6 +64,5 @@ SETUP_RUNBOOK.md
 ### 6. Needless Data
 finance/data/
 finance/logs/
-finance/migrations/
 profiler_html/
 logs/
