@@ -16,6 +16,7 @@ from finance.api_tools.serializers.exp_serializers import(
     ExpenseCatchUpSerializer,
 )
 from finance.api_tools.serializers.spectactular_serializers import SpectacularExpenseSerializer
+from finance.models import UpcomingExpense
 
 @extend_schema_view(    
     post=extend_schema(
@@ -124,7 +125,12 @@ class UpcomingExpenseDetailView(APIView):
         return Response({'expense': serializer.data, 'amount': result['amount']}, status=status.HTTP_200_OK)
 
     def put(self, request, name: str):
-        serializer = ExpensePutSerializer(data=request.data)
+        uid = request.user.appprofile.user_id
+        existing = UpcomingExpense.objects.for_user(uid).filter(name__iexact=str(name).strip()).first()
+        serializer = ExpensePutSerializer(
+            data=request.data,
+            context={"existing": existing},
+        )
         serializer.is_valid(raise_exception=True)
         result = exp_svc.update_expense(
             request.user.appprofile.user_id,
@@ -134,7 +140,13 @@ class UpcomingExpenseDetailView(APIView):
         return Response(ExpenseSetReturnSerializer(result).data, status=status.HTTP_200_OK)
     
     def patch(self, request, name: str):
-        serializer = ExpensePatchSerializer(data=request.data, partial=True)
+        uid = request.user.appprofile.user_id
+        existing = UpcomingExpense.objects.for_user(uid).filter(name__iexact=str(name).strip()).first()
+        serializer = ExpensePatchSerializer(
+            data=request.data,
+            partial=True,
+            context={"existing": existing},
+        )
         serializer.is_valid(raise_exception=True)
         result = exp_svc.update_expense(
             request.user.appprofile.user_id,
