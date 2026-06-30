@@ -3,6 +3,10 @@
 All notable changes to the API codebase must be documented in this file by the executing agent. This provides context to other agents and prevents conflicting work.
 
 ## [Unreleased]
+
+### Changed
+- **README:** Beta cross-repo contract matrix reference reworded — matrix is no longer published in public `design_docs` (private ecosystem workspace).
+
 ### Removed
 - **F-010 share token API (disabled 2026-06-29):** Removed public `POST/GET/DELETE /finance/export/share/` endpoints after privacy review (bearer URL exposed holder's full transaction history). Migration `0018` clears outstanding `ExportShareToken` rows. Model retained for audit; CSV and full JSON backup exports unchanged.
 

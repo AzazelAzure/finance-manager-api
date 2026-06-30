@@ -86,7 +86,7 @@ pytest
 
 - API documentation (Swagger UI): `/api/docs/`
 - OpenAPI schema: `/api/schema/`
-- Beta cross-repo contract matrix: `../design_docs/20_Roadmap/Beta_Contract_Compatibility_Matrix.md`
+- Beta cross-repo contract matrix: maintained in the private ecosystem workspace (no longer published in public `design_docs`).
 - JWT token endpoints:
   - Obtain access/refresh token pair: `/api/token/`
   - Refresh: `/api/token/refresh/`
