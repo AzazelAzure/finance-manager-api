@@ -8,6 +8,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **Support tests (local DX):** Autouse `CELERY_TASK_ALWAYS_EAGER` in root `conftest.py` so support-ticket test modules run without a live Redis/Celery broker; `test_support_logs` patches user confirmation delay alongside operator notify.
 
 ### Changed
+- **Dependencies (2026-07 batch):** Bumped `tzdata` 2026.2, `coverage` 7.14.3, `pytest` 9.1.1, `cryptography` ≥49.0.0, `setuptools` 82.0.1 (single `uv lock` pass; supersedes dependabot PRs #67–#71).
 - **README:** Beta cross-repo contract matrix reference reworded — matrix is no longer published in public `design_docs` (private ecosystem workspace).
 
 ### Removed
