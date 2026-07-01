@@ -31,7 +31,7 @@ class StsPayCycleEngineTests(TransactionBase):
     def _prepare_spend_and_trigger_sources(self):
         spend_source = self.sources[0]
         non_spend_source = self.sources[1]
-        self.profile.spend_accounts = [spend_source.source]
+        self.profile.spend_accounts = [spend_source.source_id]
         self.profile.save(update_fields=["spend_accounts"])
         spend_source.amount = Decimal("1000.00")
         spend_source.currency = str(self.profile.base_currency).upper()

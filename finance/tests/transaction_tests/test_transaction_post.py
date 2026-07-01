@@ -100,7 +100,7 @@ class TransactionPostTestCase(TransactionBase):
         """
         uid = str(self.profile.user_id)
         src = self.sources[0]
-        self.profile.spend_accounts = [src.source]
+        self.profile.spend_accounts = [src.source_id]
         self.profile.save(update_fields=["spend_accounts"])
         src.amount = Decimal("1000.00")
         src.currency = str(self.profile.base_currency).upper()

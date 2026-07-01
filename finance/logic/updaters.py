@@ -9,7 +9,6 @@ from finance.logic.source_linkage import (
     build_source_maps,
     generate_source_id,
     load_source_maps,
-    resolve_name_to_id,
 )
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
@@ -123,14 +122,17 @@ class Updater:
     def fix_tx_data(self, data):
         """Normalize incoming transaction payload fields in-place."""
         maps = build_source_maps(self.sources) if hasattr(self, "sources") and self.sources else load_source_maps(self.uid)
+        name_to_id, id_to_name = maps
         for item in data:
             item['uid'] = self.profile.user_id
             item['amount'] = abs(Decimal(item['amount']))
             item['currency'] = item['currency'].upper()
-            item['source'] = item['source'].lower()
-            resolved = resolve_name_to_id(item['source'], maps)
-            if resolved:
-                item['source'] = resolved
+            raw_source = str(item['source'])
+            if raw_source in id_to_name:
+                item['source'] = raw_source
+            else:
+                lower = raw_source.lower()
+                item['source'] = name_to_id.get(lower, lower)
             if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
                 item['amount'] = item['amount'] * -1
             if not item.get('date'):

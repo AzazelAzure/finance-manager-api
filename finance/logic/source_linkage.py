@@ -68,6 +68,15 @@ def load_source_maps(uid) -> tuple[dict[str, str], dict[str, str]]:
     return build_source_maps(sources)
 
 
+def build_source_check(sources) -> set[str]:
+    """Accept display names and source_ids for transaction source validation."""
+    out: set[str] = set()
+    for src in sources:
+        out.add(src.source)
+        out.add(src.source_id)
+    return out
+
+
 def resolve_transactions_for_api(transactions, maps: tuple[dict[str, str], dict[str, str]]):
     """Replace stored source_id with display name on in-memory transaction rows (API only)."""
     for tx in transactions:

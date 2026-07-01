@@ -8,6 +8,7 @@ from finance.factories import (
 from faker import Faker
 
 from finance.models import Transaction, PaymentSource
+from finance.logic.source_linkage import load_source_maps, resolve_name_to_id, resolve_transactions_for_api
 
 from dateutil.relativedelta import relativedelta
 from django.utils.dateparse import parse_date
@@ -202,6 +203,11 @@ class TransactionBase(BaseTestCase):
                     Decimal(str(accepted_tx[key])).quantize(Decimal("0.01")),
                     Decimal(str(data[key])).quantize(Decimal("0.01")),
                 )
+            elif key == 'source':
+                maps = load_source_maps(self.profile.user_id)
+                expected_id = resolve_name_to_id(str(data['source']).lower(), maps)
+                self.assertEqual(accepted_tx[key], data[key])
+                self.assertIsNotNone(expected_id)
             else:
                 self.assertEqual(accepted_tx[key], data[key])
 
@@ -217,6 +223,10 @@ class TransactionBase(BaseTestCase):
                     Decimal(str(accepted_tx[key])).quantize(Decimal("0.01")),
                     Decimal(str(tx_dict[key])).quantize(Decimal("0.01")),
                 )
+            elif key == 'source':
+                maps = load_source_maps(self.profile.user_id)
+                expected_id = resolve_name_to_id(str(data['source']).lower(), maps)
+                self.assertEqual(tx_dict['source'], expected_id)
             else:
                 self.assertEqual(accepted_tx[key], tx_dict[key])
 
@@ -290,7 +300,9 @@ class TransactionBase(BaseTestCase):
         response_data_by_tx_id = {item['tx_id']: item for item in response.data['accepted']}
         txs = Transaction.objects.for_user(self.profile).filter(tx_id__in=tx_ids)
         from finance.api_tools.serializers.tx_serializers import TransactionAcceptedSerializer
+        maps = load_source_maps(self.profile.user_id)
         for tx in txs:
+            resolve_transactions_for_api([tx], maps)
             expected_data = TransactionAcceptedSerializer(tx).data
             actual_data = response_data_by_tx_id[tx.tx_id]
             for key in expected_data.keys():
