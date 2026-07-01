@@ -7,7 +7,10 @@ from django.core import mail
 from django.test import override_settings
 from rest_framework import status
 from finance.tests.basetest import BaseTestCase
-from finance.tests.support_test_helpers import patch_support_notify_delay
+from finance.tests.support_test_helpers import (
+    patch_support_confirmation_delay,
+    patch_support_notify_delay,
+)
 from finance.models import SupportTicket
 from loguru import logger
 
@@ -17,6 +20,9 @@ class SupportLogsTestCase(BaseTestCase):
         self._notify_patcher = patch_support_notify_delay()
         self._notify_patcher.start()
         self.addCleanup(self._notify_patcher.stop)
+        self._confirm_patcher = patch_support_confirmation_delay()
+        self._confirm_patcher.start()
+        self.addCleanup(self._confirm_patcher.stop)
         from django.core.cache import cache
         cache.clear()
         self.url = reverse("support_tickets")

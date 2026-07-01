@@ -23,3 +23,9 @@ def _seed_test_randomness():
     random.seed(TEST_RANDOM_SEED)
     factory.random.reseed_random(TEST_RANDOM_SEED)
     Faker.seed(TEST_RANDOM_SEED)
+
+
+@pytest.fixture(autouse=True)
+def _celery_tasks_run_eagerly(settings):
+    """Run Celery tasks in-process so support tests do not need a live Redis broker."""
+    settings.CELERY_TASK_ALWAYS_EAGER = True
