@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.urls import reverse
 from rest_framework import status
 
-from finance.models import BalanceSnapshot
+from finance.models import BalanceSnapshot, PaymentSource
 from finance.tests.basetest import BaseTestCase
 
 
@@ -26,17 +26,17 @@ class BalanceHistoryApiTests(BaseTestCase):
         self.assertEqual(resp.data["base_currency"], self.profile.base_currency)
 
     def test_returns_snapshots_in_base_currency(self):
-        source = self.sources.source
+        source_id = self.sources.source_id
         BalanceSnapshot.objects.create(
             uid=self.uid,
-            source=source,
+            source=source_id,
             snapshot_date=date(2026, 1, 10),
             closing_balance=Decimal("100.00"),
             currency="USD",
         )
         BalanceSnapshot.objects.create(
             uid=self.uid,
-            source=source,
+            source=source_id,
             snapshot_date=date(2026, 1, 11),
             closing_balance=Decimal("150.00"),
             currency="USD",
@@ -50,16 +50,25 @@ class BalanceHistoryApiTests(BaseTestCase):
         self.assertEqual(resp.data["series"][0]["currency"], self.profile.base_currency)
 
     def test_source_filter(self):
+        cash_ps = PaymentSource.objects.for_user(self.uid).get_by_source("cash").first()
+        savings_ps = PaymentSource.objects.create(
+            uid=self.uid,
+            source="savings",
+            source_id="2026-01-01-SAVINGS1",
+            acc_type="SAVINGS",
+            amount=Decimal("0"),
+            currency="USD",
+        )
         BalanceSnapshot.objects.create(
             uid=self.uid,
-            source="cash",
+            source=cash_ps.source_id,
             snapshot_date=date(2026, 2, 1),
             closing_balance=Decimal("10.00"),
             currency="USD",
         )
         BalanceSnapshot.objects.create(
             uid=self.uid,
-            source="savings",
+            source=savings_ps.source_id,
             snapshot_date=date(2026, 2, 1),
             closing_balance=Decimal("20.00"),
             currency="USD",

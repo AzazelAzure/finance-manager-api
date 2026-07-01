@@ -15,6 +15,7 @@ from django.forms.models import model_to_dict
 from rest_framework.exceptions import ValidationError
 
 import zoneinfo
+from finance.logic.source_linkage import build_source_check
 from finance.logic.updaters import Updater
 from finance.models import AppProfile, Category, PaymentSource, Tag, Transaction, UpcomingExpense
 from finance.validators.validation_core import _validate_currency
@@ -209,7 +210,7 @@ def TransactionValidator(func):
         upcoming = upcoming_obj if isinstance(upcoming_obj, list) else list(upcoming_obj)
         upcoming_check = {u.name for u in upcoming}
 
-        source_check = kwargs.get("source_check") or {s.source for s in sources}
+        source_check = kwargs.get("source_check") or build_source_check(sources)
         # `cat_check` is loaded lazily only when needed by validation.
         cat_check = set()
         kwargs["source_check"] = source_check

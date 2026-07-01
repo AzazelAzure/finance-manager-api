@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from finance.models import Category, PaymentSource, Tag, Transaction, UpcomingExpense
+from finance.logic.source_linkage import ids_to_names, load_source_maps, resolve_id_to_name
 
 CSV_HEADERS = [
     "Date",
@@ -47,12 +48,13 @@ def _format_tags(tags) -> str:
     return str(tags)
 
 
-def _transaction_csv_row(tx: Transaction) -> list:
+def _transaction_csv_row(tx: Transaction, maps) -> list:
+    display_source = resolve_id_to_name(tx.source, maps) or tx.source or ""
     return [
         tx.date.isoformat(),
         str(tx.amount),
         tx.currency or "",
-        tx.source or "",
+        display_source,
         tx.category or "",
         _format_tags(tx.tags),
         tx.description or "",
@@ -86,6 +88,7 @@ class TransactionCsvExportView(APIView):
             queryset = queryset.filter(date__lte=date_to)
 
         row_count = queryset.count()
+        maps = load_source_maps(uid)
 
         def csv_rows():
             buffer = io.StringIO()
@@ -96,7 +99,7 @@ class TransactionCsvExportView(APIView):
             buffer.truncate(0)
 
             for tx in queryset.iterator():
-                writer.writerow(_transaction_csv_row(tx))
+                writer.writerow(_transaction_csv_row(tx, maps))
                 yield buffer.getvalue()
                 buffer.seek(0)
                 buffer.truncate(0)
@@ -117,15 +120,18 @@ class TransactionCsvExportView(APIView):
 
 
 def _profile_backup_dict(profile) -> dict:
+    uid = str(profile.user_id)
+    maps = load_source_maps(uid)
+    spend = profile.spend_accounts or []
     return {
-        "user_id": str(profile.user_id),
+        "user_id": uid,
         "base_currency": profile.base_currency,
         "timezone": profile.timezone,
         "start_of_week": profile.start_of_week,
         "sts_window_mode": profile.sts_window_mode,
         "pay_cycle_frequency": profile.pay_cycle_frequency,
         "pay_cycle_anchor_date": profile.pay_cycle_anchor_date,
-        "spend_accounts": profile.spend_accounts,
+        "spend_accounts": ids_to_names(spend, maps) if spend else [],
     }
 
 
@@ -139,6 +145,11 @@ class FullBackupExportView(APIView):
         uid = str(profile.user_id)
 
         transactions = list(Transaction.objects.for_user(uid).order_by("date", "tx_id").values())
+        maps = load_source_maps(uid)
+        for row in transactions:
+            display = resolve_id_to_name(row.get("source"), maps)
+            if display is not None:
+                row["source"] = display
         sources = list(PaymentSource.objects.filter(uid=uid).values())
         categories = list(Category.objects.filter(uid=uid).values())
         tags = list(Tag.objects.filter(uid=uid).values())

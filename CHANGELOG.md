@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 
 ### Fixed
+- **Payment source linkage standardization (T01):** Added stable `PaymentSource.source_id` and migrated transaction, balance snapshot, savings goal, and `spend_accounts` linkage to store `source_id` internally while API JSON continues to expose display names. Renaming a payment source no longer breaks linked rows on the four surfaces.
 - **Support tests (local DX):** Autouse `CELERY_TASK_ALWAYS_EAGER` in root `conftest.py` so support-ticket test modules run without a live Redis/Celery broker; `test_support_logs` patches user confirmation delay alongside operator notify.
 - **Bill↔transaction linkage (cadence-aware reversal):** `Updater._handle_tx_update` now rolls recurring bill `due_date` backward using the same cadence table as `advance_bill_due_date` (weekly/biweekly/semimonthly/monthly/quarterly/annual/custom) instead of a hardcoded one-month step — fixes non-monthly bills desyncing when a linked transaction is edited or deleted.
 

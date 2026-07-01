@@ -7,6 +7,7 @@ from datetime import date
 from rest_framework.exceptions import ValidationError
 
 from finance.models import AppProfile, PaymentSource
+from finance.logic.source_linkage import names_to_ids
 from finance.validators.validation_core import _validate_currency, _validate_timezone
 from loguru import logger
 
@@ -37,8 +38,10 @@ def validate_profile_update_payload(uid, data):
             if item not in source_check:
                 logger.error(f"Source does not exist: {item}")
                 raise ValidationError("Source does not exist")
+        from finance.logic.source_linkage import build_source_maps
 
-        normalized["spend_accounts"] = spend_accounts
+        maps = build_source_maps(sources)
+        normalized["spend_accounts"] = names_to_ids(spend_accounts, maps)
 
     if normalized.get("timezone") is not None:
         normalized["timezone"] = _validate_timezone(normalized["timezone"])

@@ -9,6 +9,7 @@ from django.db.models import Count, Sum
 from loguru import logger
 from rest_framework.exceptions import ValidationError
 from finance.models import Transaction, UpcomingExpense, AppProfile, FinancialSnapshot, PaymentSource
+from finance.logic.source_linkage import load_source_maps, resolve_name_to_id, resolve_transactions_for_api
 import copy
 from decimal import Decimal
 from types import SimpleNamespace
@@ -38,6 +39,11 @@ def get_transactions(uid,**kwargs):
     fc = Calculator(profile)
 
     filter_kwargs = {k: v for k, v in kwargs.items() if k not in _GET_TX_IGNORE_KEYS}
+    if filter_kwargs.get("source"):
+        maps = load_source_maps(uid)
+        source_id = resolve_name_to_id(str(filter_kwargs["source"]).lower(), maps)
+        if source_id:
+            filter_kwargs["source"] = source_id
     # Use shared filtering logic
     queryset = apply_transaction_filters(queryset, **filter_kwargs)
 
@@ -94,8 +100,12 @@ def get_transactions(uid,**kwargs):
         k: v.quantize(quant) for k, v in sorted(cat_totals.items(), key=lambda item: item[1], reverse=True)
     }
 
+    tx_list = list(queryset)
+    maps = load_source_maps(uid)
+    resolve_transactions_for_api(tx_list, maps)
+
     return {
-        "transactions": queryset,
+        "transactions": tx_list,
         "total_expenses": total_expenses.quantize(quant),
         "total_income": total_income.quantize(quant),
         "total_transfer_out": total_transfer_out.quantize(quant),
@@ -119,12 +129,16 @@ def add_transaction(uid, data, *args, **kwargs):
         to_update = Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
         update = Updater(profile=profile, transactions=to_update, upcoming=upcoming, sources=sources)
         snapshot = update.transaction_handler()
+        maps = load_source_maps(uid)
+        resolve_transactions_for_api(to_update, maps)
         return {'accepted': to_update, 'rejected': rejected, 'snapshot': snapshot}
     else:
         logger.debug(f"Creating single transaction for {uid}")
         tx = [Transaction.objects.create(**data)]
         update = Updater(profile=profile, transactions=tx, upcoming=upcoming, sources=sources)
         snapshot = update.transaction_handler()
+        maps = load_source_maps(uid)
+        resolve_transactions_for_api(tx, maps)
         return {'accepted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
@@ -172,6 +186,8 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     if not needs_recalc:
         tx.refresh_from_db()
         snapshot = FinancialSnapshot.objects.for_user(uid).first()
+        maps = load_source_maps(uid)
+        resolve_transactions_for_api([tx], maps)
         return {"updated": [tx], "snapshot": snapshot}
 
     new_tx = copy.copy(tx)
@@ -184,6 +200,8 @@ def update_transaction(uid, tx_id: str, data: dict, *args, **kwargs):
     snapshot = update.transaction_handler(update=prior_for_reversal)
     # Reload so the API returns persisted values (signed amounts, etc.).
     tx.refresh_from_db()
+    maps = load_source_maps(uid)
+    resolve_transactions_for_api([tx], maps)
     return {"updated": [tx], "snapshot": snapshot}
 
 @validator.UserValidator
@@ -224,6 +242,8 @@ def get_transaction(uid, tx_id: str, *args, **kwargs):
     """Return a single transaction row and its amount."""
     logger.debug(f"Fetching transaction {tx_id} for {uid}")
     tx = kwargs.get('id_check', Transaction.objects.for_user(uid).get_tx(tx_id).first())
+    maps = load_source_maps(uid)
+    resolve_transactions_for_api([tx], maps)
     return {'transaction': tx, 'amount': tx.amount}
 
 

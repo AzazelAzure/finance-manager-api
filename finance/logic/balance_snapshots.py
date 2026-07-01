@@ -8,6 +8,7 @@ import zoneinfo
 
 from finance.logic.convert_currency import convert_currency
 from finance.logic.fincalc import Calculator
+from finance.logic.source_linkage import load_source_maps, resolve_id_to_name, resolve_name_to_id
 from finance.models import AppProfile, BalanceSnapshot, PaymentSource, Transaction
 
 
@@ -22,15 +23,15 @@ def _convert_amount(amount, from_currency: str, to_currency: str) -> Decimal:
 
 
 def _opening_balances_by_source(uid: str) -> tuple[dict[str, Decimal], dict[str, PaymentSource]]:
-    """Return per-source opening balance (amount not explained by persisted transactions)."""
+    """Return per-source_id opening balance (amount not explained by persisted transactions)."""
     sources = list(PaymentSource.objects.for_user(uid))
-    source_map = {source.source: source for source in sources}
+    source_map = {source.source_id: source for source in sources}
     openings: dict[str, Decimal] = {}
     for source in sources:
         tx_sum = Decimal("0.00")
-        for tx in Transaction.objects.for_user(uid).filter(source=source.source):
+        for tx in Transaction.objects.for_user(uid).filter(source=source.source_id):
             tx_sum += _convert_amount(tx.amount, tx.currency, source.currency)
-        openings[source.source] = _quantize(Decimal(source.amount) - tx_sum)
+        openings[source.source_id] = _quantize(Decimal(source.amount) - tx_sum)
     return openings, source_map
 
 
@@ -59,13 +60,13 @@ def persist_snapshots_for_date(uid: str, snapshot_date: date) -> int:
     """Upsert day-end rows for every payment source. Returns rows written."""
     balances, source_map = closing_balances_as_of(uid, snapshot_date)
     written = 0
-    for source_name, balance in balances.items():
-        source = source_map.get(source_name)
+    for source_id, balance in balances.items():
+        source = source_map.get(source_id)
         if source is None:
             continue
         BalanceSnapshot.objects.update_or_create(
             uid=uid,
-            source=source_name,
+            source=source_id,
             snapshot_date=snapshot_date,
             defaults={
                 "closing_balance": _quantize(balance),
@@ -111,6 +112,7 @@ def get_balance_history(
     end_date: date | None = None,
 ) -> dict:
     """Return serialized balance history in the user's base currency."""
+    maps = load_source_maps(uid)
     start, end = resolve_date_range(
         profile,
         range_preset=range_preset,
@@ -122,7 +124,9 @@ def get_balance_history(
         qs = qs.filter(snapshot_date__gte=start)
     qs = qs.filter(snapshot_date__lte=end)
     if source:
-        qs = qs.filter(source=source.strip().lower())
+        source_id = resolve_name_to_id(source.strip(), maps)
+        if source_id:
+            qs = qs.filter(source=source_id)
 
     calculator = Calculator(profile)
     base_currency = calculator.base_currency
@@ -133,10 +137,11 @@ def get_balance_history(
                 calculator._calc_totals(row.currency, base_currency, row.closing_balance),
             ),
         )
+        display_source = resolve_id_to_name(row.source, maps) or row.source
         series.append(
             {
                 "date": row.snapshot_date.isoformat(),
-                "source": row.source,
+                "source": display_source,
                 "amount": str(amount_base),
                 "currency": base_currency,
             },

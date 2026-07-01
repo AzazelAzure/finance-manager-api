@@ -5,6 +5,11 @@ from datetime import datetime
 from finance.logic.fincalc import Calculator
 from finance.logic.convert_currency import convert_currency
 from finance.logic.pay_cycle import current_pay_cycle_window
+from finance.logic.source_linkage import (
+    build_source_maps,
+    generate_source_id,
+    load_source_maps,
+)
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from finance.models import (
@@ -57,7 +62,9 @@ class Updater:
                 self.unpaid = [b for b in self.upcoming if not b.paid_flag]
             else:
                 self.unpaid = list(self.upcoming.filter(paid_flag=False))
-            self.spend_accounts = list(source for source in self.sources if source.source in self.spend_accounts)
+            self.spend_accounts = list(
+                source for source in self.sources if source.source_id in self.spend_accounts
+            )
             
         if kwargs.get('sources'):
             self.sources = kwargs.get('sources')
@@ -114,11 +121,18 @@ class Updater:
     # Data fixers
     def fix_tx_data(self, data):
         """Normalize incoming transaction payload fields in-place."""
+        maps = build_source_maps(self.sources) if hasattr(self, "sources") and self.sources else load_source_maps(self.uid)
+        name_to_id, id_to_name = maps
         for item in data:
             item['uid'] = self.profile.user_id
             item['amount'] = abs(Decimal(item['amount']))
             item['currency'] = item['currency'].upper()
-            item['source'] = item['source'].lower()
+            raw_source = str(item['source'])
+            if raw_source in id_to_name:
+                item['source'] = raw_source
+            else:
+                lower = raw_source.lower()
+                item['source'] = name_to_id.get(lower, lower)
             if item['tx_type'] in ['EXPENSE', 'XFER_OUT']:
                 item['amount'] = item['amount'] * -1
             if not item.get('date'):
@@ -138,10 +152,13 @@ class Updater:
 
     def fix_source_data(self, data):
         """Normalize incoming source payload fields in-place."""
+        today = datetime.now(self.timezone).date()
         for item in data:
             item['uid'] = self.profile.user_id
             item['source'] = item['source'].lower()
             item['acc_type'] = item['acc_type'].upper()
+            if not item.get('source_id'):
+                item['source_id'] = generate_source_id(today)
             if item.get('currency'):
                 item['currency'] = item['currency'].upper()
             if item.get('amount'):
@@ -178,8 +195,8 @@ class Updater:
 
         src_amounts = self.fc.calc_tx_sources(self.transactions, self.sources)
         for source in self.sources:
-            if source.source in src_amounts:
-                source.amount = src_amounts[source.source]
+            if source.source_id in src_amounts:
+                source.amount = src_amounts[source.source_id]
         PaymentSource.objects.for_user(self.uid).bulk_update(self.sources, ['amount'])
         snapshot = self._tx_snapshot_handler()
         return snapshot
@@ -194,7 +211,7 @@ class Updater:
                 txs.update(bill=new_name)
             else:
                 txs.update(bill='unknown')
-        accounts = [source for source in self.sources if source.source in self.spend_accounts]
+        accounts = [source for source in self.sources if source.source_id in self.spend_accounts]
         debts = self._bills_unpaid_due_in_profile_current_month()
         self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.total_remaining_expenses = self.fc.calc_upcoming_bills_base_total(debts)
@@ -230,7 +247,7 @@ class Updater:
 
         # calc_acc_types mutates balances in memory; use DB-fresh rows for STS / assets.
         fresh_sources = list(PaymentSource.objects.for_user(self.uid))
-        accounts = [s for s in fresh_sources if s.source in self.spend_accounts]
+        accounts = [s for s in fresh_sources if s.source_id in self.spend_accounts]
         debts = self._bills_unpaid_due_in_profile_current_month()
         self.snapshots.safe_to_spend = self.fc.calc_sts(accounts, debts)
         self.snapshots.total_assets = self.fc.calc_total_assets(fresh_sources)
@@ -254,7 +271,7 @@ class Updater:
         fresh_sources = list(PaymentSource.objects.for_user(self.uid))
         debts = self._bills_unpaid_due_in_profile_current_month()
         spend_accounts = [
-            s for s in fresh_sources if s.source in self.spend_accounts
+            s for s in fresh_sources if s.source_id in self.spend_accounts
         ]
         self.snapshots.safe_to_spend = self.fc.calc_sts(spend_accounts, debts)
         self.snapshots.total_assets = self.fc.calc_total_assets(fresh_sources)
@@ -308,7 +325,7 @@ class Updater:
                 affected_bill.save()
             else:
                 append_change = affected_bill
-        affected_source = next((source for source in self.sources if source.source == tx.source), None)
+        affected_source = next((source for source in self.sources if source.source_id == tx.source), None)
         if affected_source:
             # Undo the same delta calc_tx_sources applies when the row was added (per-source currency).
             delta = Decimal(tx.amount).quantize(Decimal("0.01"))
@@ -332,7 +349,7 @@ class Updater:
         # user_handler: reload DB rows before total_assets and safe_to_spend.
         fresh_sources = list(PaymentSource.objects.for_user(self.uid))
         spend_names = self.profile.spend_accounts
-        spend_accounts = [s for s in fresh_sources if s.source in spend_names]
+        spend_accounts = [s for s in fresh_sources if s.source_id in spend_names]
         self.snapshots.total_assets = self.fc.calc_total_assets(fresh_sources)
         self.snapshots.safe_to_spend = self.fc.calc_sts(spend_accounts, bills)
         self.snapshots.total_leaks = self.fc.calc_leaks(transfers) if transfers else Decimal("0.00")

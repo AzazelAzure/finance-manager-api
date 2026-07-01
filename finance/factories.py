@@ -1,8 +1,10 @@
 import factory
 import django.utils.timezone
+from datetime import date
 from django.contrib.auth.models import User
 from django.conf import settings
 from finance.models import *
+from finance.logic.source_linkage import generate_source_id
 from factory import fuzzy, LazyAttribute
 from faker import Faker
 from decimal import Decimal
@@ -33,6 +35,7 @@ class PaymentSourceFactory(factory.django.DjangoModelFactory):
         model = PaymentSource
 
     uid = factory.Faker("uuid4")
+    source_id = factory.LazyAttribute(lambda o: generate_source_id(date.today()))
     source = factory.Sequence(lambda n: f"source-{n}")
     acc_type = factory.Faker("random_element", elements=("SAVINGS", "CHECKING", "CASH", "INVESTMENT", "EWALLET", "UNKNOWN"))
     amount = LazyAttribute(
@@ -56,10 +59,17 @@ class TransactionFactory(factory.django.DjangoModelFactory):
     description = factory.Sequence(lambda n: f"tx-{n}")
     amount = LazyAttribute(
         lambda o: _faker.pydecimal(left_digits=5, right_digits=2).quantize(Decimal("0.01")))
-    source = factory.Faker("word")
+    source = factory.LazyAttribute(lambda o: generate_source_id(date.today()))
     currency = fuzzy.FuzzyChoice(settings.SUPPORTED_CURRENCIES)
     tx_type = factory.Faker("random_element", elements=("EXPENSE", "INCOME", "XFER_OUT", "XFER_IN"))
     bill = factory.Faker("word")
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        src = kwargs.get("source")
+        if isinstance(src, PaymentSource):
+            kwargs["source"] = src.source_id
+        return super()._create(model_class, *args, **kwargs)
 
 
 class CategoryFactory(factory.django.DjangoModelFactory):

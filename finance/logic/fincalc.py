@@ -176,11 +176,11 @@ class Calculator:
         return acctype_totals
 
     def calc_tx_sources(self, tx_list, source_list):
-        """Apply transactions to source balances and return per-source totals."""
-        source_aggregate ={}
-        source_map = {source.source: source for source in source_list}
-        for source in source_list: 
-            source_aggregate[source.source] = Decimal(source.amount).quantize(Decimal("0.01"))
+        """Apply transactions to source balances and return per-source_id totals."""
+        source_aggregate = {}
+        source_map = {source.source_id: source for source in source_list}
+        for source in source_list:
+            source_aggregate[source.source_id] = Decimal(source.amount).quantize(Decimal("0.01"))
         for tx in tx_list:
             amount_to_add = tx.amount
             # Convert each transaction into the target source currency before applying.
