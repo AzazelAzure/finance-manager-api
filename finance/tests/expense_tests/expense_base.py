@@ -42,10 +42,10 @@ class ExpenseBase(BaseTestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         return response
 
-    def create_linked_expense_transaction(self, bill_name: str):
+    def create_linked_expense_transaction(self, bill_name: str, payment_date: date | None = None):
         source_obj = PaymentSource.objects.for_user(self.profile.user_id).first()
         tx_payload = {
-            "date": str(date.today()),
+            "date": str(payment_date or date.today()),
             "description": "expense payment",
             "amount": "25.00",
             "source": source_obj.source,

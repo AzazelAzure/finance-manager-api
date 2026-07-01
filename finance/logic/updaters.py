@@ -165,8 +165,17 @@ class Updater:
         updated_bill = False
         if update:
             updated_bill = self._handle_tx_update(update)
-        if self.paid_bills:
+
+        bills_to_settle = self.paid_bills
+        if update and update.bill:
+            # PATCH reversal already rolled back the prior payment; do not re-advance.
+            bills_to_settle = self.paid_bills - {update.bill}
+
+        if bills_to_settle:
             self._handle_upcoming(updated_bill)
+        elif updated_bill:
+            updated_bill.save()
+
         src_amounts = self.fc.calc_tx_sources(self.transactions, self.sources)
         for source in self.sources:
             if source.source in src_amounts:
@@ -287,9 +296,12 @@ class Updater:
         append_change = False
         affected_bill = next((bill for bill in self.unpaid if bill.name == tx.bill), None)
         if affected_bill:
-            if affected_bill.due_date - relativedelta(months=1) <= tx.date:
+            from finance.logic.bill_recurrence import subtract_interval_from_date
+
+            prior_due = subtract_interval_from_date(affected_bill.due_date, affected_bill, periods=1)
+            if prior_due <= tx.date:
                 affected_bill.paid_flag = False
-                affected_bill.due_date = affected_bill.due_date - relativedelta(months=1)
+                affected_bill.due_date = prior_due
             if affected_bill.end_date and affected_bill.due_date <= affected_bill.end_date:
                 affected_bill.is_recurring = True
             if not self.paid_bills:

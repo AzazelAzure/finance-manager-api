@@ -66,6 +66,42 @@ def _advance_one_period(due: date, bill: UpcomingExpense) -> date:
     return due + step
 
 
+def _last_of_prev_month(due: date) -> date:
+    first = date(due.year, due.month, 1)
+    return first - timedelta(days=1)
+
+
+def _retreat_semimonthly(due: date) -> date:
+    """Inverse of ``_advance_semimonthly`` for one cadence step backward."""
+    day = due.day
+    if day == _SEMIMONTHLY_ANCHORS[1]:
+        return date(due.year, due.month, _SEMIMONTHLY_ANCHORS[0])
+    if day == _SEMIMONTHLY_ANCHORS[0]:
+        prev = _last_of_prev_month(due)
+        return date(prev.year, prev.month, _SEMIMONTHLY_ANCHORS[1])
+    if day > _SEMIMONTHLY_ANCHORS[1]:
+        return date(due.year, due.month, _SEMIMONTHLY_ANCHORS[1])
+    if day > _SEMIMONTHLY_ANCHORS[0]:
+        return date(due.year, due.month, _SEMIMONTHLY_ANCHORS[0])
+    prev = _last_of_prev_month(due)
+    return date(prev.year, prev.month, _SEMIMONTHLY_ANCHORS[1])
+
+
+def _retreat_one_period(due: date, bill: UpcomingExpense) -> date:
+    if bill.cadence == "semimonthly":
+        return _retreat_semimonthly(due)
+    step = bill_interval_step(bill)
+    return due - step
+
+
+def subtract_interval_from_date(due: date, bill: UpcomingExpense, periods: int = 1) -> date:
+    """Move ``due`` backward by ``periods`` cadence steps (mirror of ``add_interval_to_date``)."""
+    result = due
+    for _ in range(max(periods, 0)):
+        result = _retreat_one_period(result, bill)
+    return result
+
+
 def add_interval_to_date(due: date, bill: UpcomingExpense, periods: int = 1) -> date:
     result = due
     for _ in range(max(periods, 0)):
@@ -89,3 +125,10 @@ def advance_bill_due_date(bill: UpcomingExpense, periods: int = 1) -> None:
     if not bill.due_date:
         return
     bill.due_date = add_interval_to_date(bill.due_date, bill, periods)
+
+
+def retreat_bill_due_date(bill: UpcomingExpense, periods: int = 1) -> None:
+    """Roll ``due_date`` backward by ``periods`` (inverse of ``advance_bill_due_date``)."""
+    if not bill.due_date:
+        return
+    bill.due_date = subtract_interval_from_date(bill.due_date, bill, periods)
