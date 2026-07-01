@@ -1,6 +1,0 @@
-smoke_test: SMOKE-API-003-SEQ
-plan: P-SMOKE
-branch: smoke/api-003-seq
-agent: claude-ws1
-dispatched: 2026-07-01T05:02
-status: PASS
