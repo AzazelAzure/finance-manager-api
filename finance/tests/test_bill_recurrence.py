@@ -10,6 +10,8 @@ from finance.logic.bill_recurrence import (
     add_interval_to_date,
     advance_bill_due_date,
     periods_behind,
+    retreat_bill_due_date,
+    subtract_interval_from_date,
 )
 
 
@@ -106,6 +108,15 @@ class TestCatchUpAndAdvance:
         bill = _bill("weekly", date(2026, 6, 1))
         advance_bill_due_date(bill, periods=2)
         assert bill.due_date == date(2026, 6, 15)
+
+    def test_retreat_mirrors_advance_weekly(self):
+        bill = _bill("weekly", date(2026, 6, 8))
+        assert subtract_interval_from_date(date(2026, 6, 8), bill, 1) == date(2026, 6, 1)
+
+    def test_retreat_bill_due_date_mutates(self):
+        bill = _bill("weekly", date(2026, 6, 15))
+        retreat_bill_due_date(bill, periods=2)
+        assert bill.due_date == date(2026, 6, 1)
 
     def test_max_catch_up_constant(self):
         assert MAX_CATCH_UP_PERIODS == 24
