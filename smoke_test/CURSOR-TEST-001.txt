@@ -1,0 +1,6 @@
+smoke_test: CURSOR-TEST-001
+plan: P-SMOKE
+branch: smoke/cursor-test-001
+agent: cursor-ws1
+dispatched: 2026-07-01T05:26
+status: PASS
