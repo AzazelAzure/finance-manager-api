@@ -35,14 +35,14 @@ class BalanceSnapshotPopulationTests(BaseTestCase):
         self.assertEqual(resp.status_code, 201)
 
         balances, _ = closing_balances_as_of(self.uid, date(2026, 1, 10))
-        self.assertEqual(balances[source.source], Decimal("100.00"))
+        self.assertEqual(balances[source.source_id], Decimal("100.00"))
 
     def test_persist_snapshots_idempotent(self):
         source = PaymentSource.objects.for_user(self.uid).first()
         snapshot_date = date(2026, 1, 15)
         BalanceSnapshot.objects.create(
             uid=self.uid,
-            source=source.source,
+            source=source.source_id,
             snapshot_date=snapshot_date,
             closing_balance=Decimal("10.00"),
             currency=source.currency,

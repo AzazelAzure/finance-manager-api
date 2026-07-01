@@ -5,7 +5,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from finance.models import PaymentSource, SavingsGoal
+from finance.models import SavingsGoal
+from finance.logic.source_linkage import load_source_maps, resolve_id_to_name, resolve_name_to_id
 
 CYCLES_PER_YEAR = {
     "weekly": 52,
@@ -31,6 +32,8 @@ def compute_per_cycle_required(goal, profile) -> Decimal:
 
 
 def _goal_payload(goal, profile) -> dict:
+    maps = load_source_maps(str(profile.user_id))
+    source_name = resolve_id_to_name(goal.source, maps) if goal.source else None
     return {
         "id": goal.id,
         "name": goal.name,
@@ -38,7 +41,7 @@ def _goal_payload(goal, profile) -> dict:
         "current_amount": str(goal.current_amount),
         "currency": goal.currency,
         "target_date": goal.target_date.isoformat(),
-        "source": goal.source.source if goal.source else None,
+        "source": source_name,
         "per_cycle_required": str(compute_per_cycle_required(goal, profile)),
     }
 
@@ -70,14 +73,15 @@ def _parse_date(value, field_name: str) -> date:
         raise ValueError(f"{field_name} must be a valid ISO date") from exc
 
 
-def _resolve_source(profile, source_name):
+def _resolve_source_id(profile, source_name):
     if source_name is None:
         return None
     uid = str(profile.user_id)
-    try:
-        return PaymentSource.objects.get(uid=uid, source=source_name)
-    except PaymentSource.DoesNotExist as exc:
-        raise ValueError("source not found for this user") from exc
+    maps = load_source_maps(uid)
+    source_id = resolve_name_to_id(str(source_name).lower(), maps)
+    if not source_id:
+        raise ValueError("source not found for this user")
+    return source_id
 
 
 class SavingsGoalListCreateView(APIView):
@@ -103,7 +107,7 @@ class SavingsGoalListCreateView(APIView):
             target_amount = _parse_decimal(data["target_amount"], "target_amount")
             target_date = _parse_date(data["target_date"], "target_date")
             current_amount = _parse_decimal(data.get("current_amount", "0"), "current_amount")
-            source = _resolve_source(profile, data.get("source")) if "source" in data else None
+            source = _resolve_source_id(profile, data.get("source")) if "source" in data else None
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -158,7 +162,7 @@ class SavingsGoalDetailView(APIView):
             if "current_amount" in data:
                 goal.current_amount = _parse_decimal(data["current_amount"], "current_amount")
             if "source" in data:
-                goal.source = _resolve_source(profile, data["source"])
+                goal.source = _resolve_source_id(profile, data["source"])
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

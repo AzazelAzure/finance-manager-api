@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from finance.logic.source_linkage import generate_source_id
 from finance.models import PaymentSource
 from finance.tests.profile_tests.profile_base import ProfileBase
+from datetime import date
 
 
 class AppProfilePatchTests(ProfileBase):
@@ -9,6 +11,7 @@ class AppProfilePatchTests(ProfileBase):
         src = PaymentSource.objects.create(
             uid=str(self.profile.user_id),
             source="wallet-main",
+            source_id=generate_source_id(date.today()),
             acc_type="EWALLET",
             amount=Decimal("50.00"),
             currency="USD",
@@ -25,7 +28,8 @@ class AppProfilePatchTests(ProfileBase):
         self.assertIn("snapshot", response.data)
 
         self.profile.refresh_from_db()
-        self.assertEqual(sorted(self.profile.spend_accounts), sorted(["cash", "wallet-main"]))
+        cash_ps = PaymentSource.objects.for_user(str(self.profile.user_id)).get_by_source("cash").first()
+        self.assertEqual(sorted(self.profile.spend_accounts), sorted([cash_ps.source_id, src.source_id]))
         self.assertEqual(self.profile.base_currency, "EUR")
         self.assertEqual(self.profile.timezone, "UTC")
         self.assertEqual(self.profile.start_of_week, 0)

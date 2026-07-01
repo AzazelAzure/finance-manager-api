@@ -30,7 +30,8 @@ class SourceDeleteTestCase(SourceBase):
 
     def test_delete_updates_safe_to_spend_for_spend_account(self):
         expected = self.seed_source("spend-delete", amount="200.00")
-        self.profile.spend_accounts = [expected["source"]]
+        ps = PaymentSource.objects.for_user(self.profile.user_id).get_by_source(expected["source"]).first()
+        self.profile.spend_accounts = [ps.source_id]
         self.profile.save(update_fields=["spend_accounts"])
         response = self.client.delete(self._detail_url(expected["source"]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -56,4 +57,5 @@ class SourceDeleteTestCase(SourceBase):
         tx = Transaction.objects.for_user(self.profile.user_id).get_tx(
             tx_response.data["accepted"][0]["tx_id"]
         ).first()
-        self.assertEqual(tx.source, "unknown")
+        unknown = PaymentSource.objects.for_user(self.profile.user_id).get_by_source("unknown").first()
+        self.assertEqual(tx.source, unknown.source_id)

@@ -26,6 +26,7 @@ from finance.models import (
     FinancialSnapshot,
     PaymentSource,
 )
+from finance.logic.source_linkage import ids_to_names, load_source_maps
 from rest_framework.exceptions import ValidationError
 
 @transaction.atomic
@@ -49,11 +50,7 @@ def user_update(uid: str, data: dict, *args, **kwargs):
     profile = kwargs.get('profile')
     sources = kwargs.get('sources') or list(PaymentSource.objects.for_user(uid))
     if data.get('spend_accounts'):
-        if isinstance(data['spend_accounts'], list):
-            data['spend_accounts'] = [item.lower() for item in data['spend_accounts']]
-            profile.spend_accounts = data['spend_accounts']
-        else:
-            profile.spend_accounts = [str(data['spend_accounts']).lower()]
+        profile.spend_accounts = data['spend_accounts']
     if data.get('base_currency'):
         profile.base_currency = data['base_currency'].upper()
     if data.get("timezone") is not None:
@@ -96,17 +93,15 @@ def user_get_info(uid: str, *args, **kwargs):
     """
     logger.debug(f"Getting spend accounts and base currency for {uid}")
     profile = kwargs.get('profile')
-    spend_accounts = profile.spend_accounts
-    base_currency = profile.base_currency
-    timezone = profile.timezone
-    start_week = profile.start_of_week
-    completed_tours = profile.completed_tours
+    spend_accounts = profile.spend_accounts or []
+    maps = load_source_maps(uid)
+    spend_display = ids_to_names(spend_accounts, maps) if spend_accounts else []
     return {
-        'spend_accounts': spend_accounts, 
-        'base_currency': base_currency,
-        'timezone': timezone,
-        'start_of_week': start_week,
-        'completed_tours': completed_tours,
+        'spend_accounts': spend_display,
+        'base_currency': profile.base_currency,
+        'timezone': profile.timezone,
+        'start_of_week': profile.start_of_week,
+        'completed_tours': profile.completed_tours,
         'sts_window_mode': profile.sts_window_mode,
         'pay_cycle_frequency': profile.pay_cycle_frequency,
         'pay_cycle_anchor_date': profile.pay_cycle_anchor_date,

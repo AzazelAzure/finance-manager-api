@@ -117,18 +117,19 @@ class Tag(models.Model):
 class PaymentSource(models.Model):
     """
     Model for payment sources. Allows users to add payment sources to their accounts.
-    Automatically generates a CurrentAsset when a PaymentSource is created.
 
     Attributes:
-        source (CharField): Name of the payment source. unique per user.
+        source_id (CharField): Stable per-user identifier for linkage (immutable).
+        source (CharField): Display name of the payment source; unique per user.
         acc_type (CharField): Type of the payment source, selected from a list of choices.
-        uid (ForeignKey): Foreign key to the AppProfile model.
+        uid (CharField): Owning user id string.
     """
     objects = PaymentSourceManager.as_manager()
     class Meta:
         verbose_name_plural = "Payment Sources"
         constraints = [
-            models.UniqueConstraint(fields=['source', 'uid'], name='unique_source_per_user')
+            models.UniqueConstraint(fields=['source', 'uid'], name='unique_source_per_user'),
+            models.UniqueConstraint(fields=['source_id', 'uid'], name='unique_source_id_per_user'),
         ]
 
     class AccType(models.TextChoices):
@@ -139,6 +140,7 @@ class PaymentSource(models.Model):
         EWALLET = "EWALLET", "Mobile Wallet"
         UNKNOWN = "UNKNOWN", "Unknown"
 
+    source_id = models.CharField(max_length=20, editable=False, db_index=True)
     source = models.CharField(max_length=50)
     acc_type = models.CharField(max_length=10, choices=AccType.choices, default=AccType.UNKNOWN)
     currency = models.CharField(max_length=3, default="USD")
@@ -241,10 +243,7 @@ class SavingsGoal(models.Model):
     currency = models.CharField(max_length=10, default="USD")
     target_date = models.DateField()
     current_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    source = models.ForeignKey(
-        PaymentSource, null=True, blank=True,
-        on_delete=models.SET_NULL, related_name="savings_goals"
-    )
+    source = models.CharField(max_length=20, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -282,8 +281,8 @@ class Transaction(models.Model):
         date (DateField): Date of the transaction.
         description (CharField): Description of the transaction.
         amount (DecimalField): Amount of the transaction.
-        source (ForeignKey): Foreign key to the PaymentSource model.
-        currency (ForeignKey): Foreign key to the Currency model.
+        source (CharField): PaymentSource.source_id linkage (API exposes display name).
+        currency (CharField): ISO currency code.
         tags (ManyToManyField): Many-to-many relationship with the Tag model.
         entry_id (AutoField): Unique identifier for the transaction.
         tx_id (CharField): Unique identifier for the transaction.
@@ -305,7 +304,7 @@ class Transaction(models.Model):
     created_on = models.DateField()
     category = models.CharField(max_length=200, null=True, blank=True)
     # Link to relationship models
-    source = models.CharField(max_length=50)
+    source = models.CharField(max_length=20)
     currency = models.CharField(max_length=3)
     tags = models.JSONField(null=True, blank=True, default=list)
     tx_id = models.CharField(max_length=20, editable=False, db_index=True)
@@ -477,7 +476,7 @@ class BalanceSnapshot(models.Model):
         ]
 
     uid = models.CharField(max_length=200, db_index=True)
-    source = models.CharField(max_length=50)
+    source = models.CharField(max_length=20)
     snapshot_date = models.DateField()
     closing_balance = models.DecimalField(max_digits=15, decimal_places=2)
     currency = models.CharField(max_length=3, default="USD")

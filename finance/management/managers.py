@@ -216,8 +216,12 @@ class PaymentSourceManager(models.QuerySet):
         return self.filter(acc_type=acc_type)
     
     def get_by_source(self, source):
-        """Returns a queryset for payment sources with a given source."""
+        """Returns a queryset for payment sources with a given display name."""
         return self.filter(source=source)
+
+    def get_by_source_id(self, source_id):
+        """Returns a queryset for payment sources with a given source_id."""
+        return self.filter(source_id=source_id)
     
 class AppProfileManager(models.QuerySet):
     """Manager for AppProfile model."""

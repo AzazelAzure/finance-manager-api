@@ -15,6 +15,8 @@ from finance.models import (
     Category,
     Tag,
 )
+from finance.logic.source_linkage import generate_source_id
+from datetime import date
 from loguru import logger
 
 
@@ -35,8 +37,8 @@ def delete_source(sender, instance, **kwargs):
 
     # Update all transactions that reference the deleted source to the 'unknown' source
     if unknown_source:
-        Transaction.objects.filter(uid=instance.uid, source=instance.source).update(
-            source=unknown_source.source
+        Transaction.objects.filter(uid=instance.uid, source=instance.source_id).update(
+            source=unknown_source.source_id
         )
 
 
@@ -81,7 +83,12 @@ def user_logged_in(sender, request, user, **kwargs):
     # If not found, create it
     if not unknown_source:
         logger.critical(f'User{user.username} had unknown source deleted.  Database was tampered with, indicating a security breach.  Recreated unknown source.')
-        PaymentSource.objects.create(uid=user.appprofile.user_id, source="unknown", acc_type="UNKNOWN")
+        PaymentSource.objects.create(
+            uid=user.appprofile.user_id,
+            source="unknown",
+            source_id=generate_source_id(date.today()),
+            acc_type="UNKNOWN",
+        )
 
     return
 
@@ -123,9 +130,19 @@ def _generate_base_profile(app_profile):
     FinancialSnapshot.objects.create(uid=app_profile.user_id)
     default_currency = 'USD'
     app_profile.base_currency = default_currency
-    default_source = PaymentSource.objects.create(source="cash", acc_type="CASH", uid=app_profile.user_id)
-    PaymentSource.objects.create(source="unknown", acc_type="UNKNOWN", uid=app_profile.user_id)
-    app_profile.spend_accounts = [default_source.source]
+    default_source = PaymentSource.objects.create(
+        source="cash",
+        source_id=generate_source_id(date.today()),
+        acc_type="CASH",
+        uid=app_profile.user_id,
+    )
+    PaymentSource.objects.create(
+        source="unknown",
+        source_id=generate_source_id(date.today()),
+        acc_type="UNKNOWN",
+        uid=app_profile.user_id,
+    )
+    app_profile.spend_accounts = [default_source.source_id]
     app_profile.save()
     logger.debug(f"Created user: User: {app_profile.username}.  Base currency: {default_currency}. Default source: {default_source}")
     return
