@@ -9,6 +9,7 @@ All notable changes to the API codebase must be documented in this file by the e
 - **Bill↔transaction linkage (cadence-aware reversal):** `Updater._handle_tx_update` now rolls recurring bill `due_date` backward using the same cadence table as `advance_bill_due_date` (weekly/biweekly/semimonthly/monthly/quarterly/annual/custom) instead of a hardcoded one-month step — fixes non-monthly bills desyncing when a linked transaction is edited or deleted.
 
 ### Changed
+- **Dependencies (2026-07 batch):** Bumped `tzdata` 2026.2, `coverage` 7.14.3, `pytest` 9.1.1, `cryptography` ≥49.0.0, `setuptools` 82.0.1 (single `uv lock` pass; supersedes dependabot PRs #67–#71).
 - **README:** Beta cross-repo contract matrix reference reworded — matrix is no longer published in public `design_docs` (private ecosystem workspace).
 
 ### Removed
