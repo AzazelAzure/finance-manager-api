@@ -167,13 +167,24 @@ class Updater:
     
     def fix_expense_data(self, data):
         """Normalize incoming expense payload fields in-place."""
+        maps = build_source_maps(self.sources) if hasattr(self, "sources") and self.sources else load_source_maps(self.uid)
+        name_to_id, id_to_name = maps
         for item in data:
             item['uid'] = self.profile.user_id
             if item.get('name'):
                 item['name'] = str(item["name"]).strip()
             if item.get('currency'):
                 item['currency'] = item['currency'].upper()
-            
+            if "source" in item:
+                raw = item["source"]
+                if raw is None or raw == "":
+                    item["source"] = None
+                else:
+                    raw_source = str(raw)
+                    if raw_source in id_to_name:
+                        item["source"] = raw_source
+                    else:
+                        item["source"] = name_to_id.get(raw_source.lower(), raw_source)
 
 
     # Transaction Handler

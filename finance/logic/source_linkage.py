@@ -83,3 +83,13 @@ def resolve_transactions_for_api(transactions, maps: tuple[dict[str, str], dict[
         display = resolve_id_to_name(tx.source, maps)
         if display is not None:
             tx.source = display
+
+
+def resolve_upcoming_expenses_for_api(expenses, maps: tuple[dict[str, str], dict[str, str]]):
+    """Replace stored source_id with display name on in-memory upcoming expense rows (API only)."""
+    for expense in expenses:
+        if not expense.source:
+            continue
+        display = resolve_id_to_name(expense.source, maps)
+        if display is not None:
+            expense.source = display

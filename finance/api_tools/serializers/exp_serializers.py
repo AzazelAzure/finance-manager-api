@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from finance.api_tools.serializers.base_serializers import FinancialSnapshotSerializer
+from finance.logic.source_linkage import load_source_maps, resolve_id_to_name
 from finance.models import UpcomingExpense
 
 _CADENCE_CHOICES = [choice.value for choice in UpcomingExpense.Cadence]
@@ -43,12 +44,25 @@ class ExpenseSerializer(serializers.Serializer):
     custom_interval_days = serializers.IntegerField(
         required=False, allow_null=True, min_value=1
     )
+    auto_deduct = serializers.BooleanField(required=False, default=False)
+    source = serializers.CharField(max_length=50, required=False, allow_null=True)
 
     def validate(self, attrs):
         existing = self.context.get("existing")
         existing_cadence = getattr(existing, "cadence", "monthly") if existing else "monthly"
         existing_days = getattr(existing, "custom_interval_days", None) if existing else None
         return _validate_cadence_fields(attrs, existing_cadence, existing_days)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        uid = getattr(instance, "uid", None)
+        if uid and getattr(instance, "source", None):
+            maps = load_source_maps(uid)
+            ret["source"] = resolve_id_to_name(instance.source, maps)
+        else:
+            ret.setdefault("source", None)
+        ret.setdefault("auto_deduct", getattr(instance, "auto_deduct", False))
+        return ret
 
 
 class ExpensePostSerializer(ExpenseSerializer):
@@ -78,6 +92,8 @@ class ExpensePutSerializer(serializers.Serializer):
     custom_interval_days = serializers.IntegerField(
         required=False, allow_null=True, min_value=1
     )
+    auto_deduct = serializers.BooleanField(required=False, default=False)
+    source = serializers.CharField(max_length=50, required=False, allow_null=True)
 
     def validate(self, attrs):
         existing = self.context.get("existing")

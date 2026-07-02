@@ -14,6 +14,7 @@ class TransactionSerializer(serializers.Serializer):
     tags = serializers.ListField(child=serializers.CharField(max_length=200), required=False)
     tx_type = serializers.CharField(max_length=10)
     category = serializers.CharField(max_length=200, required=False)
+    auto_deducted = serializers.BooleanField(required=False, default=False)
 
 class TransactionSetSerializer(TransactionSerializer):
     bill = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
