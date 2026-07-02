@@ -514,4 +514,28 @@ class OperatorAlertState(models.Model):
     def __str__(self):
         return self.alert_key
 
+
+class DashboardLayout(models.Model):
+    """Per-user, per-device-class dashboard widget layout (F-006 T01)."""
+
+    class DeviceClass(models.TextChoices):
+        MOBILE = "mobile", "Mobile"
+        DESKTOP = "desktop", "Desktop"
+
+    uid = models.CharField(max_length=200, db_index=True)
+    device_class = models.CharField(max_length=10, choices=DeviceClass.choices)
+    layout = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uid", "device_class"],
+                name="dashboard_layout_uid_device_uniq",
+            ),
+        ]
+
+    def __str__(self):
+        return f"layout:{self.uid}:{self.device_class}"
+
  
