@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 
 ### Added
+- **F-006 dashboard layout persistence (T01):** `DashboardLayout` model keyed by `(uid, device_class)` with JSON layout blob (`widget_id`, `size`, `visible`). CRUD at `GET/PUT/PATCH /finance/dashboard-layout/?device_class=` plus `POST /finance/dashboard-layout/reset/` scoped to one variant. Server-side desktop and STS-first mobile defaults; widget catalog validation; cross-user isolation tests. PWA offline cache fallback documented in `finance/logic/dashboard_layout.py`.
 - **F-009 recurring auto-deduct (T01):** `UpcomingExpense.auto_deduct` (default `False`) and optional `source` CharField (`PaymentSource.source_id` linkage, display name at API boundary). `Transaction.auto_deducted` marker (default `False`) for frontend-triggered auto-deduct audit trail. Source referential validation via expense validators/services; migration `0020`.
 
 ### Changed

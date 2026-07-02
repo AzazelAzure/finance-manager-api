@@ -45,6 +45,7 @@ from finance.views.export_views import (
     TransactionCsvExportView,
 )
 from finance.views.goal_views import SavingsGoalDetailView, SavingsGoalListCreateView
+from finance.views.dashboard_layout_views import DashboardLayoutResetView, DashboardLayoutView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -154,5 +155,11 @@ urlpatterns = [
         "finance/savings-goals/<int:pk>/",
         SavingsGoalDetailView.as_view(),
         name="savings_goal_detail",
+    ),
+    path("finance/dashboard-layout/", DashboardLayoutView.as_view(), name="dashboard_layout"),
+    path(
+        "finance/dashboard-layout/reset/",
+        DashboardLayoutResetView.as_view(),
+        name="dashboard_layout_reset",
     ),
 ]
