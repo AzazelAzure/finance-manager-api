@@ -231,6 +231,8 @@ class UpcomingExpense(models.Model):
         max_length=12, choices=Cadence.choices, default=Cadence.MONTHLY
     )
     custom_interval_days = models.PositiveIntegerField(null=True, blank=True)
+    auto_deduct = models.BooleanField(default=False)
+    source = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.status}) ({self.paid_flag})"
@@ -332,7 +334,7 @@ class Transaction(models.Model):
         )
 
     tx_type = models.CharField(max_length=10, choices=TxType.choices)
-
+    auto_deducted = models.BooleanField(default=False)
 
     def __str__(self):
         return self.tx_id

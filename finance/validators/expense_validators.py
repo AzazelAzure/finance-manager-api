@@ -7,7 +7,8 @@ from loguru import logger
 from rest_framework.exceptions import ValidationError
 
 from finance.logic.updaters import Updater
-from finance.models import UpcomingExpense
+from finance.logic.source_linkage import build_source_check
+from finance.models import PaymentSource, UpcomingExpense
 from finance.validators.validation_core import _validate_currency
 
 _BILL_CLASSES = {c.value for c in UpcomingExpense.BillClass}
@@ -30,13 +31,18 @@ def UpcomingExpenseSetValidator(func):
             rest = args[1:]
         logger.debug(f"Validating expense payload for {uid}")
         profile = kwargs.get("profile")
+        sources_obj = kwargs.get("sources") or PaymentSource.objects.for_user(profile.user_id)
+        sources = sources_obj if isinstance(sources_obj, list) else list(sources_obj)
+        source_check = kwargs.get("source_check") or build_source_check(sources)
+        kwargs["sources"] = sources
+        kwargs["source_check"] = source_check
         upcoming = kwargs.get("upcoming") or UpcomingExpense.objects.for_user(profile.user_id)
         upcoming_names = list(upcoming.values_list("name", flat=True))
         upcoming_check = set(upcoming_names)
         upcoming_lower = {n.lower() for n in upcoming_names}
         existing_name = kwargs.get("existing_name")
         kwargs["upcoming"] = upcoming
-        update = Updater(profile=profile)
+        update = Updater(profile=profile, sources=sources)
 
         if isinstance(data, list):
             rejected = []
@@ -51,6 +57,7 @@ def UpcomingExpenseSetValidator(func):
                         patch,
                         existing_name=existing_name,
                         upcoming_lower=upcoming_lower,
+                        source_check=source_check,
                     )
                     accepted.append(item)
                 except ValidationError as e:
@@ -73,6 +80,7 @@ def UpcomingExpenseSetValidator(func):
             patch,
             existing_name=existing_name,
             upcoming_lower=upcoming_lower,
+            source_check=source_check,
         )
         update.fix_expense_data([data])
         if expense_name is not None:
@@ -111,6 +119,7 @@ def _validate_expense(
     existing_name=None,
     *,
     upcoming_lower=None,
+    source_check=None,
 ):
     """Validate a single expense payload; mutates defaults for date fields."""
     logger.debug(f"Validating expense fields for {uid}")
@@ -167,5 +176,17 @@ def _validate_expense(
             raise ValidationError("planned_partial_amount must be positive")
         if amount is not None and partial_dec > Decimal(str(amount)):
             raise ValidationError("planned_partial_amount cannot exceed bill amount")
+
+    if "source" in data:
+        src = data.get("source")
+        if src is None or src == "":
+            data["source"] = None
+        elif source_check is not None and src not in source_check:
+            logger.error("Source does not exist (rejected at validation; value omitted from logs)")
+            raise ValidationError("Source does not exist")
+
+    if "auto_deduct" in data and data["auto_deduct"] is not None:
+        if not isinstance(data["auto_deduct"], bool):
+            raise ValidationError("Invalid auto_deduct")
 
     return data

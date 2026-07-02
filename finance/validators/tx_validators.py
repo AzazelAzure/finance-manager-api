@@ -176,6 +176,9 @@ def _validate_transaction(
                 tx_date = date.fromisoformat(tx_date)
             if tx_date > today:
                 raise ValidationError("Date cannot be in the future")
+    if "auto_deducted" in data and data["auto_deducted"] is not None:
+        if not isinstance(data["auto_deducted"], bool):
+            raise ValidationError("Invalid auto_deducted")
     if data.get("bill"):
         if not data["bill"] in upcoming_check:
             logger.error("Linked expense not found (rejected at validation; value omitted from logs)")

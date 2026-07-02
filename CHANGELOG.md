@@ -4,6 +4,9 @@ All notable changes to the API codebase must be documented in this file by the e
 
 ## [Unreleased]
 
+### Added
+- **F-009 recurring auto-deduct (T01):** `UpcomingExpense.auto_deduct` (default `False`) and optional `source` CharField (`PaymentSource.source_id` linkage, display name at API boundary). `Transaction.auto_deducted` marker (default `False`) for frontend-triggered auto-deduct audit trail. Source referential validation via expense validators/services; migration `0020`.
+
 ### Changed
 - **Dependencies (security audit T02):** Batch-pinned CVE fixes — `Django` 6.0.6, `PyJWT` 2.13.0, `urllib3` 2.7.0, `idna` 3.15, `Pygments` 2.20.0; `cryptography` floor ≥48.0.1 (lock resolves 49.0.0), `pytest` floor ≥9.0.3 (lock resolves 9.1.1). Single `uv lock` pass; `pip-audit` clean for all seven packages.
 
