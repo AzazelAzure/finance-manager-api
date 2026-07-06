@@ -36,11 +36,27 @@ def backfill_name_linkage_surfaces(apps, schema_editor):
                 tx.source = name_to_id[key]
                 tx.save(update_fields=["source"])
 
-        for snap in BalanceSnapshot.objects.filter(uid=uid).iterator():
+        snaps = list(BalanceSnapshot.objects.filter(uid=uid))
+        groups = {}
+        for snap in snaps:
             key = str(snap.source).lower()
-            if key in name_to_id:
-                snap.source = name_to_id[key]
-                snap.save(update_fields=["source"])
+            target = name_to_id.get(key, snap.source)
+            groups.setdefault((snap.snapshot_date, target), []).append(snap)
+
+        for (_snap_date, target_source), group in groups.items():
+            if len(group) == 1:
+                snap = group[0]
+                if snap.source != target_source:
+                    snap.source = target_source
+                    snap.save(update_fields=["source"])
+                continue
+            group.sort(key=lambda s: (s.created_at, s.pk), reverse=True)
+            keeper = group[0]
+            if keeper.source != target_source:
+                keeper.source = target_source
+                keeper.save(update_fields=["source"])
+            for dup in group[1:]:
+                dup.delete()
 
         profile = AppProfile.objects.filter(user_id=uid).first()
         if profile and profile.spend_accounts:
