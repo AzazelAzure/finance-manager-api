@@ -20,7 +20,7 @@ dependencies = [
     "drf-spectacular==0.29.0",
     "inflection==0.5.1",
     "loguru==0.7.3",
-    "pycountry==22.3.5",
+    "pycountry==26.2.16",
     "PyJWT==2.13.0",
     "psycopg==3.2.4",
     "python-dateutil==2.9.0.post0",
