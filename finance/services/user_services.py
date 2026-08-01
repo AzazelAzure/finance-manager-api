@@ -11,23 +11,32 @@ Attributes:
 # TODO: Update logging
 
 
-import finance.logic.validators as validator
-from finance.logic.updaters import Updater
-from finance.logic.fincalc import Calculator
-from finance.api_tools.query_utils import apply_transaction_filters
-from django.db import transaction
-from django.conf import settings
-from django.db.models import Sum
 from decimal import Decimal
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Sum
 from loguru import logger
+from rest_framework.exceptions import ValidationError
+
+import finance.logic.validators as validator
+from finance.api_tools.query_utils import apply_transaction_filters
+from finance.logic.fincalc import Calculator
+from finance.logic.source_linkage import (
+    ids_to_names,
+    load_source_maps,
+    resolve_name_to_id,
+)
+from finance.logic.updaters import Updater
 from finance.models import (
-    Transaction,
     AppProfile,
     FinancialSnapshot,
     PaymentSource,
+    Transaction,
 )
-from finance.logic.source_linkage import ids_to_names, load_source_maps
-from rest_framework.exceptions import ValidationError
+
+# Kwargs injected by decorators (not query filters)
+_TOTALS_FILTER_IGNORE_KEYS = frozenset({"profile"})
 
 @transaction.atomic
 @validator.UserValidator
@@ -124,7 +133,13 @@ def user_get_totals(uid, *args, **kwargs):
     
     # Apply standard transaction filters to support dynamic dashboard charts
     queryset = Transaction.objects.for_user(uid)
-    queryset = apply_transaction_filters(queryset, **kwargs)
+    filter_kwargs = {k: v for k, v in kwargs.items() if k not in _TOTALS_FILTER_IGNORE_KEYS}
+    if filter_kwargs.get("source"):
+        maps = load_source_maps(uid)
+        source_id = resolve_name_to_id(str(filter_kwargs["source"]).lower(), maps)
+        if source_id:
+            filter_kwargs["source"] = source_id
+    queryset = apply_transaction_filters(queryset, **filter_kwargs)
     queryset = queryset.order_by('-date', '-tx_id')
     fc = Calculator(profile=kwargs.get('profile'))
     transfer_out_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_OUT'))
