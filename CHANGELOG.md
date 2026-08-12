@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 
 ### Fixed
+- **`create_ux_testuser` source_id seed (ux_demo):** Assign `generate_source_id` on payment sources, store `source_id` on seeded transactions, clear empty-`source_id` leftovers on `--reset`, and recompute balances by `source_id` — restores seed after migration 0019 (was failing `unique_source_id_per_user` on blank ids).
 - **Auto-deduct business-key idempotency (HFM-AD-1):** Partial unique constraint `unique_auto_deduct_bill_date_per_user` on `Transaction(uid, bill, date)` when `auto_deducted=True` and bill is non-empty (migration `0022`, fail-loud duplicate audit — no survivor delete/merge). `add_transaction` returns the existing winner for sequential dual-key and concurrent IntegrityError races (inner savepoint + re-fetch), skips `Updater.transaction_handler` for recovered rows, and first-wins in-request bulk duplicates while preserving accepted order.
 
 ### Added

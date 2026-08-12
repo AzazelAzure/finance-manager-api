@@ -13,6 +13,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from finance.logic.fincalc import Calculator
+from finance.logic.source_linkage import generate_source_id
 from finance.models import (
     AppProfile,
     Category,
@@ -98,10 +99,10 @@ class Command(BaseCommand):
         profile.base_currency = "PHP"
         profile.save(update_fields=["base_currency"])
 
-        self._seed_sources(uid)
+        name_to_id = self._seed_sources(uid)
         self._seed_categories(uid)
         self._seed_tags(uid)
-        tx_count = self._seed_transactions(uid)
+        tx_count = self._seed_transactions(uid, name_to_id)
         self._seed_upcoming(uid)
         self._recompute_balances(uid, profile)
 
@@ -116,29 +117,39 @@ class Command(BaseCommand):
         UpcomingExpense.objects.filter(uid=uid).delete()
         Category.objects.filter(uid=uid).delete()
         Tag.objects.filter(uid=uid).delete()
+        # Keep system "unknown"; also drop broken empty source_id rows left by older seeds.
         PaymentSource.objects.filter(uid=uid).exclude(source="unknown").delete()
+        PaymentSource.objects.filter(uid=uid, source_id="").delete()
 
-    def _seed_sources(self, uid: str) -> None:
+    def _seed_sources(self, uid: str) -> dict[str, str]:
+        """Create payment sources with real source_ids; return display-name → source_id."""
         spend = []
+        name_to_id: dict[str, str] = {}
+        today = date.today()
         for source_name, acc_type, amount in PAYMENT_SOURCES:
-            obj, _ = PaymentSource.objects.get_or_create(
-                uid=uid,
-                source=source_name,
-                defaults={
-                    "acc_type": acc_type,
-                    "currency": "PHP",
-                    "amount": amount,
-                },
-            )
-            if obj.amount != amount:
+            obj = PaymentSource.objects.filter(uid=uid, source=source_name).first()
+            if obj is None:
+                obj = PaymentSource.objects.create(
+                    uid=uid,
+                    source=source_name,
+                    source_id=generate_source_id(today),
+                    acc_type=acc_type,
+                    currency="PHP",
+                    amount=amount,
+                )
+            else:
+                if not obj.source_id:
+                    obj.source_id = generate_source_id(today)
                 obj.amount = amount
                 obj.acc_type = acc_type
                 obj.currency = "PHP"
-                obj.save(update_fields=["amount", "acc_type", "currency"])
+                obj.save(update_fields=["source_id", "amount", "acc_type", "currency"])
+            name_to_id[source_name] = obj.source_id
             spend.append(source_name)
         profile = AppProfile.objects.get(user_id=uid)
         profile.spend_accounts = spend[:3]
         profile.save(update_fields=["spend_accounts"])
+        return name_to_id
 
     def _seed_categories(self, uid: str) -> None:
         for name in CATEGORIES:
@@ -150,7 +161,7 @@ class Command(BaseCommand):
             tag_row.tags = TAGS
             tag_row.save(update_fields=["tags"])
 
-    def _seed_transactions(self, uid: str) -> int:
+    def _seed_transactions(self, uid: str, name_to_id: dict[str, str]) -> int:
         today = date.today()
         rng = random.Random(42)
         tx_rows: list[Transaction] = []
@@ -167,6 +178,7 @@ class Command(BaseCommand):
             tags: list[str] | None = None,
         ) -> None:
             nonlocal tx_index
+            source_id = name_to_id[source]
             tx_rows.append(
                 Transaction(
                     uid=uid,
@@ -176,7 +188,7 @@ class Command(BaseCommand):
                     description=description,
                     amount=amount,
                     category=category,
-                    source=source,
+                    source=source_id,
                     currency="PHP",
                     tags=tags or [],
                     bill="",
@@ -327,6 +339,7 @@ class Command(BaseCommand):
         )
 
     def _recompute_balances(self, uid: str, profile: AppProfile) -> None:
+        # Transaction.source stores source_id; roll up by that key.
         source_totals = {
             row["source"]: (row["total"] or Decimal("0.00"))
             for row in Transaction.objects.filter(uid=uid).values("source").annotate(total=Sum("amount"))
@@ -335,7 +348,7 @@ class Command(BaseCommand):
         for source in sources:
             if source.source == "unknown":
                 continue
-            source.amount = Decimal(source_totals.get(source.source, Decimal("0.00"))).quantize(Decimal("0.01"))
+            source.amount = Decimal(source_totals.get(source.source_id, Decimal("0.00"))).quantize(Decimal("0.01"))
         if sources:
             PaymentSource.objects.bulk_update(sources, ["amount"])
 
