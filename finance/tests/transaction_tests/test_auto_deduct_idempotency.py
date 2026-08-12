@@ -1,4 +1,4 @@
-"""HFM-AD-1: auto-deduct business-key idempotency (constraint + service recovery)."""
+"""HFM-AD-1 amend: auto-deduct accepted|replace + soft first-wins (no unique constraint)."""
 
 from datetime import date
 from decimal import Decimal
@@ -41,34 +41,33 @@ class AutoDeductIdempotencyTests(TransactionBase):
             "auto_deducted": True,
         }
 
-    def _orm_auto_deduct_kwargs(self, bill_name: str, *, tx_id: str) -> dict:
-        source = PaymentSource.objects.for_user(self.profile.user_id).first()
-        return {
-            "uid": str(self.profile.user_id),
-            "tx_id": tx_id,
-            "date": date.today(),
-            "created_on": date.today(),
-            "description": "orm-ad",
-            "amount": Decimal("-25.00"),
-            "source": source.source_id,
-            "currency": source.currency,
-            "tx_type": "EXPENSE",
-            "category": self.categories[0].name,
-            "tags": [self.tag_list[0]],
-            "bill": bill_name,
-            "auto_deducted": True,
-        }
-
-    def test_constraint_rejects_direct_duplicate_create(self):
+    def test_auto_deduct_duplicate_create_converges_to_winner(self):
+        """Service/API convergence: second create returns same winner (no second row)."""
         bill_name = "ad1-constraint-bill"
         self._create_bill(bill_name)
-        Transaction.objects.create(
-            **self._orm_auto_deduct_kwargs(bill_name, tx_id=f"{date.today().isoformat()}-AD1A")
+        first = self.client.post(
+            self.url,
+            self._auto_deduct_payload(bill_name, amount="25.00", description="winner"),
+            format="json",
         )
-        with self.assertRaises(IntegrityError):
-            Transaction.objects.create(
-                **self._orm_auto_deduct_kwargs(bill_name, tx_id=f"{date.today().isoformat()}-AD1B")
-            )
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, msg=first.data)
+        winner_id = first.data["accepted"][0]["tx_id"]
+        self.assertEqual(first.data["accepted"][0]["auto_deduct_resolution"], "accepted")
+
+        second = self.client.post(
+            self.url,
+            self._auto_deduct_payload(bill_name, amount="99.00", description="later"),
+            format="json",
+        )
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED, msg=second.data)
+        self.assertEqual(second.data["accepted"][0]["tx_id"], winner_id)
+        self.assertEqual(second.data["accepted"][0]["auto_deduct_resolution"], "replace")
+        self.assertEqual(
+            Transaction.objects.for_user(self.profile.user_id)
+            .filter(bill=bill_name, date=date.today(), auto_deducted=True)
+            .count(),
+            1,
+        )
 
     def test_bulk_duplicate_keys_first_wins_stable_order(self):
         bill_name = "ad1-bulk-dup-bill"
@@ -82,6 +81,8 @@ class AutoDeductIdempotencyTests(TransactionBase):
         self.assertEqual(accepted[0]["tx_id"], accepted[1]["tx_id"])
         self.assertEqual(accepted[0]["description"], "first")
         self.assertEqual(accepted[1]["description"], "first")
+        self.assertEqual(accepted[0]["auto_deduct_resolution"], "accepted")
+        self.assertEqual(accepted[1]["auto_deduct_resolution"], "replace")
         self.assertEqual(
             Transaction.objects.for_user(self.profile.user_id)
             .filter(bill=bill_name, date=date.today(), auto_deducted=True)
@@ -107,6 +108,7 @@ class AutoDeductIdempotencyTests(TransactionBase):
         )
         self.assertEqual(seed.status_code, status.HTTP_201_CREATED, msg=seed.data)
         seed_tx_id = seed.data["accepted"][0]["tx_id"]
+        self.assertEqual(seed.data["accepted"][0]["auto_deduct_resolution"], "accepted")
         source.refresh_from_db()
         balance_after_seed = Decimal(str(source.amount))
         self.assertNotEqual(balance_before, balance_after_seed)
@@ -121,7 +123,9 @@ class AutoDeductIdempotencyTests(TransactionBase):
         accepted = response.data["accepted"]
         self.assertEqual(len(accepted), 2)
         self.assertEqual(accepted[0]["description"], "brand-new")
+        self.assertEqual(accepted[0]["auto_deduct_resolution"], "accepted")
         self.assertEqual(accepted[1]["tx_id"], seed_tx_id)
+        self.assertEqual(accepted[1]["auto_deduct_resolution"], "replace")
         self.assertNotEqual(accepted[0]["tx_id"], accepted[1]["tx_id"])
 
         source.refresh_from_db()
@@ -145,7 +149,7 @@ class AutoDeductIdempotencyTests(TransactionBase):
         )
 
     def test_integrity_error_recovery_path_returns_winner(self):
-        """Simulate race: fast-path miss, then IntegrityError → re-fetch winner."""
+        """Simulate race: fast-path miss, then IntegrityError → re-fetch winner + replace."""
         bill_name = "ad1-ie-recovery"
         self._create_bill(bill_name)
         first = self.client.post(
@@ -170,11 +174,14 @@ class AutoDeductIdempotencyTests(TransactionBase):
                 return None
             return real_resolve(uid, bill, tx_date)
 
+        def create_raise_ie(**kwargs):
+            raise IntegrityError("simulated unique_auto_deduct race")
+
         with patch.object(
             transaction_services,
             "_resolve_auto_deduct_row",
             side_effect=resolve_miss_then_hit,
-        ):
+        ), patch.object(Transaction.objects, "create", side_effect=create_raise_ie):
             second = self.client.post(
                 self.url,
                 self._auto_deduct_payload(bill_name, amount="12.00", description="racer"),
@@ -182,6 +189,7 @@ class AutoDeductIdempotencyTests(TransactionBase):
             )
         self.assertEqual(second.status_code, status.HTTP_201_CREATED, msg=second.data)
         self.assertEqual(second.data["accepted"][0]["tx_id"], winner_id)
+        self.assertEqual(second.data["accepted"][0]["auto_deduct_resolution"], "replace")
         self.assertGreaterEqual(call_count["n"], 2)
 
         self.assertEqual(
@@ -193,8 +201,24 @@ class AutoDeductIdempotencyTests(TransactionBase):
         source.refresh_from_db()
         self.assertEqual(Decimal(str(source.amount)), balance_after_first)
 
+    def test_non_auto_deduct_omits_resolution_field(self):
+        source = PaymentSource.objects.for_user(self.profile.user_id).first()
+        payload = {
+            "date": str(date.today()),
+            "description": "plain",
+            "amount": "5.00",
+            "source": source.source,
+            "currency": source.currency,
+            "tags": [self.tag_list[0]],
+            "tx_type": "EXPENSE",
+            "category": self.categories[0].name,
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        self.assertNotIn("auto_deduct_resolution", response.data["accepted"][0])
+
     def test_blank_bill_auto_deducted_not_constrained(self):
-        """Constraint gate requires truthy bill — blank-bill auto_deducted rows may coexist."""
+        """Blank-bill auto_deducted rows omit resolution and may coexist."""
         source = PaymentSource.objects.for_user(self.profile.user_id).first()
         today = date.today()
         kwargs = {
@@ -212,5 +236,5 @@ class AutoDeductIdempotencyTests(TransactionBase):
             "auto_deducted": True,
         }
         Transaction.objects.create(tx_id=f"{today.isoformat()}-BLANK1", **kwargs)
-        # Second row with blank bill must not raise (outside partial unique predicate).
+        # Second row with blank bill must not raise (outside soft-key predicate).
         Transaction.objects.create(tx_id=f"{today.isoformat()}-BLANK2", **kwargs)

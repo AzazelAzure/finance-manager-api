@@ -187,6 +187,7 @@ class TransactionAutoDeductedTests(TransactionBase):
         )
         self.assertEqual(r1.status_code, status.HTTP_201_CREATED, msg=r1.data)
         winner_id = r1.data["accepted"][0]["tx_id"]
+        self.assertEqual(r1.data["accepted"][0]["auto_deduct_resolution"], "accepted")
 
         source.refresh_from_db()
         balance_after_first = Decimal(str(source.amount))
@@ -203,6 +204,7 @@ class TransactionAutoDeductedTests(TransactionBase):
         )
         self.assertEqual(r2.status_code, status.HTTP_201_CREATED, msg=r2.data)
         self.assertEqual(r2.data["accepted"][0]["tx_id"], winner_id)
+        self.assertEqual(r2.data["accepted"][0]["auto_deduct_resolution"], "replace")
 
         matching = Transaction.objects.for_user(self.profile.user_id).filter(
             bill=bill_name,

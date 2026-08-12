@@ -33,7 +33,7 @@ def _auto_deduct_business_key(bill, date):
 
 
 def _has_auto_deduct_business_key(data) -> bool:
-    """True when create payload is gated by unique_auto_deduct_bill_date_per_user."""
+    """True when create payload uses auto-deduct bill+date soft first-wins."""
     if isinstance(data, dict):
         return bool(data.get("auto_deducted")) and bool(data.get("bill"))
     return bool(getattr(data, "auto_deducted", False)) and bool(getattr(data, "bill", None))
@@ -50,12 +50,25 @@ def _resolve_auto_deduct_row(uid, bill, date):
     )
 
 
+def _stamp_auto_deduct_resolution(row, newly_inserted: bool, data):
+    """
+    Return a shallow copy with auto_deduct_resolution for create-response serialization.
+
+    Uses copy so bulk same-key slots (same winner row twice) keep per-slot outcomes.
+    """
+    stamped = copy.copy(row)
+    if _has_auto_deduct_business_key(data):
+        stamped.auto_deduct_resolution = "accepted" if newly_inserted else "replace"
+    return stamped
+
+
 def _create_transaction_row(uid, data):
     """
     Insert a transaction row.
 
     For auto_deducted + non-empty bill: prefer existing winner under select_for_update;
-    otherwise insert inside an inner atomic savepoint and recover on IntegrityError.
+    otherwise insert inside an inner atomic savepoint and recover on IntegrityError
+    (defensive if a partial unique index still exists mid-migration).
 
     Returns (row, newly_inserted).
     """
@@ -185,16 +198,18 @@ def add_transaction(uid, data, *args, **kwargs):
             if _has_auto_deduct_business_key(item):
                 key = _auto_deduct_business_key(item["bill"], item["date"])
                 if key in batch_winners:
-                    to_update.append(batch_winners[key])
+                    to_update.append(
+                        _stamp_auto_deduct_resolution(batch_winners[key], False, item)
+                    )
                     continue
                 row, inserted = _create_transaction_row(uid, item)
                 batch_winners[key] = row
-                to_update.append(row)
+                to_update.append(_stamp_auto_deduct_resolution(row, inserted, item))
                 if inserted:
                     newly_inserted.append(row)
             else:
                 row = Transaction.objects.create(**item)
-                to_update.append(row)
+                to_update.append(_stamp_auto_deduct_resolution(row, True, item))
                 newly_inserted.append(row)
 
         if newly_inserted:
@@ -224,8 +239,9 @@ def add_transaction(uid, data, *args, **kwargs):
         else:
             snapshot = FinancialSnapshot.objects.for_user(uid).first()
         maps = load_source_maps(uid)
-        resolve_transactions_for_api([row], maps)
-        return {'accepted': [row], 'snapshot': snapshot}
+        stamped = _stamp_auto_deduct_resolution(row, inserted, data)
+        resolve_transactions_for_api([stamped], maps)
+        return {'accepted': [stamped], 'snapshot': snapshot}
 
 @validator.UserValidator
 @TransactionIDValidator

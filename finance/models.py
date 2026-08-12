@@ -298,11 +298,6 @@ class Transaction(models.Model):
         ordering = ["date"]
         constraints = [
             models.UniqueConstraint(fields=['tx_id', 'uid'], name='unique_transaction_per_user'),
-            models.UniqueConstraint(
-                fields=['uid', 'bill', 'date'],
-                condition=models.Q(auto_deducted=True) & ~models.Q(bill__in=[None, '']),
-                name='unique_auto_deduct_bill_date_per_user',
-            ),
         ]
     # Hard Coded Requirements
     date = models.DateField()
