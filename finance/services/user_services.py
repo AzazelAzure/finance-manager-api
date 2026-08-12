@@ -26,6 +26,7 @@ from finance.logic.source_linkage import (
     ids_to_names,
     load_source_maps,
     resolve_name_to_id,
+    resolve_transactions_for_api,
 )
 from finance.logic.updaters import Updater
 from finance.models import (
@@ -218,16 +219,25 @@ def user_get_totals(uid, *args, **kwargs):
         for s in sources
     ]
 
+    # Queryset-dependent totals must run before hydrate (aggregations use stored source_id).
+    total_expenses_for_month = fc.calc_queryset(queryset.get_by_tx_type('EXPENSE'))
+    total_income_for_month = fc.calc_queryset(queryset.get_by_tx_type('INCOME'))
+
+    # API boundary: expose payment-source display names (parity with get_transactions).
+    tx_list = list(queryset)
+    maps = load_source_maps(uid)
+    resolve_transactions_for_api(tx_list, maps)
+
     return {
         'snapshot': snapshot,
-        'transactions_for_month': queryset,
+        'transactions_for_month': tx_list,
         'flow_series': flow_series,
         'expense_by_category': expense_by_category,
         'source_balances': source_balances,
         'daily_spend': daily_spend,
         'daily_income': daily_income,
-        'total_expenses_for_month': fc.calc_queryset(queryset.get_by_tx_type('EXPENSE')),
-        'total_income_for_month': fc.calc_queryset(queryset.get_by_tx_type('INCOME')),
+        'total_expenses_for_month': total_expenses_for_month,
+        'total_income_for_month': total_income_for_month,
         'total_transfer_out_for_month': transfer_out_month,
         'total_transfer_in_for_month': transfer_in_month,
         'total_leaks_for_month': leaks_for_month,
