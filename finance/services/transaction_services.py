@@ -4,7 +4,7 @@ import finance.logic.validators as validator
 from finance.validators.tx_validators import TransactionIDValidator, TransactionValidator
 from finance.logic.updaters import Updater
 from finance.logic.fincalc import Calculator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Sum
 from loguru import logger
 from rest_framework.exceptions import ValidationError
@@ -25,6 +25,57 @@ def _query_param_bool(value):
     if value is None:
         return False
     return str(value).lower() in ("1", "true", "yes", "on")
+
+
+def _auto_deduct_business_key(bill, date):
+    """Return the auto-deduct uniqueness key (bill name + due/payment date)."""
+    return (bill, date)
+
+
+def _has_auto_deduct_business_key(data) -> bool:
+    """True when create payload is gated by unique_auto_deduct_bill_date_per_user."""
+    if isinstance(data, dict):
+        return bool(data.get("auto_deducted")) and bool(data.get("bill"))
+    return bool(getattr(data, "auto_deducted", False)) and bool(getattr(data, "bill", None))
+
+
+def _resolve_auto_deduct_row(uid, bill, date):
+    """select_for_update fast-path / IntegrityError recovery lookup for winner row."""
+    return (
+        Transaction.objects.for_user(uid)
+        .filter(bill=bill, date=date, auto_deducted=True)
+        .select_for_update()
+        .order_by("pk")
+        .first()
+    )
+
+
+def _create_transaction_row(uid, data):
+    """
+    Insert a transaction row.
+
+    For auto_deducted + non-empty bill: prefer existing winner under select_for_update;
+    otherwise insert inside an inner atomic savepoint and recover on IntegrityError.
+
+    Returns (row, newly_inserted).
+    """
+    if not _has_auto_deduct_business_key(data):
+        return Transaction.objects.create(**data), True
+
+    bill = data["bill"]
+    tx_date = data["date"]
+    existing = _resolve_auto_deduct_row(uid, bill, tx_date)
+    if existing is not None:
+        return existing, False
+
+    try:
+        with transaction.atomic():
+            return Transaction.objects.create(**data), True
+    except IntegrityError:
+        winner = _resolve_auto_deduct_row(uid, bill, tx_date)
+        if winner is None:
+            raise
+        return winner, False
 
 
 # Public Functions
@@ -126,20 +177,55 @@ def add_transaction(uid, data, *args, **kwargs):
         logger.debug(f"Creating {len(data)} transactions for {uid}")
         rejected = kwargs.get('rejected', [])
         accepted = kwargs.get('accepted', [])
-        to_update = Transaction.objects.bulk_create([Transaction(**item) for item in accepted])
-        update = Updater(profile=profile, transactions=to_update, upcoming=upcoming, sources=sources)
-        snapshot = update.transaction_handler()
+        to_update = []
+        newly_inserted = []
+        batch_winners = {}
+
+        for item in accepted:
+            if _has_auto_deduct_business_key(item):
+                key = _auto_deduct_business_key(item["bill"], item["date"])
+                if key in batch_winners:
+                    to_update.append(batch_winners[key])
+                    continue
+                row, inserted = _create_transaction_row(uid, item)
+                batch_winners[key] = row
+                to_update.append(row)
+                if inserted:
+                    newly_inserted.append(row)
+            else:
+                row = Transaction.objects.create(**item)
+                to_update.append(row)
+                newly_inserted.append(row)
+
+        if newly_inserted:
+            update = Updater(
+                profile=profile,
+                transactions=newly_inserted,
+                upcoming=upcoming,
+                sources=sources,
+            )
+            snapshot = update.transaction_handler()
+        else:
+            snapshot = FinancialSnapshot.objects.for_user(uid).first()
         maps = load_source_maps(uid)
         resolve_transactions_for_api(to_update, maps)
         return {'accepted': to_update, 'rejected': rejected, 'snapshot': snapshot}
     else:
         logger.debug(f"Creating single transaction for {uid}")
-        tx = [Transaction.objects.create(**data)]
-        update = Updater(profile=profile, transactions=tx, upcoming=upcoming, sources=sources)
-        snapshot = update.transaction_handler()
+        row, inserted = _create_transaction_row(uid, data)
+        if inserted:
+            update = Updater(
+                profile=profile,
+                transactions=[row],
+                upcoming=upcoming,
+                sources=sources,
+            )
+            snapshot = update.transaction_handler()
+        else:
+            snapshot = FinancialSnapshot.objects.for_user(uid).first()
         maps = load_source_maps(uid)
-        resolve_transactions_for_api(tx, maps)
-        return {'accepted': tx, 'snapshot': snapshot}
+        resolve_transactions_for_api([row], maps)
+        return {'accepted': [row], 'snapshot': snapshot}
 
 @validator.UserValidator
 @TransactionIDValidator
