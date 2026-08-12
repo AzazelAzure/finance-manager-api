@@ -22,6 +22,20 @@ class TransactionSetSerializer(TransactionSerializer):
 class TransactionAcceptedSerializer(TransactionSetSerializer):
     tx_id = serializers.CharField(max_length=20)
     created_on = serializers.DateField()
+    # Create-response only: set by add_transaction for auto_deducted+bill rows.
+    auto_deduct_resolution = serializers.ChoiceField(
+        choices=["accepted", "replace"],
+        required=False,
+    )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        resolution = getattr(instance, "auto_deduct_resolution", None)
+        if resolution in ("accepted", "replace"):
+            data["auto_deduct_resolution"] = resolution
+        else:
+            data.pop("auto_deduct_resolution", None)
+        return data
 
 class TransactionSetReturnSerializer(serializers.Serializer):
     rejected = TransactionSetSerializer(many=True, required=False)
