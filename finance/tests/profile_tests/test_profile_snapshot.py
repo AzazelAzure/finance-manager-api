@@ -1,19 +1,48 @@
 from decimal import Decimal
 
+from django.urls import reverse
+from freezegun import freeze_time
+from rest_framework import status
+
 from finance.models import PaymentSource
 from finance.tests.profile_tests.profile_base import ProfileBase
 
 
+@freeze_time("2024-06-15 12:00:00")
 class AppProfileSnapshotTests(ProfileBase):
     def setUp(self):
         super().setUp()
+        self.uid = str(self.profile.user_id)
+        self.tx_url = reverse("transactions_list_create")
         PaymentSource.objects.create(
-            uid=str(self.profile.user_id),
+            uid=self.uid,
             source="eur-wallet",
             acc_type="EWALLET",
             amount=Decimal("100.00"),
             currency="EUR",
         )
+        self.named_source = PaymentSource.objects.create(
+            uid=self.uid,
+            source="Cash Display",
+            source_id="2024-06-15-CASH0001",
+            acc_type="CASH",
+            amount=Decimal("500.00"),
+            currency=self.profile.base_currency,
+        )
+        payload = {
+            "uid": self.uid,
+            "description": "snapshot-source-hydrate",
+            "amount": Decimal("25.00"),
+            "source": "Cash Display",
+            "currency": self.profile.base_currency,
+            "tx_type": "EXPENSE",
+            "tags": [self.tag_list[0]],
+            "category": self.categories[0].name,
+            "date": "2024-06-10",
+        }
+        created = self.client.post(self.tx_url, payload, format="json")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        self.hydrate_tx_id = created.data["accepted"][0]["tx_id"]
 
     def test_profile_get_shape(self):
         response = self.client.get(self.profile_url)
@@ -81,3 +110,13 @@ class AppProfileSnapshotTests(ProfileBase):
             after_ewallet,
             "total_ewallet should change when base_currency changes (100 EUR ewallet in setUp)",
         )
+
+    def test_snapshot_transactions_expose_source_display_name(self):
+        """transactions_for_month[].source must be display name, not stored source_id."""
+        response = self.client.get(self.snapshot_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows = response.data["transactions_for_month"]
+        match = next((row for row in rows if row["tx_id"] == self.hydrate_tx_id), None)
+        self.assertIsNotNone(match, "expected hydrate fixture transaction in snapshot")
+        self.assertEqual(match["source"], "Cash Display")
+        self.assertNotEqual(match["source"], self.named_source.source_id)
