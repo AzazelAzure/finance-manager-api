@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from django.urls import reverse
 from rest_framework import status
 
@@ -139,3 +141,78 @@ class TransactionAutoDeductedTests(TransactionBase):
         )
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
         self.assertTrue(detail_response.data["transaction"]["auto_deducted"])
+
+    def _create_auto_deduct_bill(self, name: str) -> None:
+        UpcomingExpense.objects.create(
+            uid=str(self.profile.user_id),
+            name=name,
+            amount=Decimal("50.00"),
+            due_date=date.today(),
+            start_date=date.today(),
+            currency=self.profile.base_currency,
+            is_recurring=True,
+            auto_deduct=True,
+            paid_flag=False,
+        )
+
+    def test_sequential_dual_key_auto_deduct_returns_same_winner(self):
+        """HFM-AD-1: different Idempotency-Keys, same bill+date+auto_deducted → one row."""
+        import uuid
+
+        bill_name = "ad1-dual-key-bill"
+        self._create_auto_deduct_bill(bill_name)
+        source = PaymentSource.objects.for_user(self.profile.user_id).first()
+        payment_date = str(date.today())
+        payload = {
+            "date": payment_date,
+            "description": "auto-deduct payment",
+            "amount": "25.00",
+            "source": source.source,
+            "currency": source.currency,
+            "tags": [self.tag_list[0]],
+            "tx_type": "EXPENSE",
+            "category": self.categories[0].name,
+            "bill": bill_name,
+            "auto_deducted": True,
+        }
+
+        source.refresh_from_db()
+        balance_before_first = Decimal(str(source.amount))
+
+        r1 = self.client.post(
+            self.url,
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED, msg=r1.data)
+        winner_id = r1.data["accepted"][0]["tx_id"]
+
+        source.refresh_from_db()
+        balance_after_first = Decimal(str(source.amount))
+        self.assertNotEqual(balance_before_first, balance_after_first)
+
+        bill = UpcomingExpense.objects.for_user(self.profile.user_id).get(name=bill_name)
+        due_after_first = bill.due_date
+
+        r2 = self.client.post(
+            self.url,
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED, msg=r2.data)
+        self.assertEqual(r2.data["accepted"][0]["tx_id"], winner_id)
+
+        matching = Transaction.objects.for_user(self.profile.user_id).filter(
+            bill=bill_name,
+            date=date.today(),
+            auto_deducted=True,
+        )
+        self.assertEqual(matching.count(), 1)
+
+        source.refresh_from_db()
+        self.assertEqual(Decimal(str(source.amount)), balance_after_first)
+
+        bill.refresh_from_db()
+        self.assertEqual(bill.due_date, due_after_first)
