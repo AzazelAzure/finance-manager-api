@@ -11,9 +11,10 @@ from django.db import connection, connections
 from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from finance.logic.fincalc import Calculator
-from finance.models import AppProfile, Category, PaymentSource, Transaction, UpcomingExpense
+from finance.models import Category, PaymentSource, Transaction, UpcomingExpense
 
 
 def _require_postgres(test_case) -> None:
@@ -52,7 +53,8 @@ class SourceAmountIntegrityTests(TransactionTestCase):
 
     def _client(self) -> APIClient:
         client = APIClient()
-        client.force_authenticate(user=self.user)
+        token = RefreshToken.for_user(self.user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
         return client
 
     def _expense_payload(self, description: str, amount: str, **extra) -> dict:
@@ -69,8 +71,7 @@ class SourceAmountIntegrityTests(TransactionTestCase):
         return payload
 
     def _ledger_invariant(self, source: PaymentSource) -> tuple[Decimal, Decimal]:
-        profile = AppProfile.objects.for_user(self.uid)
-        fc = Calculator(profile=profile)
+        fc = Calculator(profile=self.user.appprofile)
         ledger = fc.ledger_sum_for_source(source)
         expected = (Decimal(source.opening_amount or 0) + ledger).quantize(Decimal("0.01"))
         return expected, ledger
@@ -134,7 +135,15 @@ class SourceAmountIntegrityTests(TransactionTestCase):
         detail = reverse("transaction_detail", kwargs={"tx_id": tx_id})
         patched = self._client().patch(
             detail,
-            {"amount": "25.00", "source": self.source.source, "tx_type": "EXPENSE"},
+            {
+                "date": str(date.today()),
+                "description": "patch-me",
+                "amount": "25.00",
+                "source": self.source.source,
+                "currency": "USD",
+                "tx_type": "EXPENSE",
+                "category": self.category.name,
+            },
             format="json",
         )
         self.assertEqual(patched.status_code, 200)

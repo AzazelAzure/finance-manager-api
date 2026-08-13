@@ -5,6 +5,7 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 
 ### Fixed
+- **CI for dual-PWA source-amount job:** Postgres integrity tests now resolve `AppProfile` as an instance (not the `for_user` manager), send JWT so Idempotency-Key middleware can see the user, include `date` on transaction PATCH (view 400s without it), and use a `tx_id` that fits `varchar(20)`. Migration 0019 freeze tests query historical 0019 models so live `opening_amount` does not break SQLite CI.
 - **Multi-PWA source-balance collision:** `PaymentSource.amount` is no longer last-write-wins from a validator-stale in-memory copy. After each tx insert/patch/delete the write path locks the source row and sets `amount = opening_amount + ledger_sum` (all txs for that `source_id`, FX into source currency). Snapshot GET runs the same recompute with `opening_amount` unchanged, so migrate/snapshot will not jump HitM Cash — drifted trackers are fixed only by Data Hub Recalculate Save. Source amount PATCH sets leftover (`opening_amount = declared - ledger`). Named-bill settlement locks `UpcomingExpense` and will not double-advance a due date already rolled forward. Data Hub `GET/POST /finance/sources/balance_rebuild/` is the explicit save/discard path. Required `concurrency-postgres` CI job runs dual-PWA amount tests on PostgreSQL (`REQUIRE_POSTGRES=1`; skips fail the job).
 
 ### Added

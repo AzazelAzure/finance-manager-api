@@ -57,7 +57,7 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
         )
         self.tx = Transaction.objects.create(
             uid=self.uid,
-            tx_id=f"{date.today().isoformat()}-integrity-1",
+            tx_id=f"{date.today().isoformat()}-i1",
             date=date.today(),
             created_on=date.today(),
             description="integrity seed tx",
