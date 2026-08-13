@@ -30,3 +30,32 @@ class SourceSetReturnSerializer(SourceSerializer):
     deleted = SourceSerializer(required=False)
     snapshot = FinancialSnapshotSerializer(required=False)
 
+
+class SourceBalanceRebuildRowSerializer(serializers.Serializer):
+    source = serializers.CharField()
+    acc_type = serializers.CharField()
+    currency = serializers.CharField()
+    current_amount = serializers.CharField()
+    opening_amount = serializers.CharField()
+    transaction_sum = serializers.CharField()
+    unexplained = serializers.CharField()
+    proposed_amount = serializers.CharField()
+
+
+class SourceBalanceRebuildPreviewSerializer(serializers.Serializer):
+    sources = SourceBalanceRebuildRowSerializer(many=True)
+
+
+class SourceBalanceRebuildApplyItemSerializer(serializers.Serializer):
+    source = serializers.CharField()
+    proposed_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+
+
+class SourceBalanceRebuildApplySerializer(serializers.Serializer):
+    sources = SourceBalanceRebuildApplyItemSerializer(many=True)
+
+
+class SourceBalanceRebuildApplyReturnSerializer(serializers.Serializer):
+    updated = SourceSerializer(many=True, required=False)
+    snapshot = FinancialSnapshotSerializer(required=False)
+

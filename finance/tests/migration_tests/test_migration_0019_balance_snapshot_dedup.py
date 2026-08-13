@@ -9,8 +9,6 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
-from finance.models import BalanceSnapshot, PaymentSource
-
 
 class Migration0019BalanceSnapshotDedupTests(TransactionTestCase):
     def test_colliding_display_names_deduped_on_backfill(self):
@@ -51,7 +49,17 @@ class Migration0019BalanceSnapshotDedupTests(TransactionTestCase):
 
         call_command("migrate", "finance", "0019_payment_source_source_id", verbosity=0)
 
-        source_id = PaymentSource.objects.get(uid=uid).source_id
-        rows = list(BalanceSnapshot.objects.filter(uid=uid, snapshot_date=snap_date))
+        # Freeze at 0019 for the backfill assertion. Live PaymentSource now has
+        # opening_amount (0024); querying the current model against a 0019 schema
+        # raises OperationalError. Use the historical 0019 models instead.
+        executor = MigrationExecutor(connection)
+        apps_0019 = executor.loader.project_state(
+            [("finance", "0019_payment_source_source_id")]
+        ).apps
+        PaymentSourceH19 = apps_0019.get_model("finance", "PaymentSource")
+        BalanceSnapshotH19 = apps_0019.get_model("finance", "BalanceSnapshot")
+
+        source_id = PaymentSourceH19.objects.get(uid=uid).source_id
+        rows = list(BalanceSnapshotH19.objects.filter(uid=uid, snapshot_date=snap_date))
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].source, source_id)

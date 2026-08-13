@@ -145,6 +145,7 @@ class PaymentSource(models.Model):
     acc_type = models.CharField(max_length=10, choices=AccType.choices, default=AccType.UNKNOWN)
     currency = models.CharField(max_length=3, default="USD")
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    opening_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
 
     # User dependancy

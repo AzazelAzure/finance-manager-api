@@ -146,10 +146,6 @@ def user_get_totals(uid, *args, **kwargs):
     transfer_out_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_OUT'))
     transfer_in_month = fc.calc_queryset(queryset.get_by_tx_type('XFER_IN'))
     leaks_for_month = abs(Decimal(transfer_out_month) + Decimal(transfer_in_month)).quantize(Decimal("0.01"))
-    snapshot = FinancialSnapshot.objects.for_user(uid).first()
-    if snapshot is not None:
-        # Keep snapshot payload aligned with dashboard month rollups.
-        snapshot.total_leaks = leaks_for_month
     flow_rows = (
         queryset.values("date", "tx_type", "currency")
         .annotate(total=Sum("amount"))
@@ -207,17 +203,34 @@ def user_get_totals(uid, *args, **kwargs):
     daily_spend = [{"date": p["label"], "amount": p["outgoing"]} for p in flow_series if p["outgoing"] > 0]
     daily_income = [{"date": p["label"], "amount": p["incoming"]} for p in flow_series if p["incoming"] > 0]
 
-    # Source Balances (Live account status)
-    sources = PaymentSource.objects.for_user(uid)
-    source_balances = [
-        {
-            "source": s.source,
-            "acc_type": s.acc_type,
-            "amount": str(s.amount.quantize(Decimal("0.01"))),
-            "currency": s.currency
-        }
-        for s in sources
-    ]
+    # Source Balances (Live account status). Recompute under lock so dual-PWA
+    # lost updates cannot persist after the next dashboard refetch.
+    with transaction.atomic():
+        updater = Updater(
+            profile=kwargs.get("profile"),
+            sources=list(PaymentSource.objects.for_user(uid)),
+        )
+        updater.recompute_locked_source_amounts()
+        updater.source_handler()
+        sources = list(PaymentSource.objects.for_user(uid))
+        fc_locked = updater.fc
+    snapshot = FinancialSnapshot.objects.for_user(uid).first()
+    if snapshot is not None:
+        # Keep snapshot payload aligned with dashboard month rollups.
+        snapshot.total_leaks = leaks_for_month
+    source_balances = []
+    for s in sources:
+        ledger = fc_locked.ledger_sum_for_source(s)
+        source_balances.append(
+            {
+                "source": s.source,
+                "acc_type": s.acc_type,
+                "amount": str(s.amount.quantize(Decimal("0.01"))),
+                "opening_amount": str(Decimal(s.opening_amount or 0).quantize(Decimal("0.01"))),
+                "transaction_sum": str(ledger),
+                "currency": s.currency,
+            }
+        )
 
     # Queryset-dependent totals must run before hydrate (aggregations use stored source_id).
     total_expenses_for_month = fc.calc_queryset(queryset.get_by_tx_type('EXPENSE'))

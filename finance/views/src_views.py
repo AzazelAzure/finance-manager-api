@@ -13,6 +13,9 @@ from finance.api_tools.serializers.src_serializers import(
     SourceSetReturnSerializer,
     SourcePatchSerializer,
     SourcePutSerializer,
+    SourceBalanceRebuildPreviewSerializer,
+    SourceBalanceRebuildApplySerializer,
+    SourceBalanceRebuildApplyReturnSerializer,
 )
 
 
@@ -148,5 +151,39 @@ class SourceDetailView(APIView):
             source,
         )
         serializer = SourceSetReturnSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="finance_sources_balance_rebuild_preview",
+        summary="Preview source balance rebuild",
+        description="Read-only preview of current tracker vs ledger vs unexplained leftover. No writes.",
+        responses={status.HTTP_200_OK: SourceBalanceRebuildPreviewSerializer},
+        tags=["Sources"],
+    ),
+    post=extend_schema(
+        operation_id="finance_sources_balance_rebuild_apply",
+        summary="Apply source balance rebuild",
+        description="Set opening_amount and amount from user-accepted proposed_amount under row lock.",
+        request=SourceBalanceRebuildApplySerializer,
+        responses={status.HTTP_200_OK: SourceBalanceRebuildApplyReturnSerializer},
+        tags=["Sources"],
+    ),
+)
+class SourceBalanceRebuildView(APIView):
+    def get(self, request):
+        result = src_svc.preview_source_balance_rebuild(request.user.appprofile.user_id)
+        serializer = SourceBalanceRebuildPreviewSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = SourceBalanceRebuildApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = src_svc.apply_source_balance_rebuild(
+            request.user.appprofile.user_id,
+            serializer.validated_data,
+        )
+        serializer = SourceBalanceRebuildApplyReturnSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
     

@@ -65,6 +65,8 @@ def _method_path_allowlisted(method: str, path: str) -> bool:
         return True
     if m == "POST" and path_n == "/finance/sources/":
         return True
+    if m == "POST" and path_n == "/finance/sources/balance_rebuild/":
+        return True
     if m in ("PATCH", "DELETE") and _SRC_DETAIL_PATH.match(path_n):
         return True
     if m == "PATCH" and _APP_PROFILE_PATH.match(path_n):

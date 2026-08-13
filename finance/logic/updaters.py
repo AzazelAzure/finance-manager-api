@@ -1,9 +1,9 @@
 """State mutation helpers for transactions, sources, expenses, and snapshots."""
 
 from datetime import datetime
+from django.utils.dateparse import parse_date
 
 from finance.logic.fincalc import Calculator
-from finance.logic.convert_currency import convert_currency
 from finance.logic.pay_cycle import current_pay_cycle_window
 from finance.logic.source_linkage import (
     build_source_maps,
@@ -38,8 +38,8 @@ class Updater:
         
         
         # Situational settings
-        if kwargs.get('transactions'):
-            self.transactions = kwargs.get('transactions')
+        if "transactions" in kwargs:
+            self.transactions = kwargs.get("transactions") or []
             upcoming_obj = kwargs.get('upcoming')
             self.upcoming = upcoming_obj or UpcomingExpense.objects.for_user(self.uid)
 
@@ -83,7 +83,7 @@ class Updater:
         # Validators sometimes instantiate Updater just to call pure fixers (e.g., fix_tx_data),
         # and in those cases we should avoid an unnecessary DB hit.
         self.snapshots = None
-        if kwargs.get('transactions') or kwargs.get('sources') or kwargs.get('upcoming'):
+        if "transactions" in kwargs or kwargs.get('sources') or kwargs.get('upcoming'):
             self.snapshots = FinancialSnapshot.objects.for_user(self.uid).first()
         
         # Create the calculator instance
@@ -161,8 +161,14 @@ class Updater:
                 item['source_id'] = generate_source_id(today)
             if item.get('currency'):
                 item['currency'] = item['currency'].upper()
-            if item.get('amount'):
+            if item.get('amount') is not None and item.get('amount') != "":
                 item['amount'] = Decimal(item['amount'])
+            else:
+                item['amount'] = Decimal("0.00")
+            if item.get("opening_amount") is None or item.get("opening_amount") == "":
+                item["opening_amount"] = item["amount"]
+            else:
+                item["opening_amount"] = Decimal(item["opening_amount"])
         return data
     
     def fix_expense_data(self, data):
@@ -188,29 +194,53 @@ class Updater:
 
 
     # Transaction Handler
-    def transaction_handler(self, update=None):
-        """Apply transaction effects to sources, upcoming bills, and snapshots."""
+    def recompute_locked_source_amounts(self, source_ids=None):
+        """Lock PaymentSource rows and set amount = opening_amount + ledger_sum."""
+        qs = PaymentSource.objects.for_user(self.uid)
+        if source_ids is not None:
+            qs = qs.filter(source_id__in=list(source_ids))
+        locked = list(qs.select_for_update())
+        for source in locked:
+            self.fc.apply_opening_plus_ledger(source)
+        if locked:
+            PaymentSource.objects.bulk_update(locked, ["amount"])
+        self.sources = list(PaymentSource.objects.for_user(self.uid))
+        return locked
+
+    def _lock_bills_by_name(self, names):
+        if not names:
+            return []
+        return list(
+            UpcomingExpense.objects.for_user(self.uid).filter(name__in=list(names)).select_for_update()
+        )
+
+    def apply_bill_effects(self, update=None):
+        """Roll bill due dates / paid flags; does not touch PaymentSource.amount."""
         updated_bill = False
         if update:
             updated_bill = self._handle_tx_update(update)
 
-        bills_to_settle = self.paid_bills
-        if update and update.bill:
-            # PATCH reversal already rolled back the prior payment; do not re-advance.
-            bills_to_settle = self.paid_bills - {update.bill}
+        bills_to_settle = getattr(self, "paid_bills", set()) or set()
+        if update and getattr(update, "bill", None):
+            bills_to_settle = bills_to_settle - {update.bill}
 
         if bills_to_settle:
+            locked_bills = self._lock_bills_by_name(bills_to_settle)
+            locked_by_name = {bill.name: bill for bill in locked_bills}
+            self.unpaid = [locked_by_name[name] for name in bills_to_settle if name in locked_by_name]
             self._handle_upcoming(updated_bill)
         elif updated_bill:
             updated_bill.save()
+        return updated_bill
 
-        src_amounts = self.fc.calc_tx_sources(self.transactions, self.sources)
-        for source in self.sources:
-            if source.source_id in src_amounts:
-                source.amount = src_amounts[source.source_id]
-        PaymentSource.objects.for_user(self.uid).bulk_update(self.sources, ['amount'])
-        snapshot = self._tx_snapshot_handler()
-        return snapshot
+    def transaction_handler(self, update=None):
+        """Apply transaction effects to sources, upcoming bills, and snapshots."""
+        self.apply_bill_effects(update=update)
+        source_ids = {tx.source for tx in self.transactions if getattr(tx, "source", None)}
+        if update and getattr(update, "source", None):
+            source_ids.add(update.source)
+        self.recompute_locked_source_amounts(source_ids or None)
+        return self._tx_snapshot_handler()
 
 
     # Expense Handlers
@@ -300,49 +330,59 @@ class Updater:
             to_update.append(updated_bill)
 
         for bill in self.unpaid:
-            if bill.name in self.paid_bills:
-                to_update.append(bill)
+            if bill.name not in self.paid_bills:
+                continue
+            covering_dates = []
+            for tx in getattr(self, "transactions", []):
+                if getattr(tx, "bill", None) != bill.name:
+                    continue
+                raw = getattr(tx, "date", None)
+                if isinstance(raw, str):
+                    raw = parse_date(raw)
+                if raw:
+                    covering_dates.append(raw)
+            if covering_dates and bill.due_date and bill.due_date > max(covering_dates):
+                # Another concurrent settler already rolled this due date forward.
+                continue
+            to_update.append(bill)
 
-                # Flip the 'is recurring' if the end date has passed
-                if bill.end_date and datetime.now(self.timezone).date() >= bill.end_date:
-                    bill.is_recurring = False
-                    bill.paid_flag = True
-                elif bill.is_recurring:
-                    from finance.logic.bill_recurrence import advance_bill_due_date
+            # Flip the 'is recurring' if the end date has passed
+            if bill.end_date and datetime.now(self.timezone).date() >= bill.end_date:
+                bill.is_recurring = False
+                bill.paid_flag = True
+            elif bill.is_recurring:
+                from finance.logic.bill_recurrence import advance_bill_due_date
 
-                    advance_bill_due_date(bill, periods=1)
-                    bill.paid_flag = False
-                else:
-                    bill.paid_flag = True
+                advance_bill_due_date(bill, periods=1)
+                bill.paid_flag = False
+            else:
+                bill.paid_flag = True
 
         # Update whatever was changed
         self.upcoming.bulk_update(to_update, ['paid_flag', 'due_date', 'is_recurring'])
         return
     
     def _handle_tx_update(self, tx):
-        """Reverse old transaction effects so the replacement payload can be applied cleanly."""
+        """Reverse old bill settlement so the replacement payload can be applied cleanly."""
+        if not getattr(tx, "bill", None):
+            return False
         append_change = False
-        affected_bill = next((bill for bill in self.unpaid if bill.name == tx.bill), None)
-        if affected_bill:
-            from finance.logic.bill_recurrence import subtract_interval_from_date
+        locked = self._lock_bills_by_name({tx.bill})
+        affected_bill = next((bill for bill in locked if bill.name == tx.bill), None)
+        if not affected_bill:
+            return False
+        from finance.logic.bill_recurrence import subtract_interval_from_date
 
-            prior_due = subtract_interval_from_date(affected_bill.due_date, affected_bill, periods=1)
-            if prior_due <= tx.date:
-                affected_bill.paid_flag = False
-                affected_bill.due_date = prior_due
-            if affected_bill.end_date and affected_bill.due_date <= affected_bill.end_date:
-                affected_bill.is_recurring = True
-            if not self.paid_bills:
-                affected_bill.save()
-            else:
-                append_change = affected_bill
-        affected_source = next((source for source in self.sources if source.source_id == tx.source), None)
-        if affected_source:
-            # Undo the same delta calc_tx_sources applies when the row was added (per-source currency).
-            delta = Decimal(tx.amount).quantize(Decimal("0.01"))
-            if tx.currency != affected_source.currency:
-                delta = convert_currency(delta, tx.currency, affected_source.currency)
-            affected_source.amount -= delta
+        prior_due = subtract_interval_from_date(affected_bill.due_date, affected_bill, periods=1)
+        if prior_due <= tx.date:
+            affected_bill.paid_flag = False
+            affected_bill.due_date = prior_due
+        if affected_bill.end_date and affected_bill.due_date <= affected_bill.end_date:
+            affected_bill.is_recurring = True
+        if not self.paid_bills:
+            affected_bill.save()
+        else:
+            append_change = affected_bill
         return append_change
     
     def _tx_snapshot_handler(self):
