@@ -38,8 +38,9 @@ class PaymentSourceFactory(factory.django.DjangoModelFactory):
     source_id = factory.LazyAttribute(lambda o: generate_source_id(date.today()))
     source = factory.Sequence(lambda n: f"source-{n}")
     acc_type = factory.Faker("random_element", elements=("SAVINGS", "CHECKING", "CASH", "INVESTMENT", "EWALLET", "UNKNOWN"))
-    amount = LazyAttribute(
+    amount = factory.LazyAttribute(
         lambda o: _faker.pydecimal(left_digits=5, right_digits=2).quantize(Decimal("0.01")))
+    opening_amount = factory.LazyAttribute(lambda o: o.amount)
     currency = fuzzy.FuzzyChoice(settings.SUPPORTED_CURRENCIES)
 
 

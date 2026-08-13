@@ -175,6 +175,41 @@ class Calculator:
                 acctype_totals[f'total_{source.acc_type.lower()}'] = Decimal(source.amount).quantize(Decimal("0.01"))
         return acctype_totals
 
+    def ledger_sum_for_source(self, source):
+        """All-time transaction total for a source, converted into the source currency."""
+        from finance.models import Transaction
+
+        total = Decimal("0.00")
+        for tx in Transaction.objects.for_user(self.uid).filter(source=source.source_id):
+            amount = Decimal(tx.amount).quantize(Decimal("0.01"))
+            if tx.currency != source.currency:
+                amount = convert_currency(amount, tx.currency, source.currency).quantize(Decimal("0.01"))
+            total += amount
+        return total.quantize(Decimal("0.01"))
+
+    def apply_opening_plus_ledger(self, source):
+        """Set ``source.amount`` to opening_amount + ledger_sum (mutates in memory)."""
+        opening = Decimal(source.opening_amount or 0).quantize(Decimal("0.01"))
+        source.amount = (opening + self.ledger_sum_for_source(source)).quantize(Decimal("0.01"))
+        return source.amount
+
+    def source_balance_preview(self, source):
+        """Return current vs ledger vs unexplained for Data Hub rebuild preview."""
+        ledger = self.ledger_sum_for_source(source)
+        opening = Decimal(source.opening_amount or 0).quantize(Decimal("0.01"))
+        current = Decimal(source.amount or 0).quantize(Decimal("0.01"))
+        unexplained = (current - opening - ledger).quantize(Decimal("0.01"))
+        return {
+            "source": source.source,
+            "acc_type": source.acc_type,
+            "currency": source.currency,
+            "current_amount": str(current),
+            "opening_amount": str(opening),
+            "transaction_sum": str(ledger),
+            "unexplained": str(unexplained),
+            "proposed_amount": str(ledger),
+        }
+
     def calc_tx_sources(self, tx_list, source_list):
         """Apply transactions to source balances and return per-source_id totals."""
         source_aggregate = {}

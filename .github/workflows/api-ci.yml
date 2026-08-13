@@ -62,3 +62,61 @@ jobs:
       # fresh CI database because every migration is unapplied.
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
+
+  concurrency-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hfm
+          POSTGRES_PASSWORD: hfm
+          POSTGRES_DB: hfm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hfm -d hfm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      DJANGO_SETTINGS_MODULE: finance_api.settings
+      SECRET_KEY: ci-test-secret-key-not-real
+      DEBUG: 'True'
+      REDIS_URL: redis://localhost:6379/0
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: hfm_test
+      DB_USER: hfm
+      DB_PASSWORD: hfm
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      REQUIRE_POSTGRES: '1'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Fetch exchange-rate data
+        run: |
+          uv run python manage.py update_conversion_file
+          test -f finance/data/exchange_rates.zip
+      - name: Run dual-PWA source-amount Postgres tests
+        run: |
+          set -o pipefail
+          uv run pytest finance/tests/stress_tests/test_source_amount_integrity.py finance/tests/stress_tests/test_concurrency_integrity.py --tb=short -ra | tee pytest-postgres-out.txt
+          if grep -Eq '[0-9]+ skipped' pytest-postgres-out.txt; then
+            echo "skipped tests are not allowed in concurrency-postgres"
+            exit 1
+          fi

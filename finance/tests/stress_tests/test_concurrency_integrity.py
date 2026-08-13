@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
@@ -14,12 +15,21 @@ from rest_framework.test import APIClient
 from finance.models import Category, PaymentSource, Tag, Transaction, UpcomingExpense
 
 
+def _require_postgres(test_case) -> None:
+    if connection.vendor == "postgresql":
+        return
+    if os.environ.get("REQUIRE_POSTGRES") == "1":
+        test_case.fail(
+            f"REQUIRE_POSTGRES=1 but Django vendor is {connection.vendor}, not postgresql"
+        )
+    test_case.skipTest("Concurrency integrity stress checks require PostgreSQL")
+
+
 class ConcurrencyIntegrityTests(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
-        if connection.vendor == "sqlite":
-            self.skipTest("Concurrency integrity stress checks require PostgreSQL")
+        _require_postgres(self)
         self.user = User.objects.create_user(
             username="stress_integrity_user",
             email="stress_integrity_user@example.com",

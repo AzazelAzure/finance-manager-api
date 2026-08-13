@@ -93,6 +93,17 @@ def user_logged_in(sender, request, user, **kwargs):
     return
 
 
+@receiver(pre_save, sender=PaymentSource)
+def seed_payment_source_defaults(sender, instance, **kwargs):
+    """Fill source_id and opening_amount on create so tracker math has a leftover seed."""
+    if kwargs.get("raw"):
+        return
+    if not instance.source_id:
+        instance.source_id = generate_source_id(date.today())
+    if instance._state.adding and (instance.opening_amount is None or instance.opening_amount == 0):
+        instance.opening_amount = instance.amount or 0
+
+
 @receiver(pre_delete, sender=User)
 def delete_user_finance_data(sender, instance, **kwargs):
     """

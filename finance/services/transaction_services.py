@@ -313,30 +313,19 @@ def delete_transaction(uid, tx_id: str, *args, **kwargs):
     """Delete one transaction and return deleted payload plus refreshed snapshot."""
     logger.debug(f"Deleting transaction {tx_id} for {uid}")
     tx = kwargs.get('id_check')
-    to_delete = copy.copy(tx)
-    to_delete.amount = 0
-    if to_delete.bill:
-        to_delete.bill = None
+    source_id = tx.source
     profile = kwargs.get('profile', AppProfile.objects.for_user(uid))
     update = Updater(
         profile=profile,
-        transactions=[to_delete],
-        upcoming=kwargs.get("upcoming"),
-        sources=kwargs.get("sources"),
+        transactions=[],
+        upcoming=kwargs.get("upcoming") or UpcomingExpense.objects.for_user(uid),
+        sources=kwargs.get("sources") or list(PaymentSource.objects.for_user(uid)),
     )
-    # Update balances to reverse changes (bills / upcoming) before row removal
-    update.transaction_handler(update=tx)
-
-    # Delete transaction
+    update.apply_bill_effects(update=tx)
     tx.delete()
-    # Snapshot and KPI fields must not still reference the removed row (e.g. transfers / monthly spend).
-    fresh_sources = list(PaymentSource.objects.for_user(uid))
-    snapshot = Updater(
-        profile=profile,
-        sources=fresh_sources,
-        upcoming=kwargs.get("upcoming"),
-    ).source_handler()
-    return {f'deleted': tx, 'snapshot': snapshot}
+    update.recompute_locked_source_amounts({source_id} if source_id else None)
+    snapshot = update._tx_snapshot_handler()
+    return {'deleted': tx, 'snapshot': snapshot}
 
 @validator.UserValidator
 @TransactionIDValidator

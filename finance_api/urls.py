@@ -26,7 +26,11 @@ from finance.views.exp_views import (
     UpcomingExpenseCatchUpView,
 )
 from finance.views.profile_views import AppProfileView, AppProfileSnapshotView
-from finance.views.src_views import SourceListCreateView, SourceDetailView
+from finance.views.src_views import (
+    SourceListCreateView,
+    SourceDetailView,
+    SourceBalanceRebuildView,
+)
 from finance.views.tag_views import TagView
 from finance.views.tx_views import (
     TransactionCalendarView,
@@ -136,6 +140,11 @@ urlpatterns = [
     ),
     path("finance/exchange_rates/", ExchangeRatesMatrixView.as_view(), name="finance_exchange_rates"),
     path("finance/sources/", SourceListCreateView.as_view(), name="sources_list_create"),
+    path(
+        "finance/sources/balance_rebuild/",
+        SourceBalanceRebuildView.as_view(),
+        name="sources_balance_rebuild",
+    ),
     path("finance/sources/<str:source>/", SourceDetailView.as_view(), name="source_detail_update_delete"),
     path("finance/upcoming_expenses/", UpcomingExpenseListCreateView.as_view(), name="upcoming_expenses"),
     path(

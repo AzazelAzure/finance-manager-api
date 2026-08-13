@@ -5,6 +5,12 @@ All notable changes to the API codebase must be documented in this file by the e
 ## [Unreleased]
 
 ### Fixed
+- **Multi-PWA source-balance collision:** `PaymentSource.amount` is no longer last-write-wins from a validator-stale in-memory copy. After each tx insert/patch/delete the write path locks the source row and sets `amount = opening_amount + ledger_sum` (all txs for that `source_id`, FX into source currency). Snapshot GET runs the same recompute with `opening_amount` unchanged, so migrate/snapshot will not jump HitM Cash — drifted trackers are fixed only by Data Hub Recalculate Save. Source amount PATCH sets leftover (`opening_amount = declared - ledger`). Named-bill settlement locks `UpcomingExpense` and will not double-advance a due date already rolled forward. Data Hub `GET/POST /finance/sources/balance_rebuild/` is the explicit save/discard path. Required `concurrency-postgres` CI job runs dual-PWA amount tests on PostgreSQL (`REQUIRE_POSTGRES=1`; skips fail the job).
+
+### Added
+- **`PaymentSource.opening_amount`:** leftover/seed field (migration `0024` backfills `opening_amount = amount - ledger_sum`). Snapshot `source_balances[]` now includes `opening_amount` and `transaction_sum`.
+
+### Fixed
 - **Auto-deduct accepted|replace (HFM-AD-1 amend):** Soft first-wins remains in `add_transaction` (no second DB row for same `(uid, bill, date)` auto-deduct key). Create-response `accepted[]` items now include `auto_deduct_resolution` (`accepted` \| `replace`) when `auto_deducted=true` and bill is non-empty; omitted otherwise. Bulk same-key slots return two `accepted[]` entries with the same winner `tx_id` (first `accepted`, later `replace`). Neutralized migrate gate: edited `0022` is audit-/constraint-free; new `0023` uses `SeparateDatabaseAndState` + `DROP INDEX IF EXISTS "unique_auto_deduct_bill_date_per_user"`. Removed `unique_auto_deduct_bill_date_per_user` from `Transaction.Meta`.
 - **Auto-deduct business-key idempotency (HFM-AD-1):** Partial unique constraint `unique_auto_deduct_bill_date_per_user` on `Transaction(uid, bill, date)` when `auto_deducted=True` and bill is non-empty (migration `0022`, fail-loud duplicate audit — no survivor delete/merge). `add_transaction` returns the existing winner for sequential dual-key and concurrent IntegrityError races (inner savepoint + re-fetch), skips `Updater.transaction_handler` for recovered rows, and first-wins in-request bulk duplicates while preserving accepted order.
 
