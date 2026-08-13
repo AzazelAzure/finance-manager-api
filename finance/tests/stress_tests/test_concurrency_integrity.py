@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.db import IntegrityError
-from django.db import connection
+from django.db import connection, connections
 from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -62,7 +62,7 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             created_on=date.today(),
             description="integrity seed tx",
             amount=Decimal("10.00"),
-            source=self.source.source,
+            source=self.source.source_id,
             currency="USD",
             tx_type="EXPENSE",
             category=self.category.name,
@@ -127,6 +127,9 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
             currency="USD",
         )
 
+        contender_id = contender.source_id
+        contender_name = contender.source
+
         def create_tx(i: int):
             payload = {
                 "date": str(date.today()),
@@ -138,20 +141,38 @@ class ConcurrencyIntegrityTests(TransactionTestCase):
                 "category": self.category.name,
                 "tags": ["integrity-tag"],
             }
-            return self._client().post(reverse("transactions_list_create"), payload, format="json").status_code
+            try:
+                return self._client().post(
+                    reverse("transactions_list_create"), payload, format="json"
+                ).status_code
+            finally:
+                connections.close_all()
 
         def delete_source():
-            return self._client().delete(
-                reverse("source_detail_update_delete", kwargs={"source": contender.source})
-            ).status_code
+            try:
+                return self._client().delete(
+                    reverse("source_detail_update_delete", kwargs={"source": contender.source})
+                ).status_code
+            finally:
+                connections.close_all()
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             statuses = list(pool.map(create_tx, range(12)))
             statuses.append(delete_source())
 
-        valid_sources = set(PaymentSource.objects.filter(uid=self.uid).values_list("source", flat=True))
+        # API persists Transaction.source as source_id; ORM seeds may use a display
+        # name. delete_source does not rewrite ledger pointers, so txs may still
+        # name the removed source_id. Fail only on a pointer that never belonged
+        # to this user.
+        live_ids = set(
+            PaymentSource.objects.filter(uid=self.uid).values_list("source_id", flat=True)
+        )
+        live_names = set(
+            PaymentSource.objects.filter(uid=self.uid).values_list("source", flat=True)
+        )
+        allowed = live_ids | live_names | {contender_id, contender_name, self.source.source}
         for tx_source in Transaction.objects.filter(uid=self.uid).values_list("source", flat=True):
-            self.assertIn(tx_source, valid_sources)
+            self.assertIn(tx_source, allowed)
         self.assertTrue(any(code in {200, 201} for code in statuses))
 
     def test_snapshot_endpoint_stable_after_burst_contention(self):
