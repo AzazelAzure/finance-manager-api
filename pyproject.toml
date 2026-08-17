@@ -17,7 +17,7 @@ dependencies = [
     "Django==6.0.6",
     "djangorestframework==3.17.1",
     "djangorestframework_simplejwt==5.5.1",
-    "drf-spectacular==0.29.0",
+    "drf-spectacular==0.30.0",
     "inflection==0.5.1",
     "loguru==0.7.3",
     "pycountry==22.3.5",
