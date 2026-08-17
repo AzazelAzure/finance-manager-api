@@ -54,7 +54,7 @@ dev = [
     "iniconfig==2.3.0",
     "jsonschema==4.26.0",
     "jsonschema-specifications==2025.9.1",
-    "packaging==26.0",
+    "packaging==26.3",
     "pluggy==1.6.0",
     "Pygments==2.20.0",
     "pyinstrument==5.1.2",
