@@ -39,7 +39,7 @@ dependencies = [
     "urllib3==2.7.0",
     "django-cors-headers>=4.9.0",
     "celery>=5.4.0",
-    "redis>=8.0.1",
+    "redis>=8.1.0",
     "argon2-cffi>=25.1.0",
     "django-axes>=8.3.1",
 ]
